@@ -499,7 +499,7 @@ import type {
 import type { RoughCanvas } from "roughjs/bin/canvas";
 import type { Action, ActionResult } from "../actions/types";
 
-import { scrollOps, type AppEngineContext } from "../engine";
+import { scrollOps, gestureOps, clipboardOps, type AppEngineContext } from "../engine";
 
 const AppContext = React.createContext<AppClassProperties>(null!);
 const AppPropsContext = React.createContext<AppProps>(null!);
@@ -864,6 +864,10 @@ class App extends React.Component<AppProps, AppState> {
       getState: () => this.state,
       setState: (patch, callback) => this.setState(patch as any, callback),
       scene: this.scene,
+      store: this.store,
+      actionManager: this.actionManager,
+      fonts: this.fonts,
+      editorInterface: this.editorInterface,
       canvas: this.canvas,
       interactiveCanvas: this.interactiveCanvas,
       excalidrawContainerRef: this.excalidrawContainerRef,
@@ -884,13 +888,62 @@ class App extends React.Component<AppProps, AppState> {
       setLastPointerUp: (fn) => {
         lastPointerUp = fn;
       },
+      // Module-level mutable globals for gesture/touch tracking
+      getDidTapTwice: () => didTapTwice,
+      setDidTapTwice: (value) => {
+        didTapTwice = value;
+      },
+      getTappedTwiceTimer: () => tappedTwiceTimer,
+      setTappedTwiceTimer: (value) => {
+        tappedTwiceTimer = value;
+      },
+      getFirstTapPosition: () => firstTapPosition,
+      setFirstTapPosition: (value) => {
+        firstTapPosition = value;
+      },
+      getInvalidateContextMenu: () => invalidateContextMenu,
+      setInvalidateContextMenu: (value) => {
+        invalidateContextMenu = value;
+      },
+      // Module-level mutable globals for clipboard tracking
+      getIsPlainPaste: () => IS_PLAIN_PASTE,
+      getPlainPasteToastShown: () => PLAIN_PASTE_TOAST_SHOWN,
+      setPlainPasteToastShown: (value) => {
+        PLAIN_PASTE_TOAST_SHOWN = value;
+      },
+      // Files
+      files: this.files,
+      // LassoTrail
+      lassoTrail: this.lassoTrail,
       // Viewport tracking
       lastViewportPosition: this.lastViewportPosition,
+      // Props callbacks
+      onPaste: this.props.onPaste,
+      onDuplicate: this.props.onDuplicate,
+      validateEmbeddable: this.props.validateEmbeddable,
       // Cross-module method delegates
       focusContainer: () => this.focusContainer(),
       savePointer: (x, y, button) => this.savePointer(x, y, button),
       resetShouldCacheIgnoreZoomDebounced: () =>
         this.resetShouldCacheIgnoreZoomDebounced(),
+      deselectElements: () => this.deselectElements(),
+      handleCanvasDoubleClick: (event) => this.handleCanvasDoubleClick(event),
+      resetContextMenuTimer: () => this.resetContextMenuTimer(),
+      // clipboardOps delegates
+      isToolSupported: (tool) => this.isToolSupported(tool),
+      insertImages: (imageFiles, sceneX, sceneY) =>
+        this.insertImages(imageFiles, sceneX, sceneY),
+      insertEmbeddableElement: (opts) => this.insertEmbeddableElement(opts),
+      addMissingFiles: (files, replace) => this.addMissingFiles(files, replace),
+      addNewImagesToImageCache: () => this.addNewImagesToImageCache(),
+      getEffectiveGridSize: () => this.getEffectiveGridSize(),
+      getTopLayerFrameAtSceneCoords: (coords) =>
+        this.getTopLayerFrameAtSceneCoords(coords),
+      getEditorUIOffsets: () => this.getEditorUIOffsets(),
+      setActiveTool: (tool, keepSelection) =>
+        this.setActiveTool(tool, keepSelection),
+      setToast: (toast) => this.setToast(toast),
+      scrollToContent: (target, opts) => this.scrollToContent(target as any, opts),
     };
   }
 
@@ -3589,110 +3642,19 @@ class App extends React.Component<AppProps, AppState> {
 
   // Copy/paste
 
-  private onCut = withBatchedUpdates((event: ClipboardEvent) => {
-    const isExcalidrawActive = this.excalidrawContainerRef.current?.contains(
-      document.activeElement,
-    );
-    if (!isExcalidrawActive || isWritableElement(event.target)) {
-      return;
-    }
-    this.actionManager.executeAction(actionCut, "keyboard", event);
-    event.preventDefault();
-    event.stopPropagation();
-  });
+  private onCut = withBatchedUpdates((event: ClipboardEvent) =>
+    clipboardOps.onCut(this.engineContext, event),
+  );
 
-  private onCopy = withBatchedUpdates((event: ClipboardEvent) => {
-    const isExcalidrawActive = this.excalidrawContainerRef.current?.contains(
-      document.activeElement,
-    );
-    if (!isExcalidrawActive || isWritableElement(event.target)) {
-      return;
-    }
-    this.actionManager.executeAction(actionCopy, "keyboard", event);
-    event.preventDefault();
-    event.stopPropagation();
-  });
+  private onCopy = withBatchedUpdates((event: ClipboardEvent) =>
+    clipboardOps.onCopy(this.engineContext, event),
+  );
 
-  private static resetTapTwice() {
-    didTapTwice = false;
-    firstTapPosition = null;
-  }
+  private onTouchStart = (event: TouchEvent) =>
+    gestureOps.onTouchStart(this.engineContext, event);
 
-  private onTouchStart = (event: TouchEvent) => {
-    // fix for Apple Pencil Scribble (do not prevent for other devices)
-    if (isIOS) {
-      event.preventDefault();
-    }
-
-    if (!didTapTwice) {
-      didTapTwice = true;
-
-      if (event.touches.length === 1) {
-        firstTapPosition = {
-          x: event.touches[0].clientX,
-          y: event.touches[0].clientY,
-        };
-      }
-      clearTimeout(tappedTwiceTimer);
-      tappedTwiceTimer = window.setTimeout(
-        App.resetTapTwice,
-        TAP_TWICE_TIMEOUT,
-      );
-      return;
-    }
-
-    // insert text only if we tapped twice with a single finger at approximately the same position
-    // event.touches.length === 1 will also prevent inserting text when user's zooming
-    if (didTapTwice && event.touches.length === 1 && firstTapPosition) {
-      const touch = event.touches[0];
-      const distance = pointDistance(
-        pointFrom(touch.clientX, touch.clientY),
-        pointFrom(firstTapPosition.x, firstTapPosition.y),
-      );
-
-      // only create text if the second tap is within the threshold of the first tap
-      // this prevents accidental text creation during dragging/selection
-      if (distance <= DOUBLE_TAP_POSITION_THRESHOLD) {
-        // end lasso trail and deselect elements just in case
-        this.lassoTrail.endPath();
-        this.deselectElements();
-
-        this.handleCanvasDoubleClick({
-          clientX: touch.clientX,
-          clientY: touch.clientY,
-          type: "touch",
-          altKey: false,
-          ctrlKey: false,
-          metaKey: false,
-          shiftKey: false,
-        });
-      }
-      didTapTwice = false;
-      clearTimeout(tappedTwiceTimer);
-    }
-
-    if (event.touches.length === 2) {
-      this.setState({
-        selectedElementIds: makeNextSelectedElementIds({}, this.state),
-        activeEmbeddable: null,
-      });
-    }
-  };
-
-  private onTouchEnd = (event: TouchEvent) => {
-    this.resetContextMenuTimer();
-    if (event.touches.length > 0) {
-      this.setState({
-        previousSelectedElementIds: {},
-        selectedElementIds: makeNextSelectedElementIds(
-          this.state.previousSelectedElementIds,
-          this.state,
-        ),
-      });
-    } else {
-      gesture.pointers.clear();
-    }
-  };
+  private onTouchEnd = (event: TouchEvent) =>
+    gestureOps.onTouchEnd(this.engineContext, event);
 
   // TODO: Cover with tests
   private async insertClipboardContent(
@@ -3700,218 +3662,17 @@ class App extends React.Component<AppProps, AppState> {
     dataTransferFiles: ParsedDataTransferFile[],
     isPlainPaste: boolean,
   ) {
-    const { x: sceneX, y: sceneY } = viewportCoordsToSceneCoords(
-      {
-        clientX: this.lastViewportPosition.x,
-        clientY: this.lastViewportPosition.y,
-      },
-      this.state,
+    return clipboardOps.insertClipboardContent(
+      this.engineContext,
+      data,
+      dataTransferFiles,
+      isPlainPaste,
     );
-
-    // ------------------- Error -------------------
-    if (data.errorMessage) {
-      this.setState({ errorMessage: data.errorMessage });
-      return;
-    }
-
-    // ------------------- Mixed content with no files -------------------
-    if (dataTransferFiles.length === 0 && !isPlainPaste && data.mixedContent) {
-      await this.addElementsFromMixedContentPaste(data.mixedContent, {
-        isPlainPaste,
-        sceneX,
-        sceneY,
-      });
-      return;
-    }
-
-    // ------------------- Spreadsheet -------------------
-
-    if (!isPlainPaste && data.text) {
-      const result = tryParseSpreadsheet(data.text);
-      if (result.ok) {
-        this.setState({
-          openDialog: {
-            name: "charts",
-            data: result.data,
-            rawText: data.text,
-          },
-        });
-        return;
-      }
-    }
-
-    // ------------------- Images or SVG code -------------------
-    const imageFiles = dataTransferFiles.map((data) => data.file);
-
-    if (imageFiles.length === 0 && data.text && !isPlainPaste) {
-      const trimmedText = data.text.trim();
-      if (trimmedText.startsWith("<svg") && trimmedText.endsWith("</svg>")) {
-        // ignore SVG validation/normalization which will be done during image
-        // initialization
-        imageFiles.push(SVGStringToFile(trimmedText));
-      }
-    }
-
-    if (imageFiles.length > 0) {
-      if (this.isToolSupported("image")) {
-        await this.insertImages(imageFiles, sceneX, sceneY);
-      } else {
-        this.setState({ errorMessage: t("errors.imageToolNotSupported") });
-      }
-      return;
-    }
-
-    // ------------------- Elements -------------------
-    if (data.elements) {
-      const elements = (
-        data.programmaticAPI
-          ? convertToExcalidrawElements(
-              data.elements as ExcalidrawElementSkeleton[],
-            )
-          : data.elements
-      ) as readonly ExcalidrawElement[];
-      // TODO: remove formatting from elements if isPlainPaste
-      this.addElementsFromPasteOrLibrary({
-        elements,
-        files: data.files || null,
-        position:
-          this.editorInterface.formFactor === "desktop" ? "cursor" : "center",
-        retainSeed: isPlainPaste,
-      });
-      return;
-    }
-
-    // ------------------- Only textual stuff remaining -------------------
-    if (!data.text) {
-      return;
-    }
-
-    // ------------------- Successful Mermaid -------------------
-    if (!isPlainPaste && isMaybeMermaidDefinition(data.text)) {
-      const api = await import("@excalidraw/mermaid-to-excalidraw");
-      try {
-        const { elements: skeletonElements, files = {} } =
-          await api.parseMermaidToExcalidraw(data.text);
-
-        const elements = convertToExcalidrawElements(skeletonElements, {
-          regenerateIds: true,
-        });
-
-        this.addElementsFromPasteOrLibrary({
-          elements,
-          files,
-          position:
-            this.editorInterface.formFactor === "desktop" ? "cursor" : "center",
-        });
-
-        return;
-      } catch (err: any) {
-        console.warn(
-          `parsing pasted text as mermaid definition failed: ${err.message}`,
-        );
-      }
-    }
-
-    // ------------------- Pure embeddable URLs -------------------
-    const nonEmptyLines = normalizeEOL(data.text)
-      .split(/\n+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const embbeddableUrls = nonEmptyLines
-      .map((str) => maybeParseEmbedSrc(str))
-      .filter(
-        (string) =>
-          embeddableURLValidator(string, this.props.validateEmbeddable) &&
-          (/^(http|https):\/\/[^\s/$.?#].[^\s]*$/.test(string) ||
-            getEmbedLink(string)?.type === "video"),
-      );
-
-    if (
-      !isPlainPaste &&
-      embbeddableUrls.length > 0 &&
-      embbeddableUrls.length === nonEmptyLines.length
-    ) {
-      const embeddables: NonDeleted<ExcalidrawEmbeddableElement>[] = [];
-      for (const url of embbeddableUrls) {
-        const prevEmbeddable: ExcalidrawEmbeddableElement | undefined =
-          embeddables[embeddables.length - 1];
-        const embeddable = this.insertEmbeddableElement({
-          sceneX: prevEmbeddable
-            ? prevEmbeddable.x + prevEmbeddable.width + 20
-            : sceneX,
-          sceneY,
-          link: normalizeLink(url),
-        });
-        if (embeddable) {
-          embeddables.push(embeddable);
-        }
-      }
-      if (embeddables.length) {
-        this.store.scheduleCapture();
-        this.setState({
-          selectedElementIds: Object.fromEntries(
-            embeddables.map((embeddable) => [embeddable.id, true]),
-          ),
-        });
-      }
-      return;
-    }
-
-    // ------------------- Text -------------------
-    this.addTextFromPaste(data.text, isPlainPaste);
   }
 
   public pasteFromClipboard = withBatchedUpdates(
-    async (event: ClipboardEvent) => {
-      const isPlainPaste = !!IS_PLAIN_PASTE;
-
-      // #686
-      const target = document.activeElement;
-      const isExcalidrawActive =
-        this.excalidrawContainerRef.current?.contains(target);
-      if (event && !isExcalidrawActive) {
-        return;
-      }
-
-      const elementUnderCursor = document.elementFromPoint(
-        this.lastViewportPosition.x,
-        this.lastViewportPosition.y,
-      );
-      if (
-        event &&
-        (!(elementUnderCursor instanceof HTMLCanvasElement) ||
-          isWritableElement(target))
-      ) {
-        return;
-      }
-
-      // must be called in the same frame (thus before any awaits) as the paste
-      // event else some browsers (FF...) will clear the clipboardData
-      // (something something security)
-      const dataTransferList = await parseDataTransferEvent(event);
-
-      const filesList = dataTransferList.getFiles();
-
-      const data = await parseClipboard(dataTransferList, isPlainPaste);
-
-      if (this.props.onPaste) {
-        try {
-          if ((await this.props.onPaste(data, event)) === false) {
-            return;
-          }
-        } catch (error: any) {
-          console.error(error);
-        }
-      }
-
-      await this.insertClipboardContent(data, filesList, isPlainPaste);
-
-      this.setActiveTool(
-        { type: this.state.preferredSelectionTool.type },
-        true,
-      );
-      event?.preventDefault();
-    },
+    async (event: ClipboardEvent) =>
+      clipboardOps.pasteFromClipboard(this.engineContext, event),
   );
 
   addElementsFromPasteOrLibrary = (opts: {
@@ -3920,150 +3681,7 @@ class App extends React.Component<AppProps, AppState> {
     position: { clientX: number; clientY: number } | "cursor" | "center";
     retainSeed?: boolean;
     fitToContent?: boolean;
-  }) => {
-    const elements = restoreElements(opts.elements, null, {
-      deleteInvisibleElements: true,
-    });
-    const [minX, minY, maxX, maxY] = getCommonBounds(elements);
-
-    const elementsCenterX = distance(minX, maxX) / 2;
-    const elementsCenterY = distance(minY, maxY) / 2;
-
-    const clientX =
-      typeof opts.position === "object"
-        ? opts.position.clientX
-        : opts.position === "cursor"
-        ? this.lastViewportPosition.x
-        : this.state.width / 2 + this.state.offsetLeft;
-    const clientY =
-      typeof opts.position === "object"
-        ? opts.position.clientY
-        : opts.position === "cursor"
-        ? this.lastViewportPosition.y
-        : this.state.height / 2 + this.state.offsetTop;
-
-    const { x, y } = viewportCoordsToSceneCoords(
-      { clientX, clientY },
-      this.state,
-    );
-
-    const dx = x - elementsCenterX;
-    const dy = y - elementsCenterY;
-
-    const [gridX, gridY] = getGridPoint(dx, dy, this.getEffectiveGridSize());
-
-    const { duplicatedElements } = duplicateElements({
-      type: "everything",
-      elements: elements.map((element) => {
-        return newElementWith(element, {
-          x: element.x + gridX - minX,
-          y: element.y + gridY - minY,
-        });
-      }),
-      randomizeSeed: !opts.retainSeed,
-    });
-
-    const prevElements = this.scene.getElementsIncludingDeleted();
-    let nextElements = [...prevElements, ...duplicatedElements];
-
-    const mappedNewSceneElements = this.props.onDuplicate?.(
-      nextElements,
-      prevElements,
-    );
-
-    nextElements = mappedNewSceneElements || nextElements;
-
-    syncMovedIndices(nextElements, arrayToMap(duplicatedElements));
-
-    const topLayerFrame = this.getTopLayerFrameAtSceneCoords({ x, y });
-
-    if (topLayerFrame) {
-      const eligibleElements = filterElementsEligibleAsFrameChildren(
-        duplicatedElements,
-        topLayerFrame,
-      );
-      addElementsToFrame(
-        nextElements,
-        eligibleElements,
-        topLayerFrame,
-        this.state,
-      );
-    }
-
-    this.scene.replaceAllElements(nextElements);
-
-    duplicatedElements.forEach((newElement) => {
-      if (isTextElement(newElement) && isBoundToContainer(newElement)) {
-        const container = getContainerElement(
-          newElement,
-          this.scene.getElementsMapIncludingDeleted(),
-        );
-        redrawTextBoundingBox(newElement, container, this.scene);
-      }
-    });
-
-    // paste event may not fire FontFace loadingdone event in Safari, hence loading font faces manually
-    if (isSafari) {
-      Fonts.loadElementsFonts(duplicatedElements).then((fontFaces) => {
-        this.fonts.onLoaded(fontFaces);
-      });
-    }
-
-    if (opts.files) {
-      this.addMissingFiles(opts.files);
-    }
-
-    const nextElementsToSelect =
-      excludeElementsInFramesFromSelection(duplicatedElements);
-
-    this.store.scheduleCapture();
-    this.setState(
-      {
-        ...this.state,
-        // keep sidebar (presumably the library) open if it's docked and
-        // can fit.
-        //
-        // Note, we should close the sidebar only if we're dropping items
-        // from library, not when pasting from clipboard. Alas.
-        openSidebar:
-          this.state.openSidebar &&
-          this.editorInterface.canFitSidebar &&
-          editorJotaiStore.get(isSidebarDockedAtom)
-            ? this.state.openSidebar
-            : null,
-        ...selectGroupsForSelectedElements(
-          {
-            editingGroupId: null,
-            selectedElementIds: nextElementsToSelect.reduce(
-              (acc: Record<ExcalidrawElement["id"], true>, element) => {
-                if (!isBoundToContainer(element)) {
-                  acc[element.id] = true;
-                }
-                return acc;
-              },
-              {},
-            ),
-          },
-          this.scene.getNonDeletedElements(),
-          this.state,
-          this,
-        ),
-      },
-      () => {
-        if (opts.files) {
-          this.addNewImagesToImageCache();
-        }
-      },
-    );
-    this.setActiveTool({ type: this.state.preferredSelectionTool.type }, true);
-
-    if (opts.fitToContent) {
-      this.scrollToContent(duplicatedElements, {
-        fitToContent: true,
-        canvasOffsets: this.getEditorUIOffsets(),
-      });
-    }
-  };
+  }) => clipboardOps.addElementsFromPasteOrLibrary(this.engineContext, opts);
 
   // TODO rewrite this to paste both text & images at the same time if
   // pasted data contains both
@@ -4075,166 +3693,15 @@ class App extends React.Component<AppProps, AppState> {
       sceneY,
     }: { isPlainPaste: boolean; sceneX: number; sceneY: number },
   ) {
-    if (
-      !isPlainPaste &&
-      mixedContent.some((node) => node.type === "imageUrl") &&
-      this.isToolSupported("image")
-    ) {
-      const imageURLs = mixedContent
-        .filter((node) => node.type === "imageUrl")
-        .map((node) => node.value);
-      const responses = await Promise.all(
-        imageURLs.map(async (url) => {
-          try {
-            return { file: await ImageURLToFile(url) };
-          } catch (error: any) {
-            let errorMessage = error.message;
-            if (error.cause === "FETCH_ERROR") {
-              errorMessage = t("errors.failedToFetchImage");
-            } else if (error.cause === "UNSUPPORTED") {
-              errorMessage = t("errors.unsupportedFileType");
-            }
-            return { errorMessage };
-          }
-        }),
-      );
-
-      const imageFiles = responses
-        .filter((response): response is { file: File } => !!response.file)
-        .map((response) => response.file);
-      await this.insertImages(imageFiles, sceneX, sceneY);
-      const error = responses.find((response) => !!response.errorMessage);
-      if (error && error.errorMessage) {
-        this.setState({ errorMessage: error.errorMessage });
-      }
-    } else {
-      const textNodes = mixedContent.filter((node) => node.type === "text");
-      if (textNodes.length) {
-        this.addTextFromPaste(
-          textNodes.map((node) => node.value).join("\n\n"),
-          isPlainPaste,
-        );
-      }
-    }
+    return clipboardOps.addElementsFromMixedContentPaste(
+      this.engineContext,
+      mixedContent,
+      { isPlainPaste, sceneX, sceneY },
+    );
   }
 
   private addTextFromPaste(text: string, isPlainPaste = false) {
-    const { x, y } = viewportCoordsToSceneCoords(
-      {
-        clientX: this.lastViewportPosition.x,
-        clientY: this.lastViewportPosition.y,
-      },
-      this.state,
-    );
-
-    const textElementProps = {
-      x,
-      y,
-      strokeColor: this.state.currentItemStrokeColor,
-      backgroundColor: this.state.currentItemBackgroundColor,
-      fillStyle: this.state.currentItemFillStyle,
-      strokeWidth: this.state.currentItemStrokeWidth,
-      strokeStyle: this.state.currentItemStrokeStyle,
-      roundness: null,
-      roughness: this.state.currentItemRoughness,
-      opacity: this.state.currentItemOpacity,
-      text,
-      fontSize: this.state.currentItemFontSize,
-      fontFamily: this.state.currentItemFontFamily,
-      textAlign: DEFAULT_TEXT_ALIGN,
-      verticalAlign: DEFAULT_VERTICAL_ALIGN,
-      locked: false,
-    };
-    const fontString = getFontString({
-      fontSize: textElementProps.fontSize,
-      fontFamily: textElementProps.fontFamily,
-    });
-    const lineHeight = getLineHeight(textElementProps.fontFamily);
-    const [x1, , x2] = getVisibleSceneBounds(this.state);
-    // long texts should not go beyond 800 pixels in width nor should it go below 200 px
-    const maxTextWidth = Math.max(Math.min((x2 - x1) * 0.5, 800), 200);
-    const LINE_GAP = 10;
-    let currentY = y;
-
-    const lines = isPlainPaste ? [text] : text.split("\n");
-    const textElements = lines.reduce(
-      (acc: ExcalidrawTextElement[], line, idx) => {
-        const originalText = normalizeText(line).trim();
-        if (originalText.length) {
-          const topLayerFrame = this.getTopLayerFrameAtSceneCoords({
-            x,
-            y: currentY,
-          });
-
-          let metrics = measureText(originalText, fontString, lineHeight);
-          const isTextUnwrapped = metrics.width > maxTextWidth;
-
-          const text = isTextUnwrapped
-            ? wrapText(originalText, fontString, maxTextWidth)
-            : originalText;
-
-          metrics = isTextUnwrapped
-            ? measureText(text, fontString, lineHeight)
-            : metrics;
-
-          const startX = x - metrics.width / 2;
-          const startY = currentY - metrics.height / 2;
-
-          const element = newTextElement({
-            ...textElementProps,
-            x: startX,
-            y: startY,
-            text,
-            originalText,
-            lineHeight,
-            autoResize: !isTextUnwrapped,
-            frameId: topLayerFrame ? topLayerFrame.id : null,
-          });
-          acc.push(element);
-          currentY += element.height + LINE_GAP;
-        } else {
-          const prevLine = lines[idx - 1]?.trim();
-          // add paragraph only if previous line was not empty, IOW don't add
-          // more than one empty line
-          if (prevLine) {
-            currentY +=
-              getLineHeightInPx(textElementProps.fontSize, lineHeight) +
-              LINE_GAP;
-          }
-        }
-
-        return acc;
-      },
-      [],
-    );
-
-    if (textElements.length === 0) {
-      return;
-    }
-
-    this.scene.insertElements(textElements);
-    this.store.scheduleCapture();
-    this.setState({
-      selectedElementIds: makeNextSelectedElementIds(
-        Object.fromEntries(textElements.map((el) => [el.id, true])),
-        this.state,
-      ),
-    });
-
-    if (
-      !isPlainPaste &&
-      textElements.length > 1 &&
-      PLAIN_PASTE_TOAST_SHOWN === false &&
-      this.editorInterface.formFactor !== "phone"
-    ) {
-      this.setToast({
-        message: t("toast.pasteAsSingleElement", {
-          shortcut: getShortcutKey("CtrlOrCmd+Shift+V"),
-        }),
-        duration: 5000,
-      });
-      PLAIN_PASTE_TOAST_SHOWN = true;
-    }
+    return clipboardOps.addTextFromPaste(this.engineContext, text, isPlainPaste);
   }
 
   setAppState: React.Component<any, AppState>["setState"] = (
@@ -4299,14 +3766,8 @@ class App extends React.Component<AppProps, AppState> {
     });
   };
 
-  togglePenMode = (force: boolean | null) => {
-    this.setState((prevState) => {
-      return {
-        penMode: force ?? !prevState.penMode,
-        penDetected: true,
-      };
-    });
-  };
+  togglePenMode = (force: boolean | null) =>
+    gestureOps.togglePenMode(this.engineContext, force);
 
   onHandToolToggle = () => {
     this.actionManager.executeAction(actionToggleHandTool);
@@ -5613,12 +5074,8 @@ class App extends React.Component<AppProps, AppState> {
    * (iOS/iPadOS,MacOS), but may work on other devices in the future if
    * GestureEvent is standardized.
    */
-  private isTouchScreenMultiTouchGesture = () => {
-    // we don't want to deselect when using trackpad, and multi-point gestures
-    // only work on touch screens, so checking for >= pointers means we're on a
-    // touchscreen
-    return gesture.pointers.size >= 2;
-  };
+  private isTouchScreenMultiTouchGesture = () =>
+    gestureOps.isTouchScreenMultiTouchGesture(this.engineContext);
 
   public getName = () => {
     return (
@@ -5629,67 +5086,19 @@ class App extends React.Component<AppProps, AppState> {
   };
 
   // fires only on Safari
-  private onGestureStart = withBatchedUpdates((event: GestureEvent) => {
-    event.preventDefault();
-
-    // we only want to deselect on touch screens because user may have selected
-    // elements by mistake while zooming
-    if (this.isTouchScreenMultiTouchGesture()) {
-      this.setState({
-        selectedElementIds: makeNextSelectedElementIds({}, this.state),
-        activeEmbeddable: null,
-      });
-    }
-    gesture.initialScale = this.state.zoom.value;
-  });
+  private onGestureStart = withBatchedUpdates((event: GestureEvent) =>
+    gestureOps.onGestureStart(this.engineContext, event),
+  );
 
   // fires only on Safari
-  private onGestureChange = withBatchedUpdates((event: GestureEvent) => {
-    event.preventDefault();
-
-    // onGestureChange only has zoom factor but not the center.
-    // If we're on iPad or iPhone, then we recognize multi-touch and will
-    // zoom in at the right location in the touchmove handler
-    // (handleCanvasPointerMove).
-    //
-    // On Macbook trackpad, we don't have those events so will zoom in at the
-    // current location instead.
-    //
-    // As such, bail from this handler on touch devices.
-    if (this.isTouchScreenMultiTouchGesture()) {
-      return;
-    }
-
-    const initialScale = gesture.initialScale;
-    if (initialScale) {
-      this.setState((state) => ({
-        ...getStateForZoom(
-          {
-            viewportX: this.lastViewportPosition.x,
-            viewportY: this.lastViewportPosition.y,
-            nextZoom: getNormalizedZoom(initialScale * event.scale),
-          },
-          state,
-        ),
-      }));
-    }
-  });
+  private onGestureChange = withBatchedUpdates((event: GestureEvent) =>
+    gestureOps.onGestureChange(this.engineContext, event),
+  );
 
   // fires only on Safari
-  private onGestureEnd = withBatchedUpdates((event: GestureEvent) => {
-    event.preventDefault();
-    // reselect elements only on touch screens (see onGestureStart)
-    if (this.isTouchScreenMultiTouchGesture()) {
-      this.setState({
-        previousSelectedElementIds: {},
-        selectedElementIds: makeNextSelectedElementIds(
-          this.state.previousSelectedElementIds,
-          this.state,
-        ),
-      });
-    }
-    gesture.initialScale = null;
-  });
+  private onGestureEnd = withBatchedUpdates((event: GestureEvent) =>
+    gestureOps.onGestureEnd(this.engineContext, event),
+  );
 
   private handleTextWysiwyg(
     element: ExcalidrawTextElement,
@@ -7366,9 +6775,8 @@ class App extends React.Component<AppProps, AppState> {
   };
 
   // set touch moving for mobile context menu
-  private handleTouchMove = (event: React.TouchEvent<HTMLCanvasElement>) => {
-    invalidateContextMenu = true;
-  };
+  private handleTouchMove = (event: React.TouchEvent<HTMLCanvasElement>) =>
+    gestureOps.handleTouchMove(this.engineContext, event);
 
   handleHoverSelectedLinearElement(
     linearElementEditor: LinearElementEditor,

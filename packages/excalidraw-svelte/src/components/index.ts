@@ -16,7 +16,13 @@ export { default as Card } from './Card.svelte';
 export { default as Paragraph } from './Paragraph.svelte';
 export { default as Ellipsify } from './Ellipsify.svelte';
 
-// Batch 3 — SKIPPED for now
+// Batch 3 — Phase 3 batch 2
+export { default as Button } from './Button.svelte';
+export { default as Tooltip } from './Tooltip.svelte';
+export { default as Switch } from './Switch.svelte';
+export { default as Range } from './Range.svelte';
+export { default as TextField } from './TextField.svelte';
+
 // HintViewer — depends on UIAppState / AppClassProperties / app.scene → needs Phase 1 store + Phase 6 context
 // LinkButton — depends on FilledButton (not yet ported)
 // DarkModeToggle — depends on ToolButton (not yet ported)
