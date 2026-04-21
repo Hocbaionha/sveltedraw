@@ -26,6 +26,7 @@ import type {
   ExcalidrawFrameLikeElement,
   ExcalidrawImageElement,
   ExcalidrawArrowElement,
+  ExcalidrawIframeLikeElement,
   NonDeletedExcalidrawElement,
   ExcalidrawTextContainer,
 } from "@excalidraw/element/types";
@@ -475,4 +476,47 @@ export interface AppEngineContext {
   handleCanvasPanUsingWheelOrSpaceDrag: (
     event: React.PointerEvent<HTMLElement> | MouseEvent,
   ) => boolean;
+
+  // Phase 2h.1 (canvasEventOps) delegates
+  getLastCompletedCanvasClicks: () => { x: number; y: number }[];
+  setLastCompletedCanvasClicks: (
+    clicks: { x: number; y: number }[],
+  ) => void;
+  setLastPointerUpEvent: (
+    event: React.PointerEvent<HTMLElement> | PointerEvent | null,
+  ) => void;
+  setLastPointerUpIsDoubleClick: (value: boolean) => void;
+  isDoubleClick: (
+    lastPointerEvent:
+      | PointerEvent
+      | React.PointerEvent<HTMLElement>
+      | undefined
+      | null,
+    currentPointerEvent: PointerEvent | React.PointerEvent<HTMLElement>,
+  ) => boolean;
+  handleIframeLikeCenterClick: () => boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getContextMenuItems: (type: "element" | "canvas") => any[];
+  handleElementLinkClick: (
+    event: React.PointerEvent<HTMLCanvasElement>,
+  ) => void;
+  // Phase 2h.4 (bindFrameOps) delegates
+  getBindModeHandler: () => ReturnType<typeof setTimeout> | null;
+  setBindModeHandler: (
+    handler: ReturnType<typeof setTimeout> | null,
+  ) => void;
+  getPreviousHoveredBindableElement: () => NonDeletedExcalidrawElement | null;
+  setPreviousHoveredBindableElement: (
+    element: NonDeletedExcalidrawElement | null,
+  ) => void;
+  getHTMLIFrameElement: (
+    element: ExcalidrawIframeLikeElement,
+  ) => HTMLIFrameElement | undefined;
+  getAppId: () => string;
+  propOnLinkOpen?: (
+    element: NonDeletedExcalidrawElement,
+    event: CustomEvent<{
+      nativeEvent: MouseEvent | React.PointerEvent<HTMLCanvasElement>;
+    }>,
+  ) => void;
 }
