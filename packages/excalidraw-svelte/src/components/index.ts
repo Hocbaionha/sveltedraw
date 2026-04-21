@@ -26,6 +26,19 @@ export { default as TextField } from './TextField.svelte';
 // Tooltip DOM utilities (framework-agnostic, used by Hyperlink and others)
 export { getTooltipDiv, updateTooltipPosition } from './tooltipUtils.js';
 
+// Batch 4 — Phase 3 batch 4 (Modal/Toast/DropdownMenu family)
+// Skipped: Dialog + ContextMenu (need App-context bridge — Phase 6)
+// Skipped: icons.tsx (200+ icons, deserves codegen pass — own batch)
+export { default as Modal } from './Modal.svelte';
+export { default as Toast } from './Toast.svelte';
+export { default as ToastProgressBar } from './ToastProgressBar.svelte';
+export { default as DropdownMenu } from './DropdownMenu.svelte';
+export { default as DropdownMenuTrigger } from './DropdownMenuTrigger.svelte';
+export { default as DropdownMenuContent } from './DropdownMenuContent.svelte';
+export { default as DropdownMenuItem } from './DropdownMenuItem.svelte';
+export { default as DropdownMenuSeparator } from './DropdownMenuSeparator.svelte';
+export { default as DropdownMenuGroup } from './DropdownMenuGroup.svelte';
+
 // HintViewer — depends on UIAppState / AppClassProperties / app.scene → needs Phase 1 store + Phase 6 context
 // LinkButton — depends on FilledButton (not yet ported)
 // DarkModeToggle — depends on ToolButton (not yet ported)
