@@ -27,6 +27,8 @@ import type { GlobalPoint } from "@excalidraw/math";
 
 import { YOUTUBE_STATES } from "@excalidraw/common";
 
+import type { ValueOf } from "@excalidraw/common/utility-types";
+
 import { setCursor } from "../cursor";
 
 import { YOUTUBE_VIDEO_STATES } from "./youtubeStates";
@@ -43,6 +45,71 @@ import type {
 import type React from "react";
 
 import type { AppEngineContext } from "./AppEngineContext";
+
+export function onWindowMessage(
+  _ctx: AppEngineContext,
+  event: MessageEvent,
+): void {
+  if (
+    event.origin !== "https://player.vimeo.com" &&
+    event.origin !== "https://www.youtube.com"
+  ) {
+    return;
+  }
+
+  let data = null;
+  try {
+    data = JSON.parse(event.data);
+  } catch (e) {}
+  if (!data) {
+    return;
+  }
+
+  switch (event.origin) {
+    case "https://player.vimeo.com":
+      if (data.method === "paused") {
+        let source: Window | null = null;
+        const iframes = document.body.querySelectorAll(
+          "iframe.excalidraw__embeddable",
+        );
+        if (!iframes) {
+          break;
+        }
+        for (const iframe of iframes as NodeListOf<HTMLIFrameElement>) {
+          if (iframe.contentWindow === event.source) {
+            source = iframe.contentWindow;
+          }
+        }
+        source?.postMessage(
+          JSON.stringify({
+            method: data.value ? "play" : "pause",
+            value: true,
+          }),
+          "*",
+        );
+      }
+      break;
+    case "https://www.youtube.com":
+      if (
+        data.event === "infoDelivery" &&
+        data.info &&
+        data.id &&
+        typeof data.info.playerState === "number"
+      ) {
+        const id = data.id;
+        const playerState = data.info.playerState as number;
+        if (
+          (Object.values(YOUTUBE_STATES) as number[]).includes(playerState)
+        ) {
+          YOUTUBE_VIDEO_STATES.set(
+            id,
+            playerState as ValueOf<typeof YOUTUBE_STATES>,
+          );
+        }
+      }
+      break;
+  }
+}
 
 export function getFrameNameDOMId(
   ctx: AppEngineContext,

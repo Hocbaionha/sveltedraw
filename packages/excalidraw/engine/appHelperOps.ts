@@ -32,6 +32,23 @@ import type { ExcalidrawElement } from "@excalidraw/element/types";
 
 import type { AppEngineContext } from "./AppEngineContext";
 
+export function resetHistory(ctx: AppEngineContext): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (ctx.getApp() as any).history.clear();
+}
+
+export function resetStore(ctx: AppEngineContext): void {
+  // store.clear is on the actual store, not on the engine context's `store`
+  // (which is the public Store). Call via getApp.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (ctx.getApp() as any).store.clear();
+}
+
+export function onUnload(ctx: AppEngineContext): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (ctx.getApp() as any).onBlur();
+}
+
 export function maybeUnfollowRemoteUser(ctx: AppEngineContext): void {
   if (ctx.getState().userToFollow) {
     ctx.setState({ userToFollow: null });

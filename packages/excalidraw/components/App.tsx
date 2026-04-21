@@ -1230,68 +1230,8 @@ class App extends React.Component<AppProps, AppState> {
     return result;
   };
 
-  private onWindowMessage(event: MessageEvent) {
-    if (
-      event.origin !== "https://player.vimeo.com" &&
-      event.origin !== "https://www.youtube.com"
-    ) {
-      return;
-    }
-
-    let data = null;
-    try {
-      data = JSON.parse(event.data);
-    } catch (e) {}
-    if (!data) {
-      return;
-    }
-
-    switch (event.origin) {
-      case "https://player.vimeo.com":
-        //Allowing for multiple instances of Excalidraw running in the window
-        if (data.method === "paused") {
-          let source: Window | null = null;
-          const iframes = document.body.querySelectorAll(
-            "iframe.excalidraw__embeddable",
-          );
-          if (!iframes) {
-            break;
-          }
-          for (const iframe of iframes as NodeListOf<HTMLIFrameElement>) {
-            if (iframe.contentWindow === event.source) {
-              source = iframe.contentWindow;
-            }
-          }
-          source?.postMessage(
-            JSON.stringify({
-              method: data.value ? "play" : "pause",
-              value: true,
-            }),
-            "*",
-          );
-        }
-        break;
-      case "https://www.youtube.com":
-        if (
-          data.event === "infoDelivery" &&
-          data.info &&
-          data.id &&
-          typeof data.info.playerState === "number"
-        ) {
-          const id = data.id;
-          const playerState = data.info.playerState as number;
-          if (
-            (Object.values(YOUTUBE_STATES) as number[]).includes(playerState)
-          ) {
-            YOUTUBE_VIDEO_STATES.set(
-              id,
-              playerState as ValueOf<typeof YOUTUBE_STATES>,
-            );
-          }
-        }
-        break;
-    }
-  }
+  private onWindowMessage = (event: MessageEvent) =>
+    bindFrameOps.onWindowMessage(this.engineContext, event);
 
   private handleSkipBindMode() {
     return bindFrameOps.handleSkipBindMode(this.engineContext);
@@ -2659,21 +2599,15 @@ class App extends React.Component<AppProps, AppState> {
     });
   });
 
-  private onUnload = () => {
-    this.onBlur();
-  };
+  private onUnload = () => appHelperOps.onUnload(this.engineContext);
 
   private disableEvent: EventListener = (event) => {
     event.preventDefault();
   };
 
-  private resetHistory = () => {
-    this.history.clear();
-  };
+  private resetHistory = () => appHelperOps.resetHistory(this.engineContext);
 
-  private resetStore = () => {
-    this.store.clear();
-  };
+  private resetStore = () => appHelperOps.resetStore(this.engineContext);
 
   /**
    * Resets scene & history.
