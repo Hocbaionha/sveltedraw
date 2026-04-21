@@ -1,4 +1,10 @@
 export * as scrollOps from "./scrollOps";
 export * as gestureOps from "./gestureOps";
 export * as clipboardOps from "./clipboardOps";
+export * as keyboardOps from "./keyboardOps";
+export * as pointerDownSubOps from "./pointerDownSubOps";
+export * as pointerMoveOps from "./pointerMoveOps";
+export * as pointerUpOps from "./pointerUpOps";
+export * as pointerHelperOps from "./pointerHelperOps";
+export * as pointerEventOps from "./pointerEventOps";
 export type { AppEngineContext } from "./AppEngineContext";
