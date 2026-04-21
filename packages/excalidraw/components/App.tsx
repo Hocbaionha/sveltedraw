@@ -2907,65 +2907,15 @@ class App extends React.Component<AppProps, AppState> {
     }
   }, 300);
 
-  private updateDOMRect = (cb?: () => void) => {
-    if (this.excalidrawContainerRef?.current) {
-      const excalidrawContainer = this.excalidrawContainerRef.current;
-      const {
-        width,
-        height,
-        left: offsetLeft,
-        top: offsetTop,
-      } = excalidrawContainer.getBoundingClientRect();
-      const {
-        width: currentWidth,
-        height: currentHeight,
-        offsetTop: currentOffsetTop,
-        offsetLeft: currentOffsetLeft,
-      } = this.state;
-
-      if (
-        width === currentWidth &&
-        height === currentHeight &&
-        offsetLeft === currentOffsetLeft &&
-        offsetTop === currentOffsetTop
-      ) {
-        if (cb) {
-          cb();
-        }
-        return;
-      }
-
-      this.setState(
-        {
-          width,
-          height,
-          offsetLeft,
-          offsetTop,
-        },
-        () => {
-          cb && cb();
-        },
-      );
-    }
-  };
+  private updateDOMRect = (cb?: () => void) =>
+    appHelperOps.updateDOMRect(this.engineContext, cb);
 
   public refresh = () => {
     this.setState({ ...this.getCanvasOffsets() });
   };
 
   private getCanvasOffsets(): Pick<AppState, "offsetTop" | "offsetLeft"> {
-    if (this.excalidrawContainerRef?.current) {
-      const excalidrawContainer = this.excalidrawContainerRef.current;
-      const { left, top } = excalidrawContainer.getBoundingClientRect();
-      return {
-        offsetLeft: left,
-        offsetTop: top,
-      };
-    }
-    return {
-      offsetLeft: 0,
-      offsetTop: 0,
-    };
+    return appHelperOps.getCanvasOffsets(this.engineContext);
   }
 
   watchState = () => {};

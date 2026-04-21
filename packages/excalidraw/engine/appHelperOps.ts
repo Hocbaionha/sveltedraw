@@ -401,6 +401,71 @@ export function setActiveTool(
   });
 }
 
+export function updateDOMRect(
+  ctx: AppEngineContext,
+  cb?: () => void,
+): void {
+  const app = ctx.getApp() as any;
+  if (app.excalidrawContainerRef?.current) {
+    const excalidrawContainer = app.excalidrawContainerRef.current;
+    const {
+      width,
+      height,
+      left: offsetLeft,
+      top: offsetTop,
+    } = excalidrawContainer.getBoundingClientRect();
+    const state = ctx.getState();
+    const {
+      width: currentWidth,
+      height: currentHeight,
+      offsetTop: currentOffsetTop,
+      offsetLeft: currentOffsetLeft,
+    } = state;
+
+    if (
+      width === currentWidth &&
+      height === currentHeight &&
+      offsetLeft === currentOffsetLeft &&
+      offsetTop === currentOffsetTop
+    ) {
+      if (cb) {
+        cb();
+      }
+      return;
+    }
+
+    ctx.setState(
+      {
+        width,
+        height,
+        offsetLeft,
+        offsetTop,
+      } as Partial<AppState>,
+      () => {
+        cb && cb();
+      },
+    );
+  }
+}
+
+export function getCanvasOffsets(
+  ctx: AppEngineContext,
+): Pick<AppState, "offsetTop" | "offsetLeft"> {
+  const app = ctx.getApp() as any;
+  if (app.excalidrawContainerRef?.current) {
+    const excalidrawContainer = app.excalidrawContainerRef.current;
+    const { left, top } = excalidrawContainer.getBoundingClientRect();
+    return {
+      offsetLeft: left,
+      offsetTop: top,
+    };
+  }
+  return {
+    offsetLeft: 0,
+    offsetTop: 0,
+  };
+}
+
 export function deselectElements(ctx: AppEngineContext): void {
   ctx.setState({
     selectedElementIds: makeNextSelectedElementIds({}, ctx.getState()),
