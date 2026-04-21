@@ -3265,41 +3265,7 @@ class App extends React.Component<AppProps, AppState> {
   private addMissingFiles = (
     files: BinaryFiles | BinaryFileData[],
     replace = false,
-  ) => {
-    const nextFiles = replace ? {} : { ...this.files };
-    const addedFiles: BinaryFiles = {};
-
-    const _files = Array.isArray(files) ? files : Object.values(files);
-
-    for (const fileData of _files) {
-      if (nextFiles[fileData.id]) {
-        continue;
-      }
-
-      addedFiles[fileData.id] = fileData;
-      nextFiles[fileData.id] = fileData;
-
-      if (fileData.mimeType === MIME_TYPES.svg) {
-        try {
-          const restoredDataURL = getDataURL_sync(
-            normalizeSVG(dataURLToString(fileData.dataURL)),
-            MIME_TYPES.svg,
-          );
-          if (fileData.dataURL !== restoredDataURL) {
-            // bump version so persistence layer can update the store
-            fileData.version = (fileData.version ?? 1) + 1;
-            fileData.dataURL = restoredDataURL;
-          }
-        } catch (error) {
-          console.error(error);
-        }
-      }
-    }
-
-    this.files = nextFiles;
-
-    return { addedFiles };
-  };
+  ) => appHelperOps.addMissingFiles(this.engineContext, files, replace);
 
   public updateScene = withBatchedUpdates(
     <K extends keyof AppState>(sceneData: {
@@ -3354,23 +3320,8 @@ class App extends React.Component<AppProps, AppState> {
   public applyDeltas = (
     deltas: StoreDelta[],
     options?: ApplyToOptions,
-  ): [SceneElementsMap, AppState, boolean] => {
-    // squash all deltas together, starting with a fresh new delta instance
-    const aggregatedDelta = StoreDelta.squash(...deltas);
-
-    // create new instance of elements map & appState, so we don't accidentaly mutate existing ones
-    const nextAppState = { ...this.state };
-    const nextElements = new Map(
-      this.scene.getElementsMapIncludingDeleted(),
-    ) as SceneElementsMap;
-
-    return StoreDelta.applyTo(
-      aggregatedDelta,
-      nextElements,
-      nextAppState,
-      options,
-    );
-  };
+  ): [SceneElementsMap, AppState, boolean] =>
+    appHelperOps.applyDeltas(this.engineContext, deltas, options);
 
   public mutateElement = <TElement extends Mutable<ExcalidrawElement>>(
     element: TElement,
@@ -3501,79 +3452,7 @@ class App extends React.Component<AppProps, AppState> {
       fromSelection?: boolean;
     },
     keepSelection = false,
-  ) => {
-    if (!this.isToolSupported(tool.type)) {
-      console.warn(
-        `"${tool.type}" tool is disabled via "UIOptions.canvasActions.tools.${tool.type}"`,
-      );
-      return;
-    }
-
-    const nextActiveTool = updateActiveTool(this.state, tool);
-    if (nextActiveTool.type === "hand") {
-      setCursor(this.interactiveCanvas, CURSOR_TYPE.GRAB);
-    } else if (!appGlobals.isHoldingSpace) {
-      setCursorForShape(this.interactiveCanvas, {
-        ...this.state,
-        activeTool: nextActiveTool,
-      });
-    }
-    if (isToolIcon(document.activeElement)) {
-      this.focusContainer();
-    }
-    if (!isLinearElementType(nextActiveTool.type)) {
-      this.setState({ suggestedBinding: null });
-    }
-    if (nextActiveTool.type === "image") {
-      this.onImageToolbarButtonClick();
-    }
-
-    this.setState((prevState) => {
-      const commonResets = {
-        snapLines: prevState.snapLines.length ? [] : prevState.snapLines,
-        originSnapOffset: null,
-        activeEmbeddable: null,
-        selectedLinearElement: isSelectionLikeTool(nextActiveTool.type)
-          ? prevState.selectedLinearElement
-          : null,
-      } as const;
-
-      if (nextActiveTool.type === "freedraw") {
-        this.store.scheduleCapture();
-      }
-
-      if (nextActiveTool.type === "lasso") {
-        return {
-          ...prevState,
-          ...commonResets,
-          activeTool: nextActiveTool,
-          ...(keepSelection
-            ? {}
-            : {
-                selectedElementIds: makeNextSelectedElementIds({}, prevState),
-                selectedGroupIds: makeNextSelectedElementIds({}, prevState),
-                editingGroupId: null,
-                multiElement: null,
-              }),
-        };
-      } else if (nextActiveTool.type !== "selection") {
-        return {
-          ...prevState,
-          ...commonResets,
-          activeTool: nextActiveTool,
-          selectedElementIds: makeNextSelectedElementIds({}, prevState),
-          selectedGroupIds: makeNextSelectedElementIds({}, prevState),
-          editingGroupId: null,
-          multiElement: null,
-        };
-      }
-      return {
-        ...prevState,
-        ...commonResets,
-        activeTool: nextActiveTool,
-      };
-    });
-  };
+  ) => appHelperOps.setActiveTool(this.engineContext, tool, keepSelection);
 
   setOpenDialog = (dialogType: AppState["openDialog"]) => {
     this.setState({ openDialog: dialogType });
@@ -3629,12 +3508,7 @@ class App extends React.Component<AppProps, AppState> {
   }
 
   private deselectElements() {
-    this.setState({
-      selectedElementIds: makeNextSelectedElementIds({}, this.state),
-      selectedGroupIds: {},
-      editingGroupId: null,
-      activeEmbeddable: null,
-    });
+    appHelperOps.deselectElements(this.engineContext);
   }
 
   private getSelectedTextElement(
