@@ -2,8 +2,11 @@
   // Port of packages/excalidraw/components/LoadingMessage.tsx
   // TODO: i18n — "Loading scene..." is hardcoded; original uses t("labels.loadingScene")
 
+  import { untrack } from 'svelte';
   import clsx from 'clsx';
   import Spinner from './Spinner.svelte';
+  // @ts-ignore — resolved by Vite alias; no tsconfig path to avoid upstream cascade
+  import { t } from '@excalidraw/excalidraw/i18n';
 
   const THEME_DARK = 'dark'; // matches THEME.DARK from @excalidraw/common
 
@@ -15,7 +18,8 @@
     theme?: string;
   } = $props();
 
-  let isWaiting = $state(false);
+  // untrack: intentionally capture initial value only — $effect handles updates
+  let isWaiting = $state(untrack(() => !!delay));
 
   $effect(() => {
     if (!delay) {
@@ -39,6 +43,6 @@
     <div>
       <Spinner />
     </div>
-    <div class="LoadingMessage-text">Loading scene...</div>
+    <div class="LoadingMessage-text">{t('labels.loadingScene')}</div>
   </div>
 {/if}

@@ -12,6 +12,8 @@ export default defineConfig({
   },
   resolve: {
     alias: [
+      { find: /^@excalidraw\/excalidraw$/, replacement: resolve('../packages/excalidraw/index.tsx') },
+      { find: /^@excalidraw\/excalidraw\/(.*)/, replacement: resolve('../packages/excalidraw/$1') },
       { find: /^@excalidraw\/common$/, replacement: resolve('../packages/common/src/index.ts') },
       { find: /^@excalidraw\/common\/(.*)/, replacement: resolve('../packages/common/src/$1') },
       { find: /^@excalidraw\/element$/, replacement: resolve('../packages/element/src/index.ts') },

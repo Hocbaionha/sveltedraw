@@ -23,6 +23,9 @@ export { default as Switch } from './Switch.svelte';
 export { default as Range } from './Range.svelte';
 export { default as TextField } from './TextField.svelte';
 
+// Tooltip DOM utilities (framework-agnostic, used by Hyperlink and others)
+export { getTooltipDiv, updateTooltipPosition } from './tooltipUtils.js';
+
 // HintViewer — depends on UIAppState / AppClassProperties / app.scene → needs Phase 1 store + Phase 6 context
 // LinkButton — depends on FilledButton (not yet ported)
 // DarkModeToggle — depends on ToolButton (not yet ported)

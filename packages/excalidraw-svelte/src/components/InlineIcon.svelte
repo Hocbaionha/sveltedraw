@@ -10,7 +10,7 @@
     size = '1em',
   }: {
     class?: string;
-    icon?: Snippet;
+    icon: Snippet;
     size?: string;
   } = $props();
 </script>

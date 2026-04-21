@@ -41,25 +41,10 @@
     ref?: HTMLInputElement;
   } = $props();
 
-  let innerRef: HTMLInputElement | undefined = $state();
-
   $effect(() => {
-    if (ref !== undefined) {
-      // sync the $bindable ref upward
-    }
-  });
-
-  // Keep ref prop in sync with internal element
-  $effect(() => {
-    if (innerRef) {
-      ref = innerRef;
-    }
-  });
-
-  $effect(() => {
-    if (selectOnRender && innerRef) {
-      innerRef.focus();
-      innerRef.select();
+    if (selectOnRender && ref) {
+      ref.focus();
+      ref.select();
     }
   });
 
@@ -77,7 +62,7 @@
   })}
   role="none"
   onclick={() => {
-    innerRef?.focus();
+    ref?.focus();
     onclick?.();
   }}
 >
@@ -97,7 +82,7 @@
       readonly={readonly}
       value={value !== undefined ? value : undefined}
       placeholder={placeholder}
-      bind:this={innerRef}
+      bind:this={ref}
       oninput={(event) => onChange?.((event.target as HTMLInputElement).value)}
       onkeydown={onKeyDown}
       {type}
