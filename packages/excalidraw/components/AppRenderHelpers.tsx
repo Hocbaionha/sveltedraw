@@ -44,8 +44,100 @@ import type {
 } from "@excalidraw/element/types";
 
 import { t } from "../i18n";
+import { isBrave, isDevEnv, isTestEnv, supportsResizeObserver } from "@excalidraw/common";
+import { isMeasureTextSupported } from "@excalidraw/element";
+import BraveMeasureTextError from "./BraveMeasureTextError";
 
 type AppLike = any;
+
+export async function componentDidMount(app: AppLike): Promise<void> {
+  app.unmounted = false;
+  app.api = app.createExcalidrawAPI();
+
+  app.excalidrawContainerValue.container = app.excalidrawContainerRef.current;
+
+  if (isTestEnv() || isDevEnv()) {
+    const setState = app.setState.bind(app);
+    Object.defineProperties((window as any).h, {
+      state: {
+        configurable: true,
+        get: () => {
+          return app.state;
+        },
+      },
+      setState: {
+        configurable: true,
+        value: (...args: Parameters<typeof setState>) => {
+          return app.setState(...args);
+        },
+      },
+      app: {
+        configurable: true,
+        value: app,
+      },
+      history: {
+        configurable: true,
+        value: app.history,
+      },
+      store: {
+        configurable: true,
+        value: app.store,
+      },
+      fonts: {
+        configurable: true,
+        value: app.fonts,
+      },
+    });
+  }
+
+  app.store.onDurableIncrementEmitter.on((increment: any) => {
+    app.history.record(increment.delta);
+  });
+
+  if (app.props.onIncrement) {
+    app.store.onStoreIncrementEmitter.on((increment: any) => {
+      app.props.onIncrement?.(increment);
+    });
+  }
+
+  app.scene.onUpdate(app.triggerRender);
+  app.addEventListeners();
+
+  if (app.props.autoFocus && app.excalidrawContainerRef.current) {
+    app.focusContainer();
+  }
+
+  if (supportsResizeObserver && app.excalidrawContainerRef.current) {
+    app.resizeObserver = new ResizeObserver(() => {
+      app.refreshEditorInterface();
+      app.updateDOMRect();
+    });
+    app.resizeObserver?.observe(app.excalidrawContainerRef.current);
+  }
+
+  const searchParams = new URLSearchParams(window.location.search.slice(1));
+
+  if (searchParams.has("web-share-target")) {
+    app.restoreFileFromShare();
+  } else {
+    app.updateDOMRect(app.initializeScene);
+  }
+
+  if (isBrave() && !isMeasureTextSupported()) {
+    app.setState({
+      errorMessage: <BraveMeasureTextError />,
+    });
+  }
+
+  const mountPayload = {
+    excalidrawAPI: app.api,
+    container: app.excalidrawContainerRef.current,
+  };
+
+  app.editorLifecycleEvents.emit("editor:mount", mountPayload);
+  app.props.onMount?.(mountPayload);
+  app.props.onExcalidrawAPI?.(app.api);
+}
 
 export function renderEmbeddables(app: AppLike) {
     const scale = app.state.zoom.value;

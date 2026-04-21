@@ -445,6 +445,7 @@ import { activeEyeDropperAtom } from "./EyeDropper";
 import FollowMode from "./FollowMode/FollowMode";
 import LayerUI from "./LayerUI";
 import {
+  componentDidMount as componentDidMountHelper,
   renderApp as renderAppHelper,
   renderEmbeddables as renderEmbeddablesHelper,
   renderFrameNames as renderFrameNamesHelper,
@@ -1538,96 +1539,7 @@ class App extends React.Component<AppProps, AppState> {
   }
 
   public async componentDidMount() {
-    this.unmounted = false;
-    this.api = this.createExcalidrawAPI();
-
-    this.excalidrawContainerValue.container =
-      this.excalidrawContainerRef.current;
-
-    if (isTestEnv() || isDevEnv()) {
-      const setState = this.setState.bind(this);
-      Object.defineProperties(window.h, {
-        state: {
-          configurable: true,
-          get: () => {
-            return this.state;
-          },
-        },
-        setState: {
-          configurable: true,
-          value: (...args: Parameters<typeof setState>) => {
-            return this.setState(...args);
-          },
-        },
-        app: {
-          configurable: true,
-          value: this,
-        },
-        history: {
-          configurable: true,
-          value: this.history,
-        },
-        store: {
-          configurable: true,
-          value: this.store,
-        },
-        fonts: {
-          configurable: true,
-          value: this.fonts,
-        },
-      });
-    }
-
-    this.store.onDurableIncrementEmitter.on((increment) => {
-      this.history.record(increment.delta);
-    });
-
-    // per. optimmisation, only subscribe if there is the `onIncrement` prop registered, to avoid unnecessary computation
-    if (this.props.onIncrement) {
-      this.store.onStoreIncrementEmitter.on((increment) => {
-        this.props.onIncrement?.(increment);
-      });
-    }
-
-    this.scene.onUpdate(this.triggerRender);
-    this.addEventListeners();
-
-    if (this.props.autoFocus && this.excalidrawContainerRef.current) {
-      this.focusContainer();
-    }
-
-    if (supportsResizeObserver && this.excalidrawContainerRef.current) {
-      this.resizeObserver = new ResizeObserver(() => {
-        this.refreshEditorInterface();
-        this.updateDOMRect();
-      });
-      this.resizeObserver?.observe(this.excalidrawContainerRef.current);
-    }
-
-    const searchParams = new URLSearchParams(window.location.search.slice(1));
-
-    if (searchParams.has("web-share-target")) {
-      // Obtain a file that was shared via the Web Share Target API.
-      this.restoreFileFromShare();
-    } else {
-      this.updateDOMRect(this.initializeScene);
-    }
-
-    // note that this check seems to always pass in localhost
-    if (isBrave() && !isMeasureTextSupported()) {
-      this.setState({
-        errorMessage: <BraveMeasureTextError />,
-      });
-    }
-
-    const mountPayload = {
-      excalidrawAPI: this.api,
-      container: this.excalidrawContainerRef.current,
-    };
-
-    this.editorLifecycleEvents.emit("editor:mount", mountPayload);
-    this.props.onMount?.(mountPayload);
-    this.props.onExcalidrawAPI?.(this.api);
+    return componentDidMountHelper(this);
   }
 
   public componentWillUnmount() {
