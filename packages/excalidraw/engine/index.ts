@@ -12,4 +12,6 @@ export * as textOps from "./textOps";
 export * as imageEraseOps from "./imageEraseOps";
 export * as bindFrameOps from "./bindFrameOps";
 export * as linearHoverContextOps from "./linearHoverContextOps";
+export * as fileOps from "./fileOps";
+export * as textWysiwygOps from "./textWysiwygOps";
 export type { AppEngineContext } from "./AppEngineContext";

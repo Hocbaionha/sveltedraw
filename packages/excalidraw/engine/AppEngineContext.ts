@@ -513,6 +513,49 @@ export interface AppEngineContext {
     element: ExcalidrawIframeLikeElement,
   ) => HTMLIFrameElement | undefined;
   getAppId: () => string;
+  getApp: () => AppClassProperties;
+  // Phase 2h.6 (fileOps) delegates
+  updateImageCache: (
+    elements: readonly NonDeletedExcalidrawElement[],
+    files?: BinaryFiles,
+  ) => Promise<{ erroredFiles: Map<string, true> }>;
+  propGenerateIdForFile?: (file: File) => string | Promise<string>;
+  getLatestInitializedImageElement: (
+    imagePlaceholder: ExcalidrawImageElement,
+    fileId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ) => any;
+  getImageNaturalDimensions: (
+    imageElement: ExcalidrawImageElement,
+    imageHTML: HTMLImageElement,
+  ) => {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    crop: null;
+  };
+  newImagePlaceholder: (opts: {
+    sceneX: number;
+    sceneY: number;
+    addToFrameUnderCursor?: boolean;
+  }) => ExcalidrawImageElement;
+  initializeImage: (
+    placeholderImageElement: ExcalidrawImageElement,
+    imageFile: File,
+  ) => Promise<NonDeleted<ExcalidrawImageElement>>;
+  loadFileToCanvas: (
+    file: File,
+    fileHandle: FileSystemFileHandle | null,
+  ) => Promise<void>;
+  addElementsFromPasteOrLibrary: (opts: {
+    elements: readonly ExcalidrawElement[];
+    files: BinaryFiles | null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    position: any;
+  }) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getLibrary: () => any;
   propOnLinkOpen?: (
     element: NonDeletedExcalidrawElement,
     event: CustomEvent<{

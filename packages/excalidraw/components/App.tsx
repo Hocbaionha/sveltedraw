@@ -499,7 +499,7 @@ import type {
 import type { RoughCanvas } from "roughjs/bin/canvas";
 import type { Action, ActionResult } from "../actions/types";
 
-import { scrollOps, gestureOps, clipboardOps, keyboardOps, pointerDownSubOps, pointerMoveOps, pointerUpOps, pointerHelperOps, pointerEventOps, canvasEventOps, textOps, imageEraseOps, bindFrameOps, linearHoverContextOps, type AppEngineContext } from "../engine";
+import { scrollOps, gestureOps, clipboardOps, keyboardOps, pointerDownSubOps, pointerMoveOps, pointerUpOps, pointerHelperOps, pointerEventOps, canvasEventOps, textOps, imageEraseOps, bindFrameOps, linearHoverContextOps, fileOps, textWysiwygOps, type AppEngineContext } from "../engine";
 import { YOUTUBE_VIDEO_STATES } from "../engine/youtubeStates";
 
 const AppContext = React.createContext<AppClassProperties>(null!);
@@ -1196,6 +1196,23 @@ class App extends React.Component<AppProps, AppState> {
       },
       getHTMLIFrameElement: (element) => this.getHTMLIFrameElement(element),
       getAppId: () => this.id,
+      getApp: () => this,
+      updateImageCache: (elements, files) =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        this.updateImageCache(elements as any, files),
+      propGenerateIdForFile: this.props?.generateIdForFile,
+      getLatestInitializedImageElement: (placeholder, fileId) =>
+        this.getLatestInitializedImageElement(placeholder, fileId as any),
+      getImageNaturalDimensions: (imageElement, imageHTML) =>
+        this.getImageNaturalDimensions(imageElement, imageHTML),
+      newImagePlaceholder: (opts) => this.newImagePlaceholder(opts),
+      initializeImage: (placeholder, file) =>
+        this.initializeImage(placeholder, file),
+      loadFileToCanvas: (file, fileHandle) =>
+        this.loadFileToCanvas(file, fileHandle),
+      addElementsFromPasteOrLibrary: (opts) =>
+        this.addElementsFromPasteOrLibrary(opts),
+      getLibrary: () => this.library,
       propOnLinkOpen: this.props?.onLinkOpen,
     };
   }
@@ -4050,131 +4067,12 @@ class App extends React.Component<AppProps, AppState> {
 
   private handleTextWysiwyg(
     element: ExcalidrawTextElement,
-    {
-      isExistingElement = false,
-      initialCaretSceneCoords = null,
-    }: {
+    opts: {
       isExistingElement?: boolean;
-      /**
-       * supply null if no caret positioning is desired, and instead
-       * text should be auto-selected
-       */
       initialCaretSceneCoords?: { x: number; y: number } | null;
     },
   ) {
-    const elementsMap = this.scene.getElementsMapIncludingDeleted();
-
-    const updateElement = (nextOriginalText: string, isDeleted: boolean) => {
-      this.scene.replaceAllElements([
-        // Not sure why we include deleted elements as well hence using deleted elements map
-        ...this.scene.getElementsIncludingDeleted().map((_element) => {
-          if (_element.id === element.id && isTextElement(_element)) {
-            return newElementWith(_element, {
-              originalText: nextOriginalText,
-              isDeleted: isDeleted ?? _element.isDeleted,
-              // returns (wrapped) text and new dimensions
-              ...refreshTextDimensions(
-                _element,
-                getContainerElement(_element, elementsMap),
-                elementsMap,
-                nextOriginalText,
-              ),
-            });
-          }
-          return _element;
-        }),
-      ]);
-    };
-
-    textWysiwyg({
-      id: element.id,
-      canvas: this.canvas,
-      getViewportCoords: (x, y) => {
-        const { x: viewportX, y: viewportY } = sceneCoordsToViewportCoords(
-          {
-            sceneX: x,
-            sceneY: y,
-          },
-          this.state,
-        );
-        return [
-          viewportX - this.state.offsetLeft,
-          viewportY - this.state.offsetTop,
-        ];
-      },
-      onChange: withBatchedUpdates((nextOriginalText) => {
-        updateElement(nextOriginalText, false);
-        if (isNonDeletedElement(element)) {
-          updateBoundElements(element, this.scene);
-        }
-      }),
-      onSubmit: withBatchedUpdates(({ viaKeyboard, nextOriginalText }) => {
-        const isDeleted = !nextOriginalText.trim();
-        updateElement(nextOriginalText, isDeleted);
-
-        // keyboard-submit keeps focus on the edited object. For bound text, keep
-        // the container selected even if the text becomes empty and is deleted.
-        const elementIdToSelect = viaKeyboard
-          ? element.containerId || (!isDeleted ? element.id : null)
-          : null;
-
-        if (elementIdToSelect) {
-          // needed to ensure state is updated before "finalize" action
-          // that's invoked on keyboard-submit as well
-          // TODO either move this into finalize as well, or handle all state
-          // updates in one place, skipping finalize action
-          flushSync(() => {
-            this.setState((prevState) => ({
-              selectedElementIds: makeNextSelectedElementIds(
-                {
-                  ...prevState.selectedElementIds,
-                  [elementIdToSelect]: true,
-                },
-                prevState,
-              ),
-            }));
-          });
-        }
-
-        if (isDeleted) {
-          fixBindingsAfterDeletion(this.scene.getNonDeletedElements(), [
-            element,
-          ]);
-        }
-
-        if (!isDeleted || isExistingElement) {
-          this.store.scheduleCapture();
-        }
-
-        flushSync(() => {
-          this.setState({
-            newElement: null,
-            editingTextElement: null,
-          });
-        });
-
-        if (this.state.activeTool.locked) {
-          setCursorForShape(this.interactiveCanvas, this.state);
-        }
-
-        this.focusContainer();
-      }),
-      element,
-      excalidrawContainer: this.excalidrawContainerRef.current,
-      app: this,
-      initialCaretSceneCoords,
-      // when text is selected, it's hard (at least on iOS) to re-position the
-      // caret (i.e. deselect). There's not much use for always selecting
-      // the text on edit anyway (and users can select-all from contextmenu
-      // if needed)
-      autoSelect: !this.editorInterface.isTouchScreen,
-    });
-    // deselect all other elements when inserting text
-    this.deselectElements();
-
-    // do an initial update to re-initialize element position since we were
-    // modifying element's x/y for sake of editor (case: syncing to remote)
-    updateElement(element.originalText, false);
+    return textWysiwygOps.handleTextWysiwyg(this.engineContext, element, opts);
   }
 
   private deselectElements() {
@@ -4878,127 +4776,10 @@ class App extends React.Component<AppProps, AppState> {
   private eraseElements = () =>
     imageEraseOps.eraseElements(this.engineContext);
 
-  private initializeImage = async (
+  private initializeImage = (
     placeholderImageElement: ExcalidrawImageElement,
     imageFile: File,
-  ) => {
-    // at this point this should be guaranteed image file, but we do this check
-    // to satisfy TS down the line
-    if (!isSupportedImageFile(imageFile)) {
-      throw new Error(t("errors.unsupportedFileType"));
-    }
-    const mimeType = imageFile.type;
-
-    setCursor(this.interactiveCanvas, "wait");
-
-    if (mimeType === MIME_TYPES.svg) {
-      try {
-        imageFile = SVGStringToFile(
-          normalizeSVG(await imageFile.text()),
-          imageFile.name,
-        );
-      } catch (error: any) {
-        console.warn(error);
-        throw new Error(t("errors.svgImageInsertError"));
-      }
-    }
-
-    // generate image id (by default the file digest) before any
-    // resizing/compression takes place to keep it more portable
-    const fileId = await ((this.props.generateIdForFile?.(
-      imageFile,
-    ) as Promise<FileId>) || generateIdFromFile(imageFile));
-
-    if (!fileId) {
-      console.warn(
-        "Couldn't generate file id or the supplied `generateIdForFile` didn't resolve to one.",
-      );
-      throw new Error(t("errors.imageInsertError"));
-    }
-
-    const existingFileData = this.files[fileId];
-    if (!existingFileData?.dataURL) {
-      try {
-        imageFile = await resizeImageFile(imageFile, {
-          maxWidthOrHeight: DEFAULT_MAX_IMAGE_WIDTH_OR_HEIGHT,
-        });
-      } catch (error: any) {
-        console.error(
-          "Error trying to resizing image file on insertion",
-          error,
-        );
-      }
-
-      if (imageFile.size > MAX_ALLOWED_FILE_BYTES) {
-        throw new Error(
-          t("errors.fileTooBig", {
-            maxSize: `${Math.trunc(MAX_ALLOWED_FILE_BYTES / 1024 / 1024)}MB`,
-          }),
-        );
-      }
-    }
-
-    const dataURL =
-      this.files[fileId]?.dataURL || (await getDataURL(imageFile));
-
-    return new Promise<NonDeleted<InitializedExcalidrawImageElement>>(
-      async (resolve, reject) => {
-        try {
-          let initializedImageElement = this.getLatestInitializedImageElement(
-            placeholderImageElement,
-            fileId,
-          );
-
-          this.addMissingFiles([
-            {
-              mimeType,
-              id: fileId,
-              dataURL,
-              created: Date.now(),
-              lastRetrieved: Date.now(),
-            },
-          ]);
-
-          if (!this.imageCache.get(fileId)) {
-            this.addNewImagesToImageCache();
-
-            const { erroredFiles } = await this.updateImageCache([
-              initializedImageElement,
-            ]);
-
-            if (erroredFiles.size) {
-              throw new Error("Image cache update resulted with an error.");
-            }
-          }
-
-          const imageHTML = await this.imageCache.get(fileId)?.image;
-
-          if (
-            imageHTML &&
-            this.state.newElement?.id !== initializedImageElement.id
-          ) {
-            initializedImageElement = this.getLatestInitializedImageElement(
-              placeholderImageElement,
-              fileId,
-            );
-
-            const naturalDimensions = this.getImageNaturalDimensions(
-              initializedImageElement,
-              imageHTML,
-            );
-
-            // no need to create a new instance anymore, just assign the natural dimensions
-            Object.assign(initializedImageElement, naturalDimensions);
-          }
-
-          resolve(initializedImageElement);
-        } catch (error: any) {
-          console.error(error);
-          reject(new Error(t("errors.imageInsertError")));
-        }
-      },
-    );
-  };
+  ) => fileOps.initializeImage(this.engineContext, placeholderImageElement, imageFile);
 
   /**
    * use during async image initialization,
@@ -5183,192 +4964,14 @@ class App extends React.Component<AppProps, AppState> {
     }
   };
 
-  private insertImages = async (
+  private insertImages = (
     imageFiles: File[],
     sceneX: number,
     sceneY: number,
-  ) => {
-    const gridPadding = 50 / this.state.zoom.value;
-    // Create, position, and insert placeholders
-    const placeholders = positionElementsOnGrid(
-      imageFiles.map(() => this.newImagePlaceholder({ sceneX, sceneY })),
-      sceneX,
-      sceneY,
-      gridPadding,
-    );
-    placeholders.forEach((el) => this.scene.insertElement(el));
+  ) => fileOps.insertImages(this.engineContext, imageFiles, sceneX, sceneY);
 
-    // Create, position, insert and select initialized (replacing placeholders)
-    const initialized = await Promise.all(
-      placeholders.map(async (placeholder, i) => {
-        try {
-          return await this.initializeImage(
-            placeholder,
-            await normalizeFile(imageFiles[i]),
-          );
-        } catch (error: any) {
-          this.setState({
-            errorMessage: error.message || t("errors.imageInsertError"),
-          });
-          return newElementWith(placeholder, { isDeleted: true });
-        }
-      }),
-    );
-    const initializedMap = arrayToMap(initialized);
-
-    const positioned = positionElementsOnGrid(
-      initialized.filter((el) => !el.isDeleted),
-      sceneX,
-      sceneY,
-      gridPadding,
-    );
-    const positionedMap = arrayToMap(positioned);
-
-    const nextElements = this.scene
-      .getElementsIncludingDeleted()
-      .map((el) => positionedMap.get(el.id) ?? initializedMap.get(el.id) ?? el);
-
-    this.updateScene({
-      appState: {
-        selectedElementIds: makeNextSelectedElementIds(
-          Object.fromEntries(positioned.map((el) => [el.id, true])),
-          this.state,
-        ),
-      },
-      elements: nextElements,
-      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
-    });
-
-    this.setState({}, () => {
-      // actionFinalize after all state values have been updated
-      this.actionManager.executeAction(actionFinalize);
-    });
-  };
-
-  private handleAppOnDrop = async (event: React.DragEvent<HTMLDivElement>) => {
-    const { x: sceneX, y: sceneY } = viewportCoordsToSceneCoords(
-      event,
-      this.state,
-    );
-    const dataTransferList = await parseDataTransferEvent(event);
-
-    // must be retrieved first, in the same frame
-    const fileItems = dataTransferList.getFiles();
-
-    if (fileItems.length === 1) {
-      const { file, fileHandle } = fileItems[0];
-
-      if (
-        file &&
-        (file.type === MIME_TYPES.png || file.type === MIME_TYPES.svg)
-      ) {
-        try {
-          const scene = await loadFromBlob(
-            file,
-            this.state,
-            this.scene.getElementsIncludingDeleted(),
-            fileHandle,
-          );
-          this.syncActionResult({
-            ...scene,
-            appState: {
-              ...(scene.appState || this.state),
-              isLoading: false,
-            },
-            replaceFiles: true,
-            captureUpdate: CaptureUpdateAction.IMMEDIATELY,
-          });
-          return;
-        } catch (error: any) {
-          if (error.name !== "EncodingError") {
-            throw new Error(t("alerts.couldNotLoadInvalidFile"));
-          }
-          // if EncodingError, fall through to insert as regular image
-        }
-      }
-    }
-
-    const imageFiles = fileItems
-      .map((data) => data.file)
-      .filter((file) => isSupportedImageFile(file));
-
-    if (imageFiles.length > 0 && this.isToolSupported("image")) {
-      return this.insertImages(imageFiles, sceneX, sceneY);
-    }
-    const excalidrawLibrary_ids = dataTransferList.getData(
-      MIME_TYPES.excalidrawlibIds,
-    );
-    const excalidrawLibrary_data = dataTransferList.getData(
-      MIME_TYPES.excalidrawlib,
-    );
-    if (excalidrawLibrary_ids || excalidrawLibrary_data) {
-      try {
-        let libraryItems: LibraryItems | null = null;
-        if (excalidrawLibrary_ids) {
-          const { itemIds } = JSON.parse(
-            excalidrawLibrary_ids,
-          ) as ExcalidrawLibraryIds;
-          const allLibraryItems = await this.library.getLatestLibrary();
-          libraryItems = allLibraryItems.filter((item) =>
-            itemIds.includes(item.id),
-          );
-          // legacy library dataTransfer format
-        } else if (excalidrawLibrary_data) {
-          libraryItems = parseLibraryJSON(excalidrawLibrary_data);
-        }
-        if (libraryItems?.length) {
-          libraryItems = libraryItems.map((item) => ({
-            ...item,
-            // #6465
-            elements: duplicateElements({
-              type: "everything",
-              elements: item.elements,
-              randomizeSeed: true,
-            }).duplicatedElements,
-          }));
-
-          this.addElementsFromPasteOrLibrary({
-            elements: distributeLibraryItemsOnSquareGrid(libraryItems),
-            position: event,
-            files: null,
-          });
-        }
-      } catch (error: any) {
-        this.setState({ errorMessage: error.message });
-      }
-      return;
-    }
-
-    if (fileItems.length > 0) {
-      const { file, fileHandle } = fileItems[0];
-      if (file) {
-        // Attempt to parse an excalidraw/excalidrawlib file
-        await this.loadFileToCanvas(file, fileHandle);
-      }
-    }
-
-    const textItem = dataTransferList.findByType(MIME_TYPES.text);
-
-    if (textItem) {
-      const text = textItem.value;
-      if (
-        text &&
-        embeddableURLValidator(text, this.props.validateEmbeddable) &&
-        (/^(http|https):\/\/[^\s/$.?#].[^\s]*$/.test(text) ||
-          getEmbedLink(text)?.type === "video")
-      ) {
-        const embeddable = this.insertEmbeddableElement({
-          sceneX,
-          sceneY,
-          link: normalizeLink(text),
-        });
-        if (embeddable) {
-          this.store.scheduleCapture();
-          this.setState({ selectedElementIds: { [embeddable.id]: true } });
-        }
-      }
-    }
-  };
+  private handleAppOnDrop = (event: React.DragEvent<HTMLDivElement>) =>
+    fileOps.handleAppOnDrop(this.engineContext, event);
 
   loadFileToCanvas = async (
     file: File,
