@@ -499,6 +499,8 @@ import type {
 import type { RoughCanvas } from "roughjs/bin/canvas";
 import type { Action, ActionResult } from "../actions/types";
 
+import { scrollOps, type AppEngineContext } from "../engine";
+
 const AppContext = React.createContext<AppClassProperties>(null!);
 const AppPropsContext = React.createContext<AppProps>(null!);
 
@@ -850,6 +852,46 @@ class App extends React.Component<AppProps, AppState> {
     // will invalidate it (so in StrictMode, doing this in constructor alone
     // would be a problem)
     this.api = this.createExcalidrawAPI();
+  }
+
+  /**
+   * Minimal context object injected into engine modules (scrollOps, etc.)
+   * extracted from App.tsx. Only exposes the fields each module actually needs.
+   * Grows as more modules are extracted from the class.
+   */
+  private get engineContext(): AppEngineContext {
+    return {
+      getState: () => this.state,
+      setState: (patch, callback) => this.setState(patch as any, callback),
+      scene: this.scene,
+      canvas: this.canvas,
+      interactiveCanvas: this.interactiveCanvas,
+      excalidrawContainerRef: this.excalidrawContainerRef,
+      cancelInProgressAnimation: this.cancelInProgressAnimation,
+      setCancelInProgressAnimation: (fn) => {
+        this.cancelInProgressAnimation = fn;
+      },
+      maybeUnfollowRemoteUser: () => this.maybeUnfollowRemoteUser(),
+      // Module-level singletons accessed via getters/setters
+      getIsPanning: () => isPanning,
+      setIsPanning: (value) => {
+        isPanning = value;
+      },
+      getIsHoldingSpace: () => isHoldingSpace,
+      getGesture: () => gesture,
+      getCurrentScrollBars: () => currentScrollBars,
+      getLastPointerUp: () => lastPointerUp,
+      setLastPointerUp: (fn) => {
+        lastPointerUp = fn;
+      },
+      // Viewport tracking
+      lastViewportPosition: this.lastViewportPosition,
+      // Cross-module method delegates
+      focusContainer: () => this.focusContainer(),
+      savePointer: (x, y, button) => this.savePointer(x, y, button),
+      resetShouldCacheIgnoreZoomDebounced: () =>
+        this.resetShouldCacheIgnoreZoomDebounced(),
+    };
   }
 
   updateEditorAtom = <Value, Args extends unknown[], Result>(
@@ -3540,15 +3582,10 @@ class App extends React.Component<AppProps, AppState> {
     this.scheduleImageRefresh();
   };
 
-  private onScroll = debounce(() => {
-    const { offsetTop, offsetLeft } = this.getCanvasOffsets();
-    this.setState((state) => {
-      if (state.offsetLeft === offsetLeft && state.offsetTop === offsetTop) {
-        return null;
-      }
-      return { offsetTop, offsetLeft };
-    });
-  }, SCROLL_TIMEOUT);
+  private onScroll = debounce(
+    () => scrollOps.onScroll(this.engineContext),
+    SCROLL_TIMEOUT,
+  );
 
   // Copy/paste
 
@@ -4284,18 +4321,7 @@ class App extends React.Component<AppProps, AppState> {
      * 1 = 100% zoom, 2 = 200% zoom, 0.5 = 50% zoom
      */
     value: number,
-  ) => {
-    this.setState({
-      ...getStateForZoom(
-        {
-          viewportX: this.state.width / 2 + this.state.offsetLeft,
-          viewportY: this.state.height / 2 + this.state.offsetTop,
-          nextZoom: getNormalizedZoom(value),
-        },
-        this.state,
-      ),
-    });
-  };
+  ) => scrollOps.zoomCanvas(this.engineContext, value);
 
   private cancelInProgressAnimation: (() => void) | null = null;
 
@@ -4450,11 +4476,13 @@ class App extends React.Component<AppProps, AppState> {
   /** use when changing scrollX/scrollY/zoom based on user interaction */
   private translateCanvas: React.Component<any, AppState>["setState"] = (
     state,
-  ) => {
-    this.cancelInProgressAnimation?.();
-    this.maybeUnfollowRemoteUser();
-    this.setState(state);
-  };
+  ) =>
+    scrollOps.translateCanvas(
+      this.engineContext,
+      state as
+        | Partial<AppState>
+        | ((prevState: AppState) => Partial<AppState> | null),
+    );
 
   setToast = (toast: AppState["toast"]) => {
     this.setState({ toast });
