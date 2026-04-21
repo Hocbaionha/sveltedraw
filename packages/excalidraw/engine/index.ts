@@ -15,4 +15,6 @@ export * as linearHoverContextOps from "./linearHoverContextOps";
 export * as fileOps from "./fileOps";
 export * as textWysiwygOps from "./textWysiwygOps";
 export * as appHelperOps from "./appHelperOps";
+export { createEngineContext } from "./engineContextFactory";
+export { appGlobals } from "./appGlobals";
 export type { AppEngineContext } from "./AppEngineContext";

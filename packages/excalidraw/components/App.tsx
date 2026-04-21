@@ -499,8 +499,8 @@ import type {
 import type { RoughCanvas } from "roughjs/bin/canvas";
 import type { Action, ActionResult } from "../actions/types";
 
-import { scrollOps, gestureOps, clipboardOps, keyboardOps, pointerDownSubOps, pointerMoveOps, pointerUpOps, pointerHelperOps, pointerEventOps, canvasEventOps, textOps, imageEraseOps, bindFrameOps, linearHoverContextOps, fileOps, textWysiwygOps, appHelperOps, type AppEngineContext } from "../engine";
-import { YOUTUBE_VIDEO_STATES } from "../engine/youtubeStates";
+import { scrollOps, gestureOps, clipboardOps, keyboardOps, pointerDownSubOps, pointerMoveOps, pointerUpOps, pointerHelperOps, pointerEventOps, canvasEventOps, textOps, imageEraseOps, bindFrameOps, linearHoverContextOps, fileOps, textWysiwygOps, appHelperOps, createEngineContext, type AppEngineContext } from "../engine";
+import { appGlobals } from "../engine/appGlobals";
 
 const AppContext = React.createContext<AppClassProperties>(null!);
 const AppPropsContext = React.createContext<AppProps>(null!);
@@ -588,30 +588,10 @@ export const useExcalidrawActionManager = () =>
  */
 export const useExcalidrawAPI = () => useContext(ExcalidrawAPIContext);
 
-let didTapTwice: boolean = false;
-let tappedTwiceTimer = 0;
-let firstTapPosition: { x: number; y: number } | null = null;
-let isHoldingSpace: boolean = false;
-let isPanning: boolean = false;
-let isDraggingScrollBar: boolean = false;
-let currentScrollBars: ScrollBars = { horizontal: null, vertical: null };
-let touchTimeout = 0;
-let invalidateContextMenu = false;
-
-// YOUTUBE_VIDEO_STATES is now hoisted into engine/youtubeStates.ts so engine
-// modules can access the same Map.
-
-let IS_PLAIN_PASTE = false;
-let IS_PLAIN_PASTE_TIMER = 0;
-let PLAIN_PASTE_TOAST_SHOWN = false;
-
-let lastPointerUp: (() => void) | null = null;
-const gesture: Gesture = {
-  pointers: new Map(),
-  lastCenter: null,
-  initialDistance: null,
-  initialScale: null,
-};
+// Module-level globals hoisted into engine/appGlobals.ts so the
+// engineContext factory and engine modules can share them. App.tsx reads/
+// writes via `appGlobals.*` directly.
+const { gesture } = appGlobals;
 
 class App extends React.Component<AppProps, AppState> {
   canvas: AppClassProperties["canvas"];
@@ -856,369 +836,7 @@ class App extends React.Component<AppProps, AppState> {
    * Grows as more modules are extracted from the class.
    */
   private get engineContext(): AppEngineContext {
-    return {
-      getState: () => this.state,
-      setState: (patch, callback) => this.setState(patch as any, callback),
-      scene: this.scene,
-      store: this.store,
-      actionManager: this.actionManager,
-      fonts: this.fonts,
-      editorInterface: this.editorInterface,
-      canvas: this.canvas,
-      interactiveCanvas: this.interactiveCanvas,
-      excalidrawContainerRef: this.excalidrawContainerRef,
-      cancelInProgressAnimation: this.cancelInProgressAnimation,
-      setCancelInProgressAnimation: (fn) => {
-        this.cancelInProgressAnimation = fn;
-      },
-      maybeUnfollowRemoteUser: () => this.maybeUnfollowRemoteUser(),
-      // Module-level singletons accessed via getters/setters
-      getIsPanning: () => isPanning,
-      setIsPanning: (value) => {
-        isPanning = value;
-      },
-      getIsHoldingSpace: () => isHoldingSpace,
-      getIsDraggingScrollBar: () => isDraggingScrollBar,
-      getGesture: () => gesture,
-      getCurrentScrollBars: () => currentScrollBars,
-      getLastPointerUp: () => lastPointerUp,
-      setLastPointerUp: (fn) => {
-        lastPointerUp = fn;
-      },
-      // Module-level mutable globals for gesture/touch tracking
-      getDidTapTwice: () => didTapTwice,
-      setDidTapTwice: (value) => {
-        didTapTwice = value;
-      },
-      getTappedTwiceTimer: () => tappedTwiceTimer,
-      setTappedTwiceTimer: (value) => {
-        tappedTwiceTimer = value;
-      },
-      getFirstTapPosition: () => firstTapPosition,
-      setFirstTapPosition: (value) => {
-        firstTapPosition = value;
-      },
-      getInvalidateContextMenu: () => invalidateContextMenu,
-      setInvalidateContextMenu: (value) => {
-        invalidateContextMenu = value;
-      },
-      // Module-level mutable globals for clipboard tracking
-      getIsPlainPaste: () => IS_PLAIN_PASTE,
-      setIsPlainPaste: (value) => {
-        IS_PLAIN_PASTE = value;
-      },
-      getIsPlainPasteTimer: () => IS_PLAIN_PASTE_TIMER,
-      setIsPlainPasteTimer: (value) => {
-        IS_PLAIN_PASTE_TIMER = value;
-      },
-      getPlainPasteToastShown: () => PLAIN_PASTE_TOAST_SHOWN,
-      setPlainPasteToastShown: (value) => {
-        PLAIN_PASTE_TOAST_SHOWN = value;
-      },
-      setIsHoldingSpace: (value) => {
-        isHoldingSpace = value;
-      },
-      // Files
-      files: this.files,
-      // LassoTrail
-      lassoTrail: this.lassoTrail,
-      // Viewport tracking
-      lastViewportPosition: this.lastViewportPosition,
-      // Props callbacks
-      onPaste: this.props.onPaste,
-      onDuplicate: this.props.onDuplicate,
-      validateEmbeddable: this.props.validateEmbeddable,
-      // Cross-module method delegates
-      focusContainer: () => this.focusContainer(),
-      savePointer: (x, y, button) => this.savePointer(x, y, button),
-      resetShouldCacheIgnoreZoomDebounced: () =>
-        this.resetShouldCacheIgnoreZoomDebounced(),
-      deselectElements: () => this.deselectElements(),
-      handleCanvasDoubleClick: (event) => this.handleCanvasDoubleClick(event),
-      resetContextMenuTimer: () => this.resetContextMenuTimer(),
-      // clipboardOps delegates
-      isToolSupported: (tool) => this.isToolSupported(tool),
-      insertImages: (imageFiles, sceneX, sceneY) =>
-        this.insertImages(imageFiles, sceneX, sceneY),
-      insertEmbeddableElement: (opts) => this.insertEmbeddableElement(opts),
-      addMissingFiles: (files, replace) => this.addMissingFiles(files, replace),
-      addNewImagesToImageCache: () => this.addNewImagesToImageCache(),
-      getEffectiveGridSize: () => this.getEffectiveGridSize(),
-      getTopLayerFrameAtSceneCoords: (coords) =>
-        this.getTopLayerFrameAtSceneCoords(coords),
-      getEditorUIOffsets: () => this.getEditorUIOffsets(),
-      setActiveTool: (tool, keepSelection) =>
-        this.setActiveTool(tool, keepSelection),
-      setToast: (toast) => this.setToast(toast),
-      scrollToContent: (target, opts) => this.scrollToContent(target as any, opts),
-      // keyboardOps
-      propViewModeEnabled: this.props.viewModeEnabled,
-      getLastPointerMoveEvent: () => this.lastPointerMoveEvent,
-      finishImageCropping: () => this.finishImageCropping(),
-      startImageCropping: (element) => this.startImageCropping(element),
-      updateEditorAtom: (atom, ...args) =>
-        (this.updateEditorAtom as any)(atom, ...args),
-      flowChartCreator: this.flowChartCreator,
-      flowChartNavigator: this.flowChartNavigator,
-      triggerRender: (force) => this.triggerRender(force),
-      handleSkipBindMode: () => this.handleSkipBindMode(),
-      resetDelayedBindMode: () => this.resetDelayedBindMode(),
-      openEyeDropper: (opts) => this.openEyeDropper(opts),
-      toggleLock: (source) => this.toggleLock(source),
-      startTextEditing: (opts) => this.startTextEditing(opts),
-      syncActionResult: (result) => this.syncActionResult(result),
-      handleDelayedBindModeChange: (element, hoveredElement) =>
-        this.handleDelayedBindModeChange(element, hoveredElement),
-      convertElementTypes: (opts) => convertElementTypes(this, opts),
-      findShapeByKey: (key) => findShapeByKey(key, this) as ToolType | null,
-      maybeHandleArrowPointlikeDrag: (event) =>
-        maybeHandleArrowPointlikeDrag({ app: this, event }),
-      getLastPointerDownEvent: () => this.lastPointerDownEvent,
-      getElementAtPosition: (x, y, opts) => this.getElementAtPosition(x, y, opts),
-      getTextBindableContainerAtPosition: (x, y) =>
-        this.getTextBindableContainerAtPosition(x, y),
-      getLastPointerMoveCoords: () => this.lastPointerMoveCoords,
-      setHitLinkElement: (element) => {
-        this.hitLinkElement = element;
-      },
-      clearSelection: (hitElement) => this.clearSelection(hitElement),
-      isASelectedElement: (hitElement) => this.isASelectedElement(hitElement),
-      setOpenDialog: (dialog) => this.setOpenDialog(dialog),
-      getElementsAtPosition: (x, y, opts) =>
-        this.getElementsAtPosition(x, y, opts),
-      getElementLinkAtPosition: (scenePointer, hitElementMightBeLocked) =>
-        this.getElementLinkAtPosition(scenePointer, hitElementMightBeLocked),
-      linearElementEditor_handlePointerDown: (event, scenePointer, lee) =>
-        LinearElementEditor.handlePointerDown(
-          event,
-          this,
-          this.store,
-          scenePointer,
-          lee,
-          this.scene,
-        ),
-      handleEraser: (event, scenePointer) =>
-        this.handleEraser(event, scenePointer),
-      handlePointerMoveOverScrollbars: (event, pointerDownState) =>
-        this.handlePointerMoveOverScrollbars(event, pointerDownState),
-      imageCache: this.imageCache,
-      laserTrails: this.laserTrails,
-      maybeCacheReferenceSnapPoints: (event, selectedElements, recompute) =>
-        this.maybeCacheReferenceSnapPoints(event, selectedElements, recompute),
-      maybeCacheVisibleGaps: (event, selectedElements, recompute) =>
-        this.maybeCacheVisibleGaps(event, selectedElements, recompute),
-      maybeDragNewGenericElement: (pointerDownState, event, informMutation) =>
-        this.maybeDragNewGenericElement(
-          pointerDownState,
-          event,
-          informMutation,
-        ),
-      maybeHandleCrop: (pointerDownState, event) =>
-        this.maybeHandleCrop(pointerDownState, event),
-      maybeHandleResize: (pointerDownState, event) =>
-        this.maybeHandleResize(pointerDownState, event),
-      getPreviousPointerMoveCoords: () => this.previousPointerMoveCoords,
-      setPreviousPointerMoveCoords: (coords) => {
-        this.previousPointerMoveCoords = coords;
-      },
-      snapDraggedElements: (elements, dragOffset, event) =>
-        snapDraggedElements(
-          elements,
-          dragOffset,
-          this,
-          event,
-          this.scene.getNonDeletedElementsMap(),
-        ),
-      linearElementEditor_addMidpoint: (lee, pointerCoords, snapToGrid) =>
-        LinearElementEditor.addMidpoint(
-          lee,
-          pointerCoords,
-          this,
-          snapToGrid,
-          this.scene,
-        ),
-      linearElementEditor_handlePointDragging: (event, x, y, lee) =>
-        LinearElementEditor.handlePointDragging(event, this, x, y, lee),
-      linearElementEditor_handleBoxSelection: (event) =>
-        LinearElementEditor.handleBoxSelection(
-          event,
-          this.state,
-          this.setState.bind(this),
-          this.scene.getNonDeletedElementsMap(),
-        ),
-      eraseElements: () => this.eraseElements(),
-      eraserTrail: this.eraserTrail,
-      getElementHitThreshold: (element) => this.getElementHitThreshold(element),
-      getSelectedTextEditingContainerAtPosition: (hitElement, sceneCoords) =>
-        this.getSelectedTextEditingContainerAtPosition(hitElement, sceneCoords),
-      handleTextWysiwyg: (element, opts) =>
-        this.handleTextWysiwyg(element, opts),
-      getLastPointerUpEvent: () => this.lastPointerUpEvent,
-      getLastPointerUpIsDoubleClick: () => this.lastPointerUpIsDoubleClick,
-      missingPointerEventCleanupEmitter_clear: () =>
-        this.missingPointerEventCleanupEmitter.clear(),
-      onPointerUpEmitter_trigger: (activeTool, pointerDownState, event) =>
-        this.onPointerUpEmitter.trigger(activeTool, pointerDownState, event),
-      removePointer: (event) => this.removePointer(event),
-      appResetCursor: () => this.resetCursor(),
-      restoreReadyToEraseElements: () => this.restoreReadyToEraseElements(),
-      updateScene: this.updateScene,
-      getElementsPendingErasure: () => this.elementsPendingErasure,
-      frameNameBoundsCache: this.frameNameBoundsCache,
-      propOnPointerUp: this.props?.onPointerUp,
-      updateFrameMembershipOfSelectedElements_facade: (allElements) =>
-        updateFrameMembershipOfSelectedElements(
-          allElements,
-          this.state,
-          this,
-        ),
-      replaceAllElementsInFrame_facade: (
-        allElements,
-        nextElementsInFrame,
-        frame,
-      ) =>
-        replaceAllElementsInFrame(
-          allElements,
-          nextElementsInFrame,
-          frame,
-          this,
-        ),
-      setElementsPendingErasure: (ids) => {
-        this.elementsPendingErasure = ids;
-      },
-      isSnappingEnabled_facade: (event, selectedElements) =>
-        isSnappingEnabled({ event, app: this, selectedElements }),
-      snapNewElement_facade: (newElement, event, origin, dragOffset) =>
-        snapNewElement(
-          newElement,
-          this,
-          event,
-          origin,
-          dragOffset,
-          this.scene.getNonDeletedElementsMap(),
-        ),
-      snapResizingElements_facade: (
-        selectedElements,
-        selectedOriginalElements,
-        event,
-        dragOffset,
-        transformHandle,
-      ) =>
-        snapResizingElements(
-          selectedElements,
-          selectedOriginalElements,
-          this,
-          event,
-          dragOffset,
-          transformHandle,
-        ),
-      setLastPointerMoveEvent: (event) => {
-        this.lastPointerMoveEvent = event;
-      },
-      setLastPointerMoveCoords: (coords) => {
-        this.lastPointerMoveCoords = coords;
-      },
-      getHitLinkElement: () => this.hitLinkElement,
-      isHittingTextAutoResizeHandle: (selectedElements, point) =>
-        this.isHittingTextAutoResizeHandle(selectedElements, point),
-      isHittingCommonBoundingBoxOfSelectedElements: (point, selectedElements) =>
-        this.isHittingCommonBoundingBoxOfSelectedElements(
-          point,
-          selectedElements,
-        ),
-      handleHoverSelectedLinearElement: (lee, x, y) =>
-        this.handleHoverSelectedLinearElement(lee, x, y),
-      handleIframeLikeElementHover: (opts) =>
-        this.handleIframeLikeElementHover(opts),
-      linearElementEditor_handlePointerMove: (event, x, y, lee) =>
-        LinearElementEditor.handlePointerMove(event, this, x, y, lee),
-      linearElementEditor_handlePointerMoveInEditMode: (event, x, y) =>
-        LinearElementEditor.handlePointerMoveInEditMode(event, x, y, this),
-      getSnapLinesAtPointer_facade: (elements, pointer, event) =>
-        getSnapLinesAtPointer(
-          elements,
-          this,
-          pointer,
-          event,
-          this.scene.getNonDeletedElementsMap(),
-        ),
-      handleCanvasPointerDown: (event) => this.handleCanvasPointerDown(event),
-      setLastPointerDownEvent: (event) => {
-        this.lastPointerDownEvent = event;
-      },
-      setEditorInterface: (patch) => {
-        this.editorInterface = updateObject(this.editorInterface, patch);
-      },
-      setAppState: (patch) =>
-        this.setAppState(patch as Pick<AppState, keyof AppState>),
-      propOnPointerDown: this.props?.onPointerDown,
-      onPointerDownEmitter_trigger: (activeTool, pointerDownState, event) =>
-        this.onPointerDownEmitter.trigger(activeTool, pointerDownState, event),
-      missingPointerEventCleanupEmitter_once: (cb) =>
-        this.missingPointerEventCleanupEmitter.once(cb),
-      maybeCleanupAfterMissingPointerUp: (event) =>
-        this.maybeCleanupAfterMissingPointerUp(event),
-      maybeOpenContextMenuAfterPointerDownOnTouchDevices: (event) =>
-        this.maybeOpenContextMenuAfterPointerDownOnTouchDevices(event),
-      updateGestureOnPointerDown: (event) =>
-        this.updateGestureOnPointerDown(event),
-      initialPointerDownState: (event) => this.initialPointerDownState(event),
-      handleTextAutoResizeHandlePointerDown: (selectedElements, point) =>
-        this.handleTextAutoResizeHandlePointerDown(selectedElements, point),
-      handleDraggingScrollBar: (event, pointerDownState) =>
-        this.handleDraggingScrollBar(event, pointerDownState),
-      clearSelectionIfNotUsingSelection: () =>
-        this.clearSelectionIfNotUsingSelection(),
-      handleCanvasPanUsingWheelOrSpaceDrag: (event) =>
-        this.handleCanvasPanUsingWheelOrSpaceDrag(event),
-      getLastCompletedCanvasClicks: () => this.lastCompletedCanvasClicks,
-      setLastCompletedCanvasClicks: (clicks) => {
-        this.lastCompletedCanvasClicks = clicks;
-      },
-      setLastPointerUpEvent: (event) => {
-        this.lastPointerUpEvent = event;
-      },
-      setLastPointerUpIsDoubleClick: (value) => {
-        this.lastPointerUpIsDoubleClick = value;
-      },
-      isDoubleClick: (prev, curr) => this.isDoubleClick(prev, curr),
-      handleIframeLikeCenterClick: () => this.handleIframeLikeCenterClick(),
-      getContextMenuItems: (type) => this.getContextMenuItems(type),
-      handleElementLinkClick: (event) => this.handleElementLinkClick(event),
-      getBindModeHandler: () => this.bindModeHandler,
-      setBindModeHandler: (handler) => {
-        this.bindModeHandler = handler;
-      },
-      getPreviousHoveredBindableElement: () =>
-        this.previousHoveredBindableElement,
-      setPreviousHoveredBindableElement: (element) => {
-        this.previousHoveredBindableElement = element;
-      },
-      getHTMLIFrameElement: (element) => this.getHTMLIFrameElement(element),
-      getAppId: () => this.id,
-      getApp: () => this,
-      setIsDraggingScrollBar: (value) => {
-        isDraggingScrollBar = value;
-      },
-      propOnPointerUpdate: this.props?.onPointerUpdate,
-      updateImageCache: (elements, files) =>
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        this.updateImageCache(elements as any, files),
-      propGenerateIdForFile: this.props?.generateIdForFile,
-      getLatestInitializedImageElement: (placeholder, fileId) =>
-        this.getLatestInitializedImageElement(placeholder, fileId as any),
-      getImageNaturalDimensions: (imageElement, imageHTML) =>
-        this.getImageNaturalDimensions(imageElement, imageHTML),
-      newImagePlaceholder: (opts) => this.newImagePlaceholder(opts),
-      initializeImage: (placeholder, file) =>
-        this.initializeImage(placeholder, file),
-      loadFileToCanvas: (file, fileHandle) =>
-        this.loadFileToCanvas(file, fileHandle),
-      addElementsFromPasteOrLibrary: (opts) =>
-        this.addElementsFromPasteOrLibrary(opts),
-      getLibrary: () => this.library,
-      propOnLinkOpen: this.props?.onLinkOpen,
-    };
+    return createEngineContext(this);
   }
 
   updateEditorAtom = <Value, Args extends unknown[], Result>(
@@ -2593,7 +2211,7 @@ class App extends React.Component<AppProps, AppState> {
   // Lifecycle
 
   private onBlur = withBatchedUpdates(() => {
-    isHoldingSpace = false;
+    appGlobals.isHoldingSpace = false;
     this.setState({
       isBindingEnabled: this.state.bindingPreference === "enabled",
     });
@@ -2956,10 +2574,10 @@ class App extends React.Component<AppProps, AppState> {
     this.editorLifecycleEvents.clear();
     ShapeCache.destroy();
     SnapCache.destroy();
-    clearTimeout(touchTimeout);
+    clearTimeout(appGlobals.touchTimeout);
     isSomeElementSelected.clearCache();
     selectGroupsForSelectedElements.clearCache();
-    touchTimeout = 0;
+    appGlobals.touchTimeout = 0;
     document.documentElement.style.overscrollBehaviorX = "";
   }
 
@@ -3287,7 +2905,7 @@ class App extends React.Component<AppProps, AppState> {
     elementsMap,
   }: RenderInteractiveSceneCallback) => {
     if (scrollBars) {
-      currentScrollBars = scrollBars;
+      appGlobals.currentScrollBars = scrollBars;
     }
     const scrolledOutside =
       // hide when editing text
@@ -3378,7 +2996,7 @@ class App extends React.Component<AppProps, AppState> {
   };
 
   removePointer = (event: React.PointerEvent<HTMLElement> | PointerEvent) => {
-    if (touchTimeout) {
+    if (appGlobals.touchTimeout) {
       this.resetContextMenuTimer();
     }
 
@@ -3894,7 +3512,7 @@ class App extends React.Component<AppProps, AppState> {
     const nextActiveTool = updateActiveTool(this.state, tool);
     if (nextActiveTool.type === "hand") {
       setCursor(this.interactiveCanvas, CURSOR_TYPE.GRAB);
-    } else if (!isHoldingSpace) {
+    } else if (!appGlobals.isHoldingSpace) {
       setCursorForShape(this.interactiveCanvas, {
         ...this.state,
         activeTool: nextActiveTool,
@@ -4234,19 +3852,19 @@ class App extends React.Component<AppProps, AppState> {
   ): void => {
     // deal with opening context menu on touch devices
     if (event.pointerType === "touch") {
-      invalidateContextMenu = false;
+      appGlobals.invalidateContextMenu = false;
 
-      if (touchTimeout) {
-        // If there's already a touchTimeout, this means that there's another
+      if (appGlobals.touchTimeout) {
+        // If there's already a appGlobals.touchTimeout, this means that there's another
         // touch down and we are doing another touch, so we shouldn't open the
         // context menu.
-        invalidateContextMenu = true;
+        appGlobals.invalidateContextMenu = true;
       } else {
         // open the context menu with the first touch's clientX and clientY
         // if the touch is not moving
-        touchTimeout = window.setTimeout(() => {
-          touchTimeout = 0;
-          if (!invalidateContextMenu) {
+        appGlobals.touchTimeout = window.setTimeout(() => {
+          appGlobals.touchTimeout = 0;
+          if (!appGlobals.invalidateContextMenu) {
             this.handleCanvasContextMenu(event);
           }
         }, TOUCH_CTX_MENU_TIMEOUT);
@@ -4255,9 +3873,9 @@ class App extends React.Component<AppProps, AppState> {
   };
 
   private resetContextMenuTimer = () => {
-    clearTimeout(touchTimeout);
-    touchTimeout = 0;
-    invalidateContextMenu = false;
+    clearTimeout(appGlobals.touchTimeout);
+    appGlobals.touchTimeout = 0;
+    appGlobals.invalidateContextMenu = false;
   };
 
   /**
@@ -4266,7 +3884,7 @@ class App extends React.Component<AppProps, AppState> {
    * pointerup handlers manually
    */
   private maybeCleanupAfterMissingPointerUp = (event: PointerEvent | null) => {
-    lastPointerUp?.();
+    appGlobals.lastPointerUp?.();
     this.missingPointerEventCleanupEmitter.trigger(event).clear();
   };
 
