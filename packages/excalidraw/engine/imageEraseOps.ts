@@ -1,26 +1,36 @@
 import {
   CaptureUpdateAction,
   ShapeCache,
+  getEmbedLink,
   getInitializedImageElements,
   isBindableElement,
   isBindingElement,
   isBoundToContainer,
   isInitializedImageElement,
+  isUsingAdaptiveRadius,
   mutateElement,
   newElementWith,
+  newEmbeddableElement,
+  newIframeElement,
   newImageElement,
   updateImageCache as _updateImageCache,
 } from "@excalidraw/element";
 
+import { ROUNDNESS } from "@excalidraw/common";
+
 import { KEYS, getGridPoint } from "@excalidraw/common";
 
+import { t } from "../i18n";
 import { activeEyeDropperAtom } from "../components/EyeDropper";
 
 import type {
   ExcalidrawArrowElement,
+  ExcalidrawEmbeddableElement,
+  ExcalidrawIframeElement,
   ExcalidrawImageElement,
   FileId,
   InitializedExcalidrawImageElement,
+  NonDeleted,
 } from "@excalidraw/element/types";
 import type { BinaryFiles } from "../types";
 
@@ -344,4 +354,127 @@ export async function addNewImagesToImageCache(
       ctx.scene.triggerUpdate();
     }
   }
+}
+
+function getCurrentItemRoundness(
+  state: { currentItemRoundness: "round" | "sharp" },
+  elementType:
+    | "selection"
+    | "rectangle"
+    | "diamond"
+    | "ellipse"
+    | "iframe"
+    | "embeddable",
+) {
+  return state.currentItemRoundness === "round"
+    ? {
+        type: isUsingAdaptiveRadius(elementType)
+          ? ROUNDNESS.ADAPTIVE_RADIUS
+          : ROUNDNESS.PROPORTIONAL_RADIUS,
+      }
+    : null;
+}
+
+export function insertIframeElement(
+  ctx: AppEngineContext,
+  {
+    sceneX,
+    sceneY,
+    width,
+    height,
+  }: {
+    sceneX: number;
+    sceneY: number;
+    width: number;
+    height: number;
+  },
+): NonDeleted<ExcalidrawIframeElement> {
+  const state = ctx.getState();
+  const lastPointerDownEvent = ctx.getLastPointerDownEvent();
+  const [gridX, gridY] = getGridPoint(
+    sceneX,
+    sceneY,
+    lastPointerDownEvent?.[KEYS.CTRL_OR_CMD]
+      ? null
+      : ctx.getEffectiveGridSize(),
+  );
+
+  const element = newIframeElement({
+    type: "iframe",
+    x: gridX,
+    y: gridY,
+    strokeColor: "transparent",
+    backgroundColor: "transparent",
+    fillStyle: state.currentItemFillStyle,
+    strokeWidth: state.currentItemStrokeWidth,
+    strokeStyle: state.currentItemStrokeStyle,
+    roughness: state.currentItemRoughness,
+    roundness: getCurrentItemRoundness(state, "iframe"),
+    opacity: state.currentItemOpacity,
+    locked: false,
+    width,
+    height,
+  });
+
+  ctx.scene.insertElement(element);
+
+  return element;
+}
+
+export function insertEmbeddableElement(
+  ctx: AppEngineContext,
+  {
+    sceneX,
+    sceneY,
+    link,
+  }: {
+    sceneX: number;
+    sceneY: number;
+    link: string;
+  },
+): NonDeleted<ExcalidrawEmbeddableElement> | undefined {
+  const state = ctx.getState();
+  const lastPointerDownEvent = ctx.getLastPointerDownEvent();
+  const [gridX, gridY] = getGridPoint(
+    sceneX,
+    sceneY,
+    lastPointerDownEvent?.[KEYS.CTRL_OR_CMD]
+      ? null
+      : ctx.getEffectiveGridSize(),
+  );
+
+  const embedLink = getEmbedLink(link);
+
+  if (!embedLink) {
+    return;
+  }
+
+  if (embedLink.error instanceof URIError) {
+    ctx.setToast({
+      message: t("toast.unrecognizedLinkFormat"),
+      closable: true,
+    });
+  }
+
+  const element = newEmbeddableElement({
+    type: "embeddable",
+    x: gridX,
+    y: gridY,
+    strokeColor: "transparent",
+    backgroundColor: "transparent",
+    fillStyle: state.currentItemFillStyle,
+    strokeWidth: state.currentItemStrokeWidth,
+    strokeStyle: state.currentItemStrokeStyle,
+    roughness: state.currentItemRoughness,
+    roundness: getCurrentItemRoundness(state, "embeddable"),
+    opacity: state.currentItemOpacity,
+    locked: false,
+    width: embedLink.intrinsicSize.w,
+    height: embedLink.intrinsicSize.h,
+    link,
+  });
+
+  ctx.scene.insertElement(element);
+
+  return element;
 }

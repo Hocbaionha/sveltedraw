@@ -2548,100 +2548,18 @@ class App extends React.Component<AppProps, AppState> {
       pointerDownState,
     );
 
-  public insertIframeElement = ({
-    sceneX,
-    sceneY,
-    width,
-    height,
-  }: {
+  public insertIframeElement = (opts: {
     sceneX: number;
     sceneY: number;
     width: number;
     height: number;
-  }) => {
-    const [gridX, gridY] = getGridPoint(
-      sceneX,
-      sceneY,
-      this.lastPointerDownEvent?.[KEYS.CTRL_OR_CMD]
-        ? null
-        : this.getEffectiveGridSize(),
-    );
+  }) => imageEraseOps.insertIframeElement(this.engineContext, opts);
 
-    const element = newIframeElement({
-      type: "iframe",
-      x: gridX,
-      y: gridY,
-      strokeColor: "transparent",
-      backgroundColor: "transparent",
-      fillStyle: this.state.currentItemFillStyle,
-      strokeWidth: this.state.currentItemStrokeWidth,
-      strokeStyle: this.state.currentItemStrokeStyle,
-      roughness: this.state.currentItemRoughness,
-      roundness: this.getCurrentItemRoundness("iframe"),
-      opacity: this.state.currentItemOpacity,
-      locked: false,
-      width,
-      height,
-    });
-
-    this.scene.insertElement(element);
-
-    return element;
-  };
-
-  //create rectangle element with youtube top left on nearest grid point width / hight 640/360
-  public insertEmbeddableElement = ({
-    sceneX,
-    sceneY,
-    link,
-  }: {
+  public insertEmbeddableElement = (opts: {
     sceneX: number;
     sceneY: number;
     link: string;
-  }) => {
-    const [gridX, gridY] = getGridPoint(
-      sceneX,
-      sceneY,
-      this.lastPointerDownEvent?.[KEYS.CTRL_OR_CMD]
-        ? null
-        : this.getEffectiveGridSize(),
-    );
-
-    const embedLink = getEmbedLink(link);
-
-    if (!embedLink) {
-      return;
-    }
-
-    if (embedLink.error instanceof URIError) {
-      this.setToast({
-        message: t("toast.unrecognizedLinkFormat"),
-        closable: true,
-      });
-    }
-
-    const element = newEmbeddableElement({
-      type: "embeddable",
-      x: gridX,
-      y: gridY,
-      strokeColor: "transparent",
-      backgroundColor: "transparent",
-      fillStyle: this.state.currentItemFillStyle,
-      strokeWidth: this.state.currentItemStrokeWidth,
-      strokeStyle: this.state.currentItemStrokeStyle,
-      roughness: this.state.currentItemRoughness,
-      roundness: this.getCurrentItemRoundness("embeddable"),
-      opacity: this.state.currentItemOpacity,
-      locked: false,
-      width: embedLink.intrinsicSize.w,
-      height: embedLink.intrinsicSize.h,
-      link,
-    });
-
-    this.scene.insertElement(element);
-
-    return element;
-  };
+  }) => imageEraseOps.insertEmbeddableElement(this.engineContext, opts);
 
   private newImagePlaceholder = (opts: {
     sceneX: number;
