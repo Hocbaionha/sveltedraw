@@ -514,6 +514,12 @@ export interface AppEngineContext {
   ) => HTMLIFrameElement | undefined;
   getAppId: () => string;
   getApp: () => AppClassProperties;
+  setIsDraggingScrollBar: (value: boolean) => void;
+  propOnPointerUpdate?: (payload: {
+    pointer: { x: number; y: number; tool: "pointer" | "laser" };
+    button: "up" | "down";
+    pointersMap: Gesture["pointers"];
+  }) => void;
   // Phase 2h.6 (fileOps) delegates
   updateImageCache: (
     elements: readonly NonDeletedExcalidrawElement[],

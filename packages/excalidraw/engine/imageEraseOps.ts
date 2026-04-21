@@ -1,6 +1,7 @@
-import { CaptureUpdateAction } from "@excalidraw/element";
 import {
+  CaptureUpdateAction,
   ShapeCache,
+  getInitializedImageElements,
   isBindableElement,
   isBindingElement,
   isBoundToContainer,
@@ -8,6 +9,7 @@ import {
   mutateElement,
   newElementWith,
   newImageElement,
+  updateImageCache as _updateImageCache,
 } from "@excalidraw/element";
 
 import { KEYS, getGridPoint } from "@excalidraw/common";
@@ -279,4 +281,67 @@ export function openEyeDropper(
     },
     keepOpenOnAlt: false,
   });
+}
+
+export async function updateImageCache(
+  ctx: AppEngineContext,
+  elements: readonly InitializedExcalidrawImageElement[],
+  files: BinaryFiles = ctx.files,
+): Promise<{ updatedFiles: Map<FileId, true>; erroredFiles: Map<FileId, true> }> {
+  const { updatedFiles, erroredFiles } = await _updateImageCache({
+    imageCache: ctx.imageCache,
+    fileIds: elements.map((element) => element.fileId),
+    files,
+  });
+
+  if (erroredFiles.size) {
+    ctx.store.scheduleAction(CaptureUpdateAction.NEVER);
+    ctx.scene.replaceAllElements(
+      ctx.scene.getElementsIncludingDeleted().map((element) => {
+        if (
+          isInitializedImageElement(element) &&
+          erroredFiles.has(element.fileId)
+        ) {
+          return newElementWith(element, {
+            status: "error",
+          });
+        }
+        return element;
+      }),
+    );
+  }
+
+  return { updatedFiles, erroredFiles };
+}
+
+export async function addNewImagesToImageCache(
+  ctx: AppEngineContext,
+  imageElements: InitializedExcalidrawImageElement[] = getInitializedImageElements(
+    ctx.scene.getNonDeletedElements(),
+  ),
+  files: BinaryFiles = ctx.files,
+): Promise<void> {
+  const uncachedImageElements = imageElements.filter(
+    (element) => !element.isDeleted && !ctx.imageCache.has(element.fileId),
+  );
+
+  if (uncachedImageElements.length) {
+    const { updatedFiles } = await updateImageCache(
+      ctx,
+      uncachedImageElements,
+      files,
+    );
+
+    if (updatedFiles.size) {
+      for (const element of uncachedImageElements) {
+        if (updatedFiles.has(element.fileId)) {
+          ShapeCache.delete(element);
+        }
+      }
+    }
+
+    if (updatedFiles.size) {
+      ctx.scene.triggerUpdate();
+    }
+  }
 }

@@ -27,6 +27,7 @@ import {
   normalizeSVG,
   positionElementsOnGrid,
   makeNextSelectedElementIds,
+  syncInvalidIndices,
 } from "@excalidraw/element";
 
 import type { LibraryItems } from "../types";
@@ -37,9 +38,12 @@ import {
   generateIdFromFile,
   getDataURL,
   isSupportedImageFile,
+  loadSceneOrLibraryFromBlob,
   normalizeFile,
   resizeImageFile,
 } from "../data/blob";
+
+import { ImageSceneDataError } from "../errors";
 import { setCursor } from "../cursor";
 import { t } from "../i18n";
 
@@ -352,6 +356,88 @@ export async function handleAppOnDrop(
         ctx.setState({ selectedElementIds: { [embeddable.id]: true } });
       }
     }
+  }
+}
+
+export async function loadFileToCanvas(
+  ctx: AppEngineContext,
+  file: File,
+  fileHandle: FileSystemFileHandle | null,
+): Promise<void> {
+  file = await normalizeFile(file);
+  try {
+    const elements = ctx.scene.getElementsIncludingDeleted();
+    let ret;
+    try {
+      ret = await loadSceneOrLibraryFromBlob(
+        file,
+        ctx.getState(),
+        elements,
+        fileHandle,
+      );
+    } catch (error: unknown) {
+      const imageSceneDataError = error instanceof ImageSceneDataError;
+      if (
+        imageSceneDataError &&
+        (error as { code?: string }).code === "IMAGE_NOT_CONTAINS_SCENE_DATA" &&
+        !ctx.isToolSupported("image")
+      ) {
+        ctx.setState({
+          isLoading: false,
+          errorMessage: t("errors.imageToolNotSupported"),
+        });
+        return;
+      }
+      const errorMessage = imageSceneDataError
+        ? t("alerts.cannotRestoreFromImage")
+        : t("alerts.couldNotLoadInvalidFile");
+      ctx.setState({
+        isLoading: false,
+        errorMessage,
+      });
+    }
+    if (!ret) {
+      return;
+    }
+
+    if (ret.type === MIME_TYPES.excalidraw) {
+      syncInvalidIndices(elements.concat(ret.data.elements));
+
+      ctx.store.scheduleMicroAction({
+        action: CaptureUpdateAction.NEVER,
+        elements,
+        appState: undefined,
+      });
+
+      ctx.setState({ isLoading: true });
+      ctx.syncActionResult({
+        ...ret.data,
+        appState: {
+          ...(ret.data.appState || ctx.getState()),
+          isLoading: false,
+        },
+        replaceFiles: true,
+        captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+      });
+    } else if (ret.type === MIME_TYPES.excalidrawlib) {
+      await ctx
+        .getLibrary()
+        .updateLibrary({
+          libraryItems: file,
+          merge: true,
+          openLibraryMenu: true,
+        })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .catch((error: any) => {
+          console.error(error);
+          ctx.setState({ errorMessage: t("errors.importLibraryError") });
+        });
+    }
+  } catch (error: unknown) {
+    ctx.setState({
+      isLoading: false,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 

@@ -499,7 +499,7 @@ import type {
 import type { RoughCanvas } from "roughjs/bin/canvas";
 import type { Action, ActionResult } from "../actions/types";
 
-import { scrollOps, gestureOps, clipboardOps, keyboardOps, pointerDownSubOps, pointerMoveOps, pointerUpOps, pointerHelperOps, pointerEventOps, canvasEventOps, textOps, imageEraseOps, bindFrameOps, linearHoverContextOps, fileOps, textWysiwygOps, type AppEngineContext } from "../engine";
+import { scrollOps, gestureOps, clipboardOps, keyboardOps, pointerDownSubOps, pointerMoveOps, pointerUpOps, pointerHelperOps, pointerEventOps, canvasEventOps, textOps, imageEraseOps, bindFrameOps, linearHoverContextOps, fileOps, textWysiwygOps, appHelperOps, type AppEngineContext } from "../engine";
 import { YOUTUBE_VIDEO_STATES } from "../engine/youtubeStates";
 
 const AppContext = React.createContext<AppClassProperties>(null!);
@@ -1197,6 +1197,10 @@ class App extends React.Component<AppProps, AppState> {
       getHTMLIFrameElement: (element) => this.getHTMLIFrameElement(element),
       getAppId: () => this.id,
       getApp: () => this,
+      setIsDraggingScrollBar: (value) => {
+        isDraggingScrollBar = value;
+      },
+      propOnPointerUpdate: this.props?.onPointerUpdate,
       updateImageCache: (elements, files) =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this.updateImageCache(elements as any, files),
@@ -3656,11 +3660,8 @@ class App extends React.Component<AppProps, AppState> {
     }
   };
 
-  private maybeUnfollowRemoteUser = () => {
-    if (this.state.userToFollow) {
-      this.setState({ userToFollow: null });
-    }
-  };
+  private maybeUnfollowRemoteUser = () =>
+    appHelperOps.maybeUnfollowRemoteUser(this.engineContext);
 
   /** use when changing scrollX/scrollY/zoom based on user interaction */
   private translateCanvas: React.Component<any, AppState>["setState"] = (
@@ -4344,128 +4345,24 @@ class App extends React.Component<AppProps, AppState> {
   private updateGestureOnPointerDown(
     event: React.PointerEvent<HTMLElement>,
   ): void {
-    gesture.pointers.set(event.pointerId, {
-      x: event.clientX,
-      y: event.clientY,
-    });
-
-    if (gesture.pointers.size === 2) {
-      gesture.lastCenter = getCenter(gesture.pointers);
-      gesture.initialScale = this.state.zoom.value;
-      gesture.initialDistance = getDistance(
-        Array.from(gesture.pointers.values()),
-      );
-    }
+    appHelperOps.updateGestureOnPointerDown(this.engineContext, event);
   }
 
   private initialPointerDownState(
     event: React.PointerEvent<HTMLElement>,
   ): PointerDownState {
-    const origin = viewportCoordsToSceneCoords(event, this.state);
-    const selectedElements = this.scene.getSelectedElements(this.state);
-    const [minX, minY, maxX, maxY] = getCommonBounds(selectedElements);
-    const isElbowArrowOnly = selectedElements.findIndex(isElbowArrow) === 0;
-
-    return {
-      origin,
-      withCmdOrCtrl: event[KEYS.CTRL_OR_CMD],
-      originInGrid: tupleToCoors(
-        getGridPoint(
-          origin.x,
-          origin.y,
-          event[KEYS.CTRL_OR_CMD] || isElbowArrowOnly
-            ? null
-            : this.getEffectiveGridSize(),
-        ),
-      ),
-      scrollbars: isOverScrollBars(
-        currentScrollBars,
-        event.clientX - this.state.offsetLeft,
-        event.clientY - this.state.offsetTop,
-      ),
-      // we need to duplicate because we'll be updating this state
-      lastCoords: { ...origin },
-      originalElements: this.scene
-        .getNonDeletedElements()
-        .reduce((acc, element) => {
-          acc.set(element.id, deepCopyElement(element));
-          return acc;
-        }, new Map() as PointerDownState["originalElements"]),
-      resize: {
-        handleType: false,
-        isResizing: false,
-        offset: { x: 0, y: 0 },
-        arrowDirection: "origin",
-        center: { x: (maxX + minX) / 2, y: (maxY + minY) / 2 },
-      },
-      hit: {
-        element: null,
-        allHitElements: [],
-        wasAddedToSelection: false,
-        hasBeenDuplicated: false,
-        hasHitCommonBoundingBoxOfSelectedElements:
-          this.isHittingCommonBoundingBoxOfSelectedElements(
-            origin,
-            selectedElements,
-          ),
-      },
-      drag: {
-        hasOccurred: false,
-        offset: null,
-        origin: { ...origin },
-        blockDragging: false,
-      },
-      eventListeners: {
-        onMove: null,
-        onUp: null,
-        onKeyUp: null,
-        onKeyDown: null,
-      },
-      boxSelection: {
-        hasOccurred: false,
-      },
-    };
+    return appHelperOps.initialPointerDownState(this.engineContext, event);
   }
 
-  // Returns whether the event is a dragging a scrollbar
   private handleDraggingScrollBar(
     event: React.PointerEvent<HTMLElement>,
     pointerDownState: PointerDownState,
   ): boolean {
-    if (
-      !(pointerDownState.scrollbars.isOverEither && !this.state.multiElement)
-    ) {
-      return false;
-    }
-    isDraggingScrollBar = true;
-    pointerDownState.lastCoords.x = event.clientX;
-    pointerDownState.lastCoords.y = event.clientY;
-    const onPointerMove = withBatchedUpdatesThrottled((event: PointerEvent) => {
-      const target = event.target;
-      if (!(target instanceof HTMLElement)) {
-        return;
-      }
-
-      this.handlePointerMoveOverScrollbars(event, pointerDownState);
-    });
-    const onPointerUp = withBatchedUpdates(() => {
-      lastPointerUp = null;
-      isDraggingScrollBar = false;
-      setCursorForShape(this.interactiveCanvas, this.state);
-      this.setState({
-        cursorButton: "up",
-      });
-      this.savePointer(event.clientX, event.clientY, "up");
-      window.removeEventListener(EVENT.POINTER_MOVE, onPointerMove);
-      window.removeEventListener(EVENT.POINTER_UP, onPointerUp);
-      onPointerMove.flush();
-    });
-
-    lastPointerUp = onPointerUp;
-
-    window.addEventListener(EVENT.POINTER_MOVE, onPointerMove);
-    window.addEventListener(EVENT.POINTER_UP, onPointerUp);
-    return true;
+    return appHelperOps.handleDraggingScrollBar(
+      this.engineContext,
+      event,
+      pointerDownState,
+    );
   }
 
   private clearSelectionIfNotUsingSelection = (): void => {
@@ -4845,68 +4742,20 @@ class App extends React.Component<AppProps, AppState> {
       imageHTML,
     );
 
-  /** updates image cache, refreshing updated elements and/or setting status
-      to error for images that fail during <img> element creation */
-  private updateImageCache = async (
+  private updateImageCache = (
     elements: readonly InitializedExcalidrawImageElement[],
-    files = this.files,
-  ) => {
-    const { updatedFiles, erroredFiles } = await _updateImageCache({
-      imageCache: this.imageCache,
-      fileIds: elements.map((element) => element.fileId),
-      files,
-    });
-
-    if (erroredFiles.size) {
-      this.store.scheduleAction(CaptureUpdateAction.NEVER);
-      this.scene.replaceAllElements(
-        this.scene.getElementsIncludingDeleted().map((element) => {
-          if (
-            isInitializedImageElement(element) &&
-            erroredFiles.has(element.fileId)
-          ) {
-            return newElementWith(element, {
-              status: "error",
-            });
-          }
-          return element;
-        }),
-      );
-    }
-
-    return { updatedFiles, erroredFiles };
-  };
-
-  /** adds new images to imageCache and re-renders if needed */
-  private addNewImagesToImageCache = async (
-    imageElements: InitializedExcalidrawImageElement[] = getInitializedImageElements(
-      this.scene.getNonDeletedElements(),
-    ),
     files: BinaryFiles = this.files,
-  ) => {
-    const uncachedImageElements = imageElements.filter(
-      (element) => !element.isDeleted && !this.imageCache.has(element.fileId),
+  ) => imageEraseOps.updateImageCache(this.engineContext, elements, files);
+
+  private addNewImagesToImageCache = (
+    imageElements?: InitializedExcalidrawImageElement[],
+    files: BinaryFiles = this.files,
+  ) =>
+    imageEraseOps.addNewImagesToImageCache(
+      this.engineContext,
+      imageElements,
+      files,
     );
-
-    if (uncachedImageElements.length) {
-      const { updatedFiles } = await this.updateImageCache(
-        uncachedImageElements,
-        files,
-      );
-
-      if (updatedFiles.size) {
-        for (const element of uncachedImageElements) {
-          if (updatedFiles.has(element.fileId)) {
-            ShapeCache.delete(element);
-          }
-        }
-      }
-
-      if (updatedFiles.size) {
-        this.scene.triggerUpdate();
-      }
-    }
-  };
 
   /** generally you should use `addNewImagesToImageCache()` directly if you need
    *  to render new images. This is just a failsafe  */
@@ -4915,25 +4764,7 @@ class App extends React.Component<AppProps, AppState> {
   }, IMAGE_RENDER_TIMEOUT);
 
   private clearSelection(hitElement: ExcalidrawElement | null): void {
-    this.setState((prevState) => ({
-      selectedElementIds: makeNextSelectedElementIds({}, prevState),
-      activeEmbeddable: null,
-      selectedGroupIds: {},
-      // Continue editing the same group if the user selected a different
-      // element from it
-      editingGroupId:
-        prevState.editingGroupId &&
-        hitElement != null &&
-        isElementInGroup(hitElement, prevState.editingGroupId)
-          ? prevState.editingGroupId
-          : null,
-    }));
-    this.setState({
-      selectedElementIds: makeNextSelectedElementIds({}, this.state),
-      activeEmbeddable: null,
-      previousSelectedElementIds: this.state.selectedElementIds,
-      selectedLinearElement: null,
-    });
+    appHelperOps.clearSelection(this.engineContext, hitElement);
   }
 
   private handleInteractiveCanvasRef = (canvas: HTMLCanvasElement | null) => {
@@ -4973,84 +4804,10 @@ class App extends React.Component<AppProps, AppState> {
   private handleAppOnDrop = (event: React.DragEvent<HTMLDivElement>) =>
     fileOps.handleAppOnDrop(this.engineContext, event);
 
-  loadFileToCanvas = async (
+  loadFileToCanvas = (
     file: File,
     fileHandle: FileSystemFileHandle | null,
-  ) => {
-    file = await normalizeFile(file);
-    try {
-      const elements = this.scene.getElementsIncludingDeleted();
-      let ret;
-      try {
-        ret = await loadSceneOrLibraryFromBlob(
-          file,
-          this.state,
-          elements,
-          fileHandle,
-        );
-      } catch (error: any) {
-        const imageSceneDataError = error instanceof ImageSceneDataError;
-        if (
-          imageSceneDataError &&
-          error.code === "IMAGE_NOT_CONTAINS_SCENE_DATA" &&
-          !this.isToolSupported("image")
-        ) {
-          this.setState({
-            isLoading: false,
-            errorMessage: t("errors.imageToolNotSupported"),
-          });
-          return;
-        }
-        const errorMessage = imageSceneDataError
-          ? t("alerts.cannotRestoreFromImage")
-          : t("alerts.couldNotLoadInvalidFile");
-        this.setState({
-          isLoading: false,
-          errorMessage,
-        });
-      }
-      if (!ret) {
-        return;
-      }
-
-      if (ret.type === MIME_TYPES.excalidraw) {
-        // restore the fractional indices by mutating elements
-        syncInvalidIndices(elements.concat(ret.data.elements));
-
-        // don't capture and only update the store snapshot for old elements,
-        // otherwise we would end up with duplicated fractional indices on undo
-        this.store.scheduleMicroAction({
-          action: CaptureUpdateAction.NEVER,
-          elements,
-          appState: undefined,
-        });
-
-        this.setState({ isLoading: true });
-        this.syncActionResult({
-          ...ret.data,
-          appState: {
-            ...(ret.data.appState || this.state),
-            isLoading: false,
-          },
-          replaceFiles: true,
-          captureUpdate: CaptureUpdateAction.IMMEDIATELY,
-        });
-      } else if (ret.type === MIME_TYPES.excalidrawlib) {
-        await this.library
-          .updateLibrary({
-            libraryItems: file,
-            merge: true,
-            openLibraryMenu: true,
-          })
-          .catch((error) => {
-            console.error(error);
-            this.setState({ errorMessage: t("errors.importLibraryError") });
-          });
-      }
-    } catch (error: any) {
-      this.setState({ isLoading: false, errorMessage: error.message });
-    }
-  };
+  ) => fileOps.loadFileToCanvas(this.engineContext, file, fileHandle);
 
   private handleCanvasContextMenu = (
     event: React.MouseEvent<HTMLElement | HTMLCanvasElement>,
@@ -5111,31 +4868,8 @@ class App extends React.Component<AppProps, AppState> {
     );
   }
 
-  private savePointer = (x: number, y: number, button: "up" | "down") => {
-    if (!x || !y) {
-      return;
-    }
-    const { x: sceneX, y: sceneY } = viewportCoordsToSceneCoords(
-      { clientX: x, clientY: y },
-      this.state,
-    );
-
-    if (isNaN(sceneX) || isNaN(sceneY)) {
-      // sometimes the pointer goes off screen
-    }
-
-    const pointer: CollaboratorPointer = {
-      x: sceneX,
-      y: sceneY,
-      tool: this.state.activeTool.type === "laser" ? "laser" : "pointer",
-    };
-
-    this.props.onPointerUpdate?.({
-      pointer,
-      button,
-      pointersMap: gesture.pointers,
-    });
-  };
+  private savePointer = (x: number, y: number, button: "up" | "down") =>
+    appHelperOps.savePointer(this.engineContext, x, y, button);
 
   private resetShouldCacheIgnoreZoomDebounced = debounce(() => {
     if (!this.unmounted) {
