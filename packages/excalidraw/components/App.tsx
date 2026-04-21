@@ -503,7 +503,7 @@ import type {
 import type { RoughCanvas } from "roughjs/bin/canvas";
 import type { Action, ActionResult } from "../actions/types";
 
-import { scrollOps, gestureOps, clipboardOps, keyboardOps, pointerDownSubOps, pointerMoveOps, pointerUpOps, pointerHelperOps, pointerEventOps, canvasEventOps, textOps, imageEraseOps, bindFrameOps, linearHoverContextOps, fileOps, textWysiwygOps, appHelperOps, createEngineContext, type AppEngineContext } from "../engine";
+import { scrollOps, gestureOps, clipboardOps, keyboardOps, pointerDownSubOps, pointerMoveOps, pointerUpOps, pointerHelperOps, pointerEventOps, canvasEventOps, textOps, imageEraseOps, bindFrameOps, linearHoverContextOps, fileOps, textWysiwygOps, appHelperOps, lifecycleOps, createEngineContext, type AppEngineContext } from "../engine";
 import { appGlobals } from "../engine/appGlobals";
 
 const AppContext = React.createContext<AppClassProperties>(null!);
@@ -1802,127 +1802,8 @@ class App extends React.Component<AppProps, AppState> {
     },
   );
 
-  private initializeScene = async () => {
-    if ("launchQueue" in window && "LaunchParams" in window) {
-      (window as any).launchQueue.setConsumer(
-        async (launchParams: { files: any[] }) => {
-          if (!launchParams.files.length) {
-            return;
-          }
-          const fileHandle = launchParams.files[0];
-          const blob: Blob = await fileHandle.getFile();
-          this.loadFileToCanvas(
-            new File([blob], blob.name || "", { type: blob.type }),
-            fileHandle,
-          );
-        },
-      );
-    }
-
-    if (this.props.theme) {
-      this.setState({ theme: this.props.theme });
-    }
-    if (!this.state.isLoading) {
-      this.setState({ isLoading: true });
-    }
-    let initialData = null;
-    try {
-      if (typeof this.props.initialData === "function") {
-        initialData = (await this.props.initialData()) || null;
-      } else {
-        initialData = (await this.props.initialData) || null;
-      }
-      if (initialData?.libraryItems) {
-        this.library
-          .updateLibrary({
-            libraryItems: initialData.libraryItems,
-            merge: true,
-          })
-          .catch((error) => {
-            console.error(error);
-          });
-      }
-    } catch (error: any) {
-      console.error(error);
-      initialData = {
-        appState: {
-          errorMessage:
-            error.message ||
-            "Encountered an error during importing or restoring scene data",
-        },
-      };
-    }
-    const restoredElements = restoreElements(initialData?.elements, null, {
-      repairBindings: true,
-      deleteInvisibleElements: true,
-    });
-    let restoredAppState = restoreAppState(initialData?.appState, null);
-    const activeTool = restoredAppState.activeTool;
-
-    if (!restoredAppState.preferredSelectionTool.initialized) {
-      restoredAppState.preferredSelectionTool = {
-        type:
-          this.editorInterface.formFactor === "phone" ? "lasso" : "selection",
-        initialized: true,
-      };
-    }
-
-    restoredAppState = {
-      ...restoredAppState,
-      theme: this.props.theme || restoredAppState.theme,
-      // we're falling back to current (pre-init) state when deciding
-      // whether to open the library, to handle a case where we
-      // update the state outside of initialData (e.g. when loading the app
-      // with a library install link, which should auto-open the library)
-      openSidebar: restoredAppState?.openSidebar || this.state.openSidebar,
-      activeTool:
-        activeTool.type === "image" ||
-        activeTool.type === "lasso" ||
-        activeTool.type === "selection"
-          ? {
-              ...activeTool,
-              type: restoredAppState.preferredSelectionTool.type,
-            }
-          : restoredAppState.activeTool,
-      isLoading: false,
-      toast: this.state.toast,
-    };
-
-    if (initialData?.scrollToContent) {
-      restoredAppState = {
-        ...restoredAppState,
-        ...calculateScrollCenter(restoredElements, {
-          ...restoredAppState,
-          width: this.state.width,
-          height: this.state.height,
-          offsetTop: this.state.offsetTop,
-          offsetLeft: this.state.offsetLeft,
-        }),
-      };
-    }
-
-    this.resetStore();
-    this.resetHistory();
-    this.syncActionResult({
-      elements: restoredElements,
-      appState: restoredAppState,
-      files: initialData?.files,
-      captureUpdate: CaptureUpdateAction.NEVER,
-    });
-
-    // clear the shape and image cache so that any images in initialData
-    // can be loaded fresh
-    this.clearImageShapeCache();
-
-    // manually loading the font faces seems faster even in browsers that do fire the loadingdone event
-    this.fonts.loadSceneFonts().then((fontFaces) => {
-      this.fonts.onLoaded(fontFaces);
-    });
-
-    if (isElementLink(window.location.href)) {
-      this.scrollToContent(window.location.href, { animate: false });
-    }
-  };
+  private initializeScene = () =>
+    lifecycleOps.initializeScene(this.engineContext);
 
   private getFormFactor = (editorWidth: number, editorHeight: number) => {
     return (
