@@ -64,7 +64,7 @@
   // prettier-ignore
   import { getFormFactor, createUserAgentDescriptor, MQ_RIGHT_SIDEBAR_MIN_WIDTH, supportsResizeObserver, POINTER_EVENTS, randomId, viewportCoordsToSceneCoords, DEFAULT_ELEMENT_PROPS, DEFAULT_FONT_FAMILY } from "@excalidraw/common";
   // @ts-ignore — upstream
-  import { newElement, hitElementItself, duplicateElements } from "@excalidraw/element";
+  import { newElement, hitElementItself, duplicateElements, deepCopyElement } from "@excalidraw/element";
   // @ts-ignore — upstream, resolved via Vite alias
   // prettier-ignore
   import { DEFAULT_COLLISION_THRESHOLD, ELEMENT_TRANSLATE_AMOUNT, ELEMENT_SHIFT_TRANSLATE_AMOUNT } from "@excalidraw/common";
@@ -474,6 +474,11 @@
     rc = rough.canvas(staticCanvas);
     sceneReady++; // triggers the first static paint
 
+    // Seed history with the initial (empty) state. Maintains the invariant
+    // that history[historyIndex] always equals the current scene state,
+    // so `undo` has a floor to land at (never goes past "empty scene").
+    pushHistory();
+
     // Test-only probe: smoke scripts read `window.__sveltedrawProbe` to
     // inspect live scene + appState. DEV-only.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -571,6 +576,77 @@
     };
   };
 
+  // ── History (undo/redo) ──────────────────────────────────────────────
+  //
+  // Snapshot-based, not delta-based. Upstream's History class is tightly
+  // coupled to Store / StoreSnapshot / CaptureUpdateAction; porting that
+  // machinery is out-of-scope for a PoC. Snapshots hold a deep clone of
+  // every element + a copy of selectedElementIds. Memory cost is O(entry-
+  // count × scene-size), acceptable for dozens of edits on small scenes.
+  //
+  // INVARIANT: `history[historyIndex]` always equals the CURRENT scene state.
+  // - Push an initial snapshot on mount (empty scene → history=[empty]).
+  // - After ANY durable mutation, call `pushHistory()` to record the NEW state.
+  //   This truncates the redo tail (history.length = historyIndex + 1 + new).
+  // - `undo()`: if index > 0, dec, apply history[index].
+  // - `redo()`: if index < length-1, inc, apply history[index].
+  //
+  // For gestures (drag, in-progress draw), don't record mid-flight frames:
+  // wait until pointerup/commit then push ONE entry. `discardHistoryIfUnchanged`
+  // is no longer needed with this model — we simply don't push on no-op.
+  type HistorySnapshot = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    elements: any[];
+    selectedElementIds: Record<string, true>;
+  };
+  const history: HistorySnapshot[] = [];
+  let historyIndex = -1;
+
+  const captureSnapshot = (): HistorySnapshot => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const els = scene?.getElementsIncludingDeleted() ?? [];
+    return {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      elements: els.map((el: any) => deepCopyElement(el)),
+      selectedElementIds: {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ...((appState as any).selectedElementIds ?? {}),
+      },
+    };
+  };
+
+  // Push the CURRENT state as the new head (call AFTER a mutation).
+  // Truncates the redo tail — any future states past the current index are
+  // discarded (standard undo behavior when you edit after undoing).
+  const pushHistory = () => {
+    const snap = captureSnapshot();
+    history.length = historyIndex + 1;
+    history.push(snap);
+    historyIndex = history.length - 1;
+  };
+
+  const applySnapshot = (snap: HistorySnapshot) => {
+    if (!scene) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cloned = snap.elements.map((el: any) => deepCopyElement(el));
+    scene.replaceAllElements(cloned, { skipValidation: true });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).selectedElementIds = { ...snap.selectedElementIds };
+    bumpSceneRepaint();
+  };
+
+  const undo = () => {
+    if (historyIndex <= 0) return;
+    historyIndex--;
+    applySnapshot(history[historyIndex]);
+  };
+
+  const redo = () => {
+    if (historyIndex >= history.length - 1) return;
+    historyIndex++;
+    applySnapshot(history[historyIndex]);
+  };
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getSelectedElements = (): any[] => {
     if (!scene) return [];
@@ -593,6 +669,7 @@
       .filter((el: any) => !selectedSet.has(el.id));
     scene.replaceAllElements(remaining, { skipValidation: true });
     clearSelection();
+    pushHistory();
     bumpSceneRepaint();
   };
 
@@ -644,6 +721,7 @@
     for (const id of duplicateIds) nextSel[id] = true;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (appState as any).selectedElementIds = nextSel;
+    pushHistory();
     bumpSceneRepaint();
   };
 
@@ -658,6 +736,10 @@
         { informMutation: false, isDragging: false },
       );
     }
+    // One history entry per nudge keypress. Real editors often coalesce
+    // consecutive nudges into a single entry if released within ~500ms;
+    // keep it simple for now — user can undo multiple times.
+    pushHistory();
     bumpSceneRepaint();
   };
 
@@ -675,17 +757,35 @@
 
     const mod = event.ctrlKey || event.metaKey;
 
-    // ── Ctrl/Cmd shortcuts ────────────────────────────────────────────
-    if (mod && !event.shiftKey && !event.altKey) {
-      if (event.key === "a" || event.key === "A") {
-        selectAll();
+    // ── Ctrl/Cmd + (Shift) shortcuts ──────────────────────────────────
+    if (mod && !event.altKey) {
+      // Undo: Ctrl/Cmd + Z
+      // Redo: Ctrl/Cmd + Shift + Z (primary) OR Ctrl + Y (Windows alt)
+      if ((event.key === "z" || event.key === "Z") && !event.shiftKey) {
+        undo();
         event.preventDefault();
         return;
       }
-      if (event.key === "d" || event.key === "D") {
-        duplicateSelected();
+      if (
+        ((event.key === "z" || event.key === "Z") && event.shiftKey) ||
+        ((event.key === "y" || event.key === "Y") && !event.shiftKey)
+      ) {
+        redo();
         event.preventDefault();
         return;
+      }
+
+      if (!event.shiftKey) {
+        if (event.key === "a" || event.key === "A") {
+          selectAll();
+          event.preventDefault();
+          return;
+        }
+        if (event.key === "d" || event.key === "D") {
+          duplicateSelected();
+          event.preventDefault();
+          return;
+        }
       }
     }
 
@@ -849,6 +949,9 @@
         })
         .filter(Boolean) as typeof dragOrigins;
       dragStart = { x, y };
+      // History recorded on pointerup IF element positions actually changed
+      // (see finalize branch). Recording on pointerdown would store the
+      // pre-drag state; we want the post-drag state per the invariant.
       (event.currentTarget as HTMLElement | null)?.setPointerCapture?.(
         event.pointerId,
       );
@@ -934,8 +1037,19 @@
 
     // ── Finalize selection drag ──
     if (dragOrigins.length > 0) {
+      // Check if ANY element actually moved. No-move click shouldn't push
+      // a history entry (otherwise "click to select" would pollute the
+      // undo stack).
+      let moved = false;
+      for (const origin of dragOrigins) {
+        if (origin.el.x !== origin.x || origin.el.y !== origin.y) {
+          moved = true;
+          break;
+        }
+      }
       dragOrigins = [];
       dragStart = null;
+      if (moved) pushHistory();
       bumpSceneRepaint();
       (event.currentTarget as HTMLElement | null)?.releasePointerCapture?.(
         event.pointerId,
@@ -945,15 +1059,18 @@
 
     // ── Finalize new rectangle ──
     if (cur) {
+      let committed = false;
       if (cur.width > 1 && cur.height > 1 && scene) {
         const existing = scene.getElementsIncludingDeleted();
         // skipValidation: fractional-index validator throws for fresh
         // elements; syncInvalidIndices inside replaceAllElements repairs.
         scene.replaceAllElements([...existing, cur], { skipValidation: true });
+        committed = true;
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (appState as any).newElement = null;
       dragStart = null;
+      if (committed) pushHistory();
       bumpSceneRepaint();
     }
 

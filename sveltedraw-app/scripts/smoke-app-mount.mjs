@@ -284,11 +284,37 @@ async function main() {
         selectedCount: Object.keys(p.appState?.selectedElementIds ?? {}).length,
       };
 
+      // ── Batch 8: undo/redo ────────────────────────────────────────
+      // State right now: 2 rectangles, selection empty (Delete cleared it).
+      // Undo the delete → should restore 4 rectangles.
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 30));
+      const afterUndoDelete = {
+        count: p.scene?.getNonDeletedElements?.()?.length ?? 0,
+      };
+
+      // Redo the delete → back to 2 rectangles.
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 30));
+      const afterRedoDelete = {
+        count: p.scene?.getNonDeletedElements?.()?.length ?? 0,
+      };
+
+      // Undo the delete again, then Ctrl+Y (Windows redo) to re-delete.
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 30));
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'y', ctrlKey: true, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 30));
+      const afterCtrlY = {
+        count: p.scene?.getNonDeletedElements?.()?.length ?? 0,
+      };
+
       return {
         ...afterDraw,
         afterSelect, afterDrag, afterClickEmpty,
         afterSecondDraw, afterSelectAll, afterNudge1, afterShiftNudge,
         afterDuplicate, afterDelete,
+        afterUndoDelete, afterRedoDelete, afterCtrlY,
       };
     })()`,
     returnByValue: true,
@@ -468,6 +494,23 @@ async function main() {
     "delete-removes-selection",
     probe?.afterDelete?.count === 2 && probe?.afterDelete?.selectedCount === 0,
     `count=${probe?.afterDelete?.count} sel=${probe?.afterDelete?.selectedCount}`,
+  );
+
+  // Batch 8: undo / redo.
+  pass(
+    "ctrl-z-undoes-delete",
+    probe?.afterUndoDelete?.count === 4,
+    `count=${probe?.afterUndoDelete?.count} (expected 4)`,
+  );
+  pass(
+    "ctrl-shift-z-redoes",
+    probe?.afterRedoDelete?.count === 2,
+    `count=${probe?.afterRedoDelete?.count} (expected 2)`,
+  );
+  pass(
+    "ctrl-y-redoes",
+    probe?.afterCtrlY?.count === 2,
+    `count=${probe?.afterCtrlY?.count} (expected 2 after undo+redo)`,
   );
 
   console.log("\n=== Assertions ===");
