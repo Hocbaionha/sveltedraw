@@ -309,12 +309,67 @@ async function main() {
         count: p.scene?.getNonDeletedElements?.()?.length ?? 0,
       };
 
+      // ── Batch 10: zoom + pan ──────────────────────────────────────
+      // State snapshot before zoom fiddling.
+      const zoomBefore = p.appState?.zoom?.value ?? 1;
+      const scrollXBefore = p.appState?.scrollX ?? 0;
+      const scrollYBefore = p.appState?.scrollY ?? 0;
+
+      // Ctrl+wheel zoom in
+      iv.dispatchEvent(new WheelEvent('wheel', {
+        deltaY: -100, ctrlKey: true, bubbles: true, cancelable: true,
+        clientX: rect.left + 400, clientY: rect.top + 400,
+      }));
+      await new Promise(r => setTimeout(r, 30));
+      const afterZoomIn = {
+        zoom: p.appState?.zoom?.value ?? 0,
+      };
+
+      // Ctrl+0 reset
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: '0', ctrlKey: true, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 30));
+      const afterZoomReset = {
+        zoom: p.appState?.zoom?.value ?? 0,
+      };
+
+      // Plain wheel pan
+      iv.dispatchEvent(new WheelEvent('wheel', {
+        deltaX: 50, deltaY: 30, bubbles: true, cancelable: true,
+        clientX: rect.left + 400, clientY: rect.top + 400,
+      }));
+      await new Promise(r => setTimeout(r, 30));
+      const afterPan = {
+        dx: (p.appState?.scrollX ?? 0) - scrollXBefore,
+        dy: (p.appState?.scrollY ?? 0) - scrollYBefore,
+      };
+
+      // Ctrl+= zoom in via key
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: '=', ctrlKey: true, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 30));
+      const afterKeyZoomIn = {
+        zoom: p.appState?.zoom?.value ?? 0,
+      };
+
+      // Middle-mouse-button drag pan
+      const mStart = { x: rect.left + 400, y: rect.top + 400 };
+      const xBeforeMidPan = p.appState?.scrollX ?? 0;
+      iv.dispatchEvent(new PointerEvent('pointerdown', { clientX: mStart.x, clientY: mStart.y, button: 1, pointerId: 5, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 20));
+      iv.dispatchEvent(new PointerEvent('pointermove', { clientX: mStart.x + 100, clientY: mStart.y + 0, pointerId: 5, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 20));
+      iv.dispatchEvent(new PointerEvent('pointerup', { clientX: mStart.x + 100, clientY: mStart.y, button: 1, pointerId: 5, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 30));
+      const afterMiddlePan = {
+        dx: (p.appState?.scrollX ?? 0) - xBeforeMidPan,
+      };
+
       return {
         ...afterDraw,
         afterSelect, afterDrag, afterClickEmpty,
         afterSecondDraw, afterSelectAll, afterNudge1, afterShiftNudge,
         afterDuplicate, afterDelete,
         afterUndoDelete, afterRedoDelete, afterCtrlY,
+        zoomBefore, afterZoomIn, afterZoomReset, afterPan, afterKeyZoomIn, afterMiddlePan,
       };
     })()`,
     returnByValue: true,
@@ -511,6 +566,33 @@ async function main() {
     "ctrl-y-redoes",
     probe?.afterCtrlY?.count === 2,
     `count=${probe?.afterCtrlY?.count} (expected 2 after undo+redo)`,
+  );
+
+  // Batch 10: zoom + pan.
+  pass(
+    "ctrl-wheel-zooms-in",
+    (probe?.afterZoomIn?.zoom ?? 0) > (probe?.zoomBefore ?? 0) + 0.01,
+    `${probe?.zoomBefore} → ${probe?.afterZoomIn?.zoom}`,
+  );
+  pass(
+    "ctrl-0-resets-zoom",
+    Math.abs((probe?.afterZoomReset?.zoom ?? 0) - 1) < 0.001,
+    `zoom=${probe?.afterZoomReset?.zoom}`,
+  );
+  pass(
+    "wheel-pans-scroll",
+    Math.abs(probe?.afterPan?.dx ?? 0) > 1 || Math.abs(probe?.afterPan?.dy ?? 0) > 1,
+    `dx=${probe?.afterPan?.dx} dy=${probe?.afterPan?.dy}`,
+  );
+  pass(
+    "ctrl-equals-zooms-in",
+    (probe?.afterKeyZoomIn?.zoom ?? 0) > 1,
+    `zoom=${probe?.afterKeyZoomIn?.zoom}`,
+  );
+  pass(
+    "middle-mouse-pans",
+    Math.abs(probe?.afterMiddlePan?.dx ?? 0) > 10,
+    `dx=${probe?.afterMiddlePan?.dx}`,
   );
 
   console.log("\n=== Assertions ===");

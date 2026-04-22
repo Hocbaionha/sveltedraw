@@ -67,7 +67,11 @@
   import { newElement, hitElementItself, duplicateElements, deepCopyElement } from "@excalidraw/element";
   // @ts-ignore — upstream, resolved via Vite alias
   // prettier-ignore
-  import { DEFAULT_COLLISION_THRESHOLD, ELEMENT_TRANSLATE_AMOUNT, ELEMENT_SHIFT_TRANSLATE_AMOUNT } from "@excalidraw/common";
+  import { DEFAULT_COLLISION_THRESHOLD, ELEMENT_TRANSLATE_AMOUNT, ELEMENT_SHIFT_TRANSLATE_AMOUNT, ZOOM_STEP } from "@excalidraw/common";
+  // @ts-ignore — upstream
+  import { getStateForZoom } from "@excalidraw/excalidraw/scene/zoom";
+  // @ts-ignore — upstream
+  import { getNormalizedZoom } from "@excalidraw/excalidraw/scene/normalize";
   // @ts-ignore — upstream
   import { pointFrom } from "@excalidraw/math";
 
@@ -520,6 +524,18 @@
     // addEventListener on the element (not window) so multiple editors on
     // one page don't eat each other's keyboard input.
     containerEl?.addEventListener("keydown", onContainerKeyDown);
+    const onContainerKeyUp = (event: KeyboardEvent) => {
+      if (event.key === " " || event.code === "Space") {
+        spaceHeld = false;
+      }
+    };
+    containerEl?.addEventListener("keyup", onContainerKeyUp);
+
+    // Wheel listener — must be non-passive so we can preventDefault on
+    // Ctrl+wheel (browser would otherwise page-zoom the page itself).
+    // Svelte's `onwheel` prop attaches passively by default, so we go
+    // through addEventListener.
+    containerEl?.addEventListener("wheel", onContainerWheel, { passive: false });
     // Auto-focus the container on mount so hotkeys work without requiring
     // the user to click first. Matches upstream UX.
     containerEl?.focus({ preventScroll: true });
@@ -537,6 +553,8 @@
       window.removeEventListener("resize", measure);
       document.removeEventListener("fullscreenchange", onFullscreenChange);
       containerEl?.removeEventListener("keydown", onContainerKeyDown);
+      containerEl?.removeEventListener("keyup", onContainerKeyUp);
+      containerEl?.removeEventListener("wheel", onContainerWheel);
       AnimationController.cancel(INTERACTIVE_SCENE_ANIMATION_KEY);
       renderer?.destroy?.();
     };
@@ -743,6 +761,134 @@
     bumpSceneRepaint();
   };
 
+  // ── Zoom + pan ───────────────────────────────────────────────────────
+  //
+  // Viewport state: `zoom: {value}` (1 = 100%), `scrollX`, `scrollY`.
+  // Semantics mirror upstream `getStateForZoom` so scene coords stay stable
+  // under the cursor when zooming. Pan just increments scrollX/scrollY by
+  // (dx/zoom.value).
+
+  const applyZoom = (nextZoomRaw: number, viewportX: number, viewportY: number) => {
+    const nextZoom = getNormalizedZoom(nextZoomRaw);
+    const next = getStateForZoom(
+      { viewportX, viewportY, nextZoom },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      appState as any,
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).zoom = next.zoom;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).scrollX = next.scrollX;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).scrollY = next.scrollY;
+  };
+
+  // Zoom around the container center (used by Ctrl+= / Ctrl+- / Ctrl+0).
+  const zoomCentered = (nextZoom: number) => {
+    if (!containerEl) return;
+    const rect = containerEl.getBoundingClientRect();
+    applyZoom(nextZoom, rect.left + rect.width / 2, rect.top + rect.height / 2);
+  };
+
+  const resetZoom = () => zoomCentered(1);
+
+  // Wheel handler. Svelte 5 lets us attach via `onwheel` prop on the
+  // canvas; upstream uses a non-passive addEventListener on the container
+  // div (because they need preventDefault to stop the browser from
+  // navigating/scrolling). Matching that: attach manually in onMount so
+  // we can pass `{passive: false}`.
+  const onContainerWheel = (event: WheelEvent) => {
+    // Don't hijack wheel inside inputs/textarea.
+    const target = event.target as HTMLElement | null;
+    if (
+      target &&
+      (target.tagName === "INPUT" || target.tagName === "TEXTAREA" ||
+        target.isContentEditable)
+    ) {
+      return;
+    }
+    event.preventDefault();
+
+    // Ctrl/Cmd + wheel → zoom. Also triggered by trackpad pinch on most
+    // browsers (reported as ctrlKey even without ctrl pressed).
+    if (event.ctrlKey || event.metaKey) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const currentZoom = (appState.zoom as any).value;
+      // Natural scroll: up (deltaY < 0) zooms in, down zooms out.
+      const sign = event.deltaY < 0 ? 1 : -1;
+      // Exponential step for smooth pinch/scroll; matches upstream feel.
+      const factor = Math.exp((sign * Math.min(Math.abs(event.deltaY), 50)) / 100);
+      applyZoom(currentZoom * factor, event.clientX, event.clientY);
+      return;
+    }
+
+    // Plain wheel: pan. deltaMode=0 (pixels) on most devices; deltaMode=1
+    // (lines) on Firefox — multiply by ~16 to approximate.
+    const mult = event.deltaMode === 1 ? 16 : 1;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const zoomV = (appState.zoom as any).value;
+    // Shift swaps X/Y panning direction (horizontal scroll convenience).
+    if (event.shiftKey && event.deltaX === 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (appState as any).scrollX -= (event.deltaY * mult) / zoomV;
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (appState as any).scrollX -= (event.deltaX * mult) / zoomV;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (appState as any).scrollY -= (event.deltaY * mult) / zoomV;
+    }
+  };
+
+  // ── Space-drag / middle-mouse pan ────────────────────────────────────
+  let isPanning = false;
+  let panStart: { x: number; y: number; scrollX: number; scrollY: number } | null = null;
+  let spaceHeld = false;
+
+  const startPan = (clientX: number, clientY: number) => {
+    isPanning = true;
+    panStart = {
+      x: clientX,
+      y: clientY,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      scrollX: (appState as any).scrollX,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      scrollY: (appState as any).scrollY,
+    };
+  };
+  const updatePan = (clientX: number, clientY: number) => {
+    if (!panStart) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const zoomV = (appState.zoom as any).value;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).scrollX = panStart.scrollX + (clientX - panStart.x) / zoomV;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).scrollY = panStart.scrollY + (clientY - panStart.y) / zoomV;
+  };
+  const endPan = () => {
+    isPanning = false;
+    panStart = null;
+  };
+
+  // Defensive wrappers — setPointerCapture throws `NotFoundError` when the
+  // pointer session doesn't exist (e.g. synthetic PointerEvents dispatched
+  // in tests don't create real pointer sessions). Real browser events are
+  // fine, but silently swallow errors so no-op smoke dispatches don't
+  // break the interactive loop.
+  const tryCapture = (target: HTMLElement | null, pointerId: number) => {
+    try {
+      target?.setPointerCapture?.(pointerId);
+    } catch {
+      /* pointer session not active — fine */
+    }
+  };
+  const tryRelease = (target: HTMLElement | null, pointerId: number) => {
+    try {
+      target?.releasePointerCapture?.(pointerId);
+    } catch {
+      /* pointer session already gone */
+    }
+  };
+
   const onContainerKeyDown = (event: KeyboardEvent) => {
     // Ignore while typing in inputs / textareas / contenteditable.
     const target = event.target as HTMLElement | null;
@@ -786,7 +932,39 @@
           event.preventDefault();
           return;
         }
+        // Zoom controls: Ctrl+0 / Ctrl+= (+) / Ctrl+- (−). The "+" char on
+        // many layouts requires Shift, but browsers fire the "=" key without
+        // shift for Ctrl+=, so check both. `NumpadAdd` and `NumpadSubtract`
+        // for numeric-pad parity.
+        if (event.key === "0") {
+          resetZoom();
+          event.preventDefault();
+          return;
+        }
+        if (event.key === "=" || event.key === "+") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          zoomCentered((appState.zoom as any).value + ZOOM_STEP);
+          event.preventDefault();
+          return;
+        }
+        if (event.key === "-") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          zoomCentered((appState.zoom as any).value - ZOOM_STEP);
+          event.preventDefault();
+          return;
+        }
       }
+    }
+
+    // ── Space → temporary pan mode ────────────────────────────────────
+    // Pressing space toggles a "grab" cursor and makes pointerdown pan
+    // instead of doing its tool-specific action.
+    if (event.key === " " || event.code === "Space") {
+      if (!spaceHeld) {
+        spaceHeld = true;
+      }
+      event.preventDefault();
+      return;
     }
 
     // ── Delete / Backspace ────────────────────────────────────────────
@@ -916,6 +1094,15 @@
   };
 
   const onInteractivePointerDown = (event: PointerEvent) => {
+    // ── Pan gesture (middle mouse OR space held OR left+Alt via upstream)
+    //    takes precedence over any tool's pointerdown. ────────────────
+    if (event.button === 1 || spaceHeld) {
+      startPan(event.clientX, event.clientY);
+      tryCapture(event.currentTarget as HTMLElement | null, event.pointerId);
+      event.preventDefault();
+      return;
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tool = (appState.activeTool as any)?.type;
     const { x, y } = toSceneCoords(event.clientX, event.clientY);
@@ -952,9 +1139,7 @@
       // History recorded on pointerup IF element positions actually changed
       // (see finalize branch). Recording on pointerdown would store the
       // pre-drag state; we want the post-drag state per the invariant.
-      (event.currentTarget as HTMLElement | null)?.setPointerCapture?.(
-        event.pointerId,
-      );
+      tryCapture(event.currentTarget as HTMLElement | null, event.pointerId);
       return;
     }
 
@@ -980,14 +1165,16 @@
       } as any);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (appState as any).newElement = el;
-      (event.currentTarget as HTMLElement | null)?.setPointerCapture?.(
-        event.pointerId,
-      );
+      tryCapture(event.currentTarget as HTMLElement | null, event.pointerId);
       return;
     }
   };
 
   const onInteractivePointerMove = (event: PointerEvent) => {
+    if (isPanning) {
+      updatePan(event.clientX, event.clientY);
+      return;
+    }
     if (!dragStart) return;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1032,6 +1219,12 @@
   };
 
   const onInteractivePointerUp = (event: PointerEvent) => {
+    if (isPanning) {
+      endPan();
+      tryRelease(event.currentTarget as HTMLElement | null, event.pointerId);
+      return;
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cur = (appState as any).newElement;
 
@@ -1051,9 +1244,7 @@
       dragStart = null;
       if (moved) pushHistory();
       bumpSceneRepaint();
-      (event.currentTarget as HTMLElement | null)?.releasePointerCapture?.(
-        event.pointerId,
-      );
+      tryRelease(event.currentTarget as HTMLElement | null, event.pointerId);
       return;
     }
 
@@ -1074,9 +1265,7 @@
       bumpSceneRepaint();
     }
 
-    (event.currentTarget as HTMLElement | null)?.releasePointerCapture?.(
-      event.pointerId,
-    );
+    tryRelease(event.currentTarget as HTMLElement | null, event.pointerId);
   };
 
   // No-op passthroughs for events we don't handle yet.
