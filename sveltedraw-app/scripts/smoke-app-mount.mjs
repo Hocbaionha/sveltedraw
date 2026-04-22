@@ -1033,6 +1033,76 @@ async function main() {
         exportSvg = { err: String(err) };
       }
 
+      // ── Rotated text editor overlay ──
+      // Rotate a text element 45°, dblclick it, verify the textarea has
+      // a transform: rotate(~0.785) applied. Commit immediately (Escape)
+      // so follow-up tests see the rotated element unchanged.
+      let rotatedTextOverlay = null;
+      try {
+        const txt = (p.scene?.getNonDeletedElements?.() ?? []).find(el => el.type === 'text');
+        if (!txt) throw new Error('no text');
+        const prevAngle = txt.angle || 0;
+        p.scene.mutateElement(txt, { angle: Math.PI / 4 }, { informMutation: false });
+        await new Promise(r => setTimeout(r, 30));
+        const rt = p.scene?.getNonDeletedElements?.()?.find(el => el.id === txt.id);
+        const txtCtr = sceneToVp(rt.x + rt.width / 2, rt.y + rt.height / 2);
+        iv.dispatchEvent(new MouseEvent('dblclick', { clientX: txtCtr.x, clientY: txtCtr.y, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 80));
+        const ta = document.querySelector('.sveltedraw-text-editor');
+        // getComputedStyle returns the resolved transform as a matrix; we
+        // extract the rotation angle from matrix(a,b,c,d,tx,ty) where
+        // a=cos(theta), b=sin(theta). transform-origin is "Xpx Ypx".
+        let transformAngle = null;
+        let originX = null;
+        let originY = null;
+        let csTransform = null;
+        let csOrigin = null;
+        let rawStyle = null;
+        if (ta) {
+          rawStyle = ta.getAttribute('style');
+          const cs = window.getComputedStyle(ta);
+          csTransform = cs.transform;
+          csOrigin = cs.transformOrigin;
+          // Use indexOf/split rather than regex: backslash escapes in
+          // regex literals don't survive the smoke harness' template-
+          // literal wrapping.
+          const mStart = cs.transform ? cs.transform.indexOf('matrix(') : -1;
+          if (mStart >= 0) {
+            const inner = cs.transform.slice(mStart + 7, cs.transform.indexOf(')', mStart));
+            const parts = inner.split(',').map(s => parseFloat(s.trim()));
+            transformAngle = Math.atan2(parts[1], parts[0]);
+          }
+          if (cs.transformOrigin) {
+            const parts = cs.transformOrigin.split(' ').map(s => parseFloat(s));
+            if (!isNaN(parts[0])) originX = parts[0];
+            if (!isNaN(parts[1])) originY = parts[1];
+          }
+        }
+        rotatedTextOverlay = {
+          openedAfterRotate: !!ta,
+          transformAngle,
+          originX,
+          originY,
+          elW: rt.width,
+          elH: rt.height,
+          zoom: (p.appState?.zoom?.value ?? 1),
+          csTransform,
+          csOrigin,
+          rawStyle: rawStyle ? rawStyle.slice(0, 400) : null,
+        };
+        // Close editor via Escape and restore original angle so later
+        // tests see the scene as expected.
+        if (ta) {
+          ta.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+          await new Promise(r => setTimeout(r, 50));
+        }
+        const rtAfter = p.scene?.getNonDeletedElements?.()?.find(el => el.id === txt.id);
+        if (rtAfter) p.scene.mutateElement(rtAfter, { angle: prevAngle }, { informMutation: false });
+        await new Promise(r => setTimeout(r, 20));
+      } catch (err) {
+        rotatedTextOverlay = { err: String(err) };
+      }
+
       // ── Style extensions: strokeStyle / fillStyle / roughness ──
       // Select a rectangle, click dashed stroke style (data-value=dashed),
       // then solid fill style, then artist roughness. Verify each update.
@@ -1322,6 +1392,7 @@ async function main() {
         rotatedResize, ctrlASelect, undoFloor,
         polylineLine, polylineEscape,
         fontPicker, styleExt,
+        rotatedTextOverlay,
       };
     })()`,
     returnByValue: true,
@@ -1920,6 +1991,24 @@ async function main() {
       (probe?.undoFloor?.atFloor ?? -1) >= 0 &&
       (probe?.undoFloor?.final ?? -1) === (probe?.undoFloor?.before ?? -2),
     `before=${probe?.undoFloor?.before} atFloor=${probe?.undoFloor?.atFloor} afterRedo=${probe?.undoFloor?.afterRedo} final=${probe?.undoFloor?.final} alive=${probe?.undoFloor?.appStateAlive}`,
+  );
+
+  // Rotated text editor overlay: dblclick on a 45°-rotated text element
+  // should open the textarea with transform: rotate(~π/4) applied and
+  // transform-origin at (w/2, h/2) in viewport-px.
+  pass(
+    "rotated-text-overlay-has-transform",
+    probe?.rotatedTextOverlay?.openedAfterRotate === true &&
+      Math.abs((probe?.rotatedTextOverlay?.transformAngle ?? 0) - Math.PI / 4) < 0.01,
+    `opened=${probe?.rotatedTextOverlay?.openedAfterRotate} angle=${probe?.rotatedTextOverlay?.transformAngle} (expected ~${(Math.PI/4).toFixed(4)})`,
+  );
+  pass(
+    "rotated-text-overlay-origin-centered",
+    probe?.rotatedTextOverlay?.originX != null &&
+      probe?.rotatedTextOverlay?.originY != null &&
+      Math.abs(probe?.rotatedTextOverlay?.originX - (probe?.rotatedTextOverlay?.elW ?? 0) * (probe?.rotatedTextOverlay?.zoom ?? 1) / 2) < 2 &&
+      Math.abs(probe?.rotatedTextOverlay?.originY - (probe?.rotatedTextOverlay?.elH ?? 0) * (probe?.rotatedTextOverlay?.zoom ?? 1) / 2) < 2,
+    `originX=${probe?.rotatedTextOverlay?.originX} originY=${probe?.rotatedTextOverlay?.originY} elW=${probe?.rotatedTextOverlay?.elW} elH=${probe?.rotatedTextOverlay?.elH} zoom=${probe?.rotatedTextOverlay?.zoom}`,
   );
 
   // Style extensions: strokeStyle / fillStyle / roughness rows apply.
