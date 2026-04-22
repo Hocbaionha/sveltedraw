@@ -2551,10 +2551,19 @@
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const point = pointFrom(sceneX, sceneY) as any;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const threshold = DEFAULT_COLLISION_THRESHOLD / (appState.zoom as any).value;
+    const zoomV = (appState.zoom as any).value;
+    const baseThreshold = DEFAULT_COLLISION_THRESHOLD / zoomV;
     for (let i = elements.length - 1; i >= 0; i--) {
       const el = elements[i];
       if (el.locked) continue;
+      // Linear elements (line, arrow) have no fill so selection
+      // relies entirely on distance-to-outline. The default 8px
+      // threshold is stingy on thin strokes at normal zoom — bump
+      // to 15px for lines/arrows so users don't have to pixel-hunt.
+      const threshold =
+        el.type === "line" || el.type === "arrow"
+          ? Math.max(baseThreshold, 15 / zoomV)
+          : baseThreshold;
       if (
         hitElementItself({
           point,
