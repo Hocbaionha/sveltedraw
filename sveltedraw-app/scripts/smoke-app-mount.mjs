@@ -1219,6 +1219,68 @@ async function main() {
         zOrderBackward = { err: String(err) };
       }
 
+      // ── Alt-CLICK-without-drag bug reproduction ──
+      // Press Alt + pointerdown + pointerup at the same spot (no move).
+      // Expected: either NO duplicate is created (preferred UX), or if
+      // a duplicate IS created, it must be undoable. Pre-fix behavior:
+      // duplicate stays in scene but Ctrl+Z doesn't revert it.
+      let altClickNoDrag = null;
+      try {
+        const rec = p.scene?.getNonDeletedElements?.()?.find(el => el.type === 'rectangle');
+        if (!rec) throw new Error('no rect');
+        p.appState.selectedElementIds = { [rec.id]: true };
+        await new Promise(r => setTimeout(r, 20));
+        const beforeCount = p.scene?.getNonDeletedElements?.()?.length ?? 0;
+        const ctr = sceneToVp(rec.x + rec.width / 2, rec.y + rec.height / 2);
+        // Alt-press + alt-release, no move.
+        iv.dispatchEvent(new PointerEvent('pointerdown', { clientX: ctr.x, clientY: ctr.y, button: 0, pointerId: 1, altKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 20));
+        iv.dispatchEvent(new PointerEvent('pointerup', { clientX: ctr.x, clientY: ctr.y, button: 0, pointerId: 1, altKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 40));
+        const afterClickCount = p.scene?.getNonDeletedElements?.()?.length ?? 0;
+        // One undo — should restore pre-click scene if the click produced
+        // any change (either by pushing history OR by declining to create
+        // the duplicate).
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 40));
+        const afterUndoCount = p.scene?.getNonDeletedElements?.()?.length ?? 0;
+        altClickNoDrag = {
+          beforeCount,
+          afterClickCount,
+          afterUndoCount,
+          // Good behaviors:
+          //  A) no duplicate created (afterClickCount == beforeCount), OR
+          //  B) duplicate created AND undo reverts it (afterUndoCount == beforeCount).
+          // Bad: duplicate created AND undo doesn't revert.
+          healthy: afterUndoCount === beforeCount,
+        };
+      } catch (err) {
+        altClickNoDrag = { err: String(err) };
+      }
+
+      // ── History cap: 600 no-op mutations must stay bounded ──
+      // Use nudge (arrow-key) because it's the lightest-weight mutation
+      // that pushes history. After 600 nudges, probe history state.
+      let historyCap = null;
+      try {
+        const rec = p.scene?.getNonDeletedElements?.()?.find(el => el.type === 'rectangle');
+        if (!rec) throw new Error('no rect');
+        p.appState.selectedElementIds = { [rec.id]: true };
+        await new Promise(r => setTimeout(r, 20));
+        for (let i = 0; i < 600; i++) {
+          container.dispatchEvent(new KeyboardEvent('keydown', { key: i % 2 === 0 ? 'ArrowRight' : 'ArrowLeft', bubbles: true, cancelable: true }));
+        }
+        await new Promise(r => setTimeout(r, 100));
+        // Read window.__sveltedrawHistoryLen if exposed; otherwise try
+        // inferring from history array (not accessible via probe normally).
+        const len = window.__sveltedrawHistoryLen?.();
+        historyCap = {
+          historyLen: len ?? null,
+        };
+      } catch (err) {
+        historyCap = { err: String(err) };
+      }
+
       // ── Alt-drag duplicates while dragging ──
       // Select a rectangle, hold Alt, press+drag its center. Verify:
       // 1) scene element count increased by 1
@@ -1621,6 +1683,7 @@ async function main() {
         fontPicker, styleExt,
         rotatedTextOverlay,
         zOrderForward, zOrderBackward, altDragDup,
+        altClickNoDrag, historyCap,
         ctxMenuDup, ctxMenuClose,
         arrowheadPicker, textAlignPicker,
       };
@@ -2214,7 +2277,9 @@ async function main() {
   );
 
   // Deep-review: 50 undos past initial state does not crash or destroy
-  // scene (invariant: history[0] = initial snapshot, floor = 0).
+  // scene. With history cap, the floor may be a mid-session snapshot
+  // (not empty) — what matters is the invariant holds AND redo
+  // restores the original state.
   pass(
     "undo-past-initial-stable",
     probe?.undoFloor?.appStateAlive === true &&
@@ -2297,6 +2362,20 @@ async function main() {
     "ctrl-bracket-left-sends-backward",
     probe?.zOrderBackward?.moved === true,
     `beforeIdx=${probe?.zOrderBackward?.beforeIdx} afterIdx=${probe?.zOrderBackward?.afterIdx}`,
+  );
+
+  // Alt-click-without-drag must not leave an undoable-gap.
+  pass(
+    "alt-click-no-drag-is-undoable",
+    probe?.altClickNoDrag?.healthy === true,
+    `before=${probe?.altClickNoDrag?.beforeCount} afterClick=${probe?.altClickNoDrag?.afterClickCount} afterUndo=${probe?.altClickNoDrag?.afterUndoCount}`,
+  );
+
+  // History cap: 600 mutations must not grow history unboundedly.
+  pass(
+    "history-capped-below-max",
+    (probe?.historyCap?.historyLen ?? Infinity) <= 500,
+    `historyLen=${probe?.historyCap?.historyLen} (expected ≤500)`,
   );
 
   // Alt-drag duplicates instead of moving.

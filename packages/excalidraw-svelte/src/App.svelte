@@ -528,6 +528,8 @@
         exportAsPng,
         exportAsSvg,
       };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__sveltedrawHistoryLen = () => history.length;
     }
 
     // ── ResizeObserver on container (replaces window-resize from batch 1) ─
@@ -787,6 +789,12 @@
   };
   const history: HistorySnapshot[] = [];
   let historyIndex = -1;
+  // Snapshots deep-clone all scene elements. A 100-element scene at
+  // 1KB/element × 500 history entries ≈ 50MB — bounded. Without the
+  // cap an active editing session leaks indefinitely. Upstream's
+  // delta-based History class doesn't have this problem but a port
+  // would be invasive; a simple FIFO cap is sufficient for PoC.
+  const MAX_HISTORY = 500;
 
   const captureSnapshot = (): HistorySnapshot => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -811,6 +819,13 @@
     history.length = historyIndex + 1;
     history.push(snap);
     historyIndex = history.length - 1;
+    // Enforce FIFO cap: drop oldest snapshots until under MAX_HISTORY.
+    // The cap applies BEFORE we mutate historyIndex, so index ends up
+    // at the last element of the capped array (still the current state).
+    while (history.length > MAX_HISTORY) {
+      history.shift();
+      historyIndex--;
+    }
     scheduleSave();
   };
 
@@ -1612,6 +1627,10 @@
 
   // ── Space-drag / middle-mouse pan ────────────────────────────────────
   let isPanning = false;
+  // Set inside pointerdown when Alt-drag creates duplicates. Read in
+  // pointerup to force pushHistory even when cursor didn't move —
+  // otherwise the created duplicates leak out of the undo stack.
+  let altDragHadDuplicate = false;
   let panStart: { x: number; y: number; scrollX: number; scrollY: number } | null = null;
   let spaceHeld = false;
 
@@ -2704,7 +2723,10 @@
       // Alt-held at drag-start → duplicate the selection first, then
       // drag the DUPLICATES. Matches Excalidraw upstream UX. The
       // originals stay pinned at their original position; the new
-      // copies follow the cursor.
+      // copies follow the cursor. `altDragHadDuplicate` flag ensures
+      // pointerup pushes history even when the user didn't actually
+      // move (otherwise the duplicate leaks — created in scene but
+      // unreachable from undo stack).
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (event.altKey) {
         const selectedNow = getSelectedElements();
@@ -2725,6 +2747,7 @@
           for (const id of dupIds) nextSel[id] = true;
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (appState as any).selectedElementIds = nextSel;
+          altDragHadDuplicate = true;
           bumpSceneRepaint();
         }
       }
@@ -3089,7 +3112,9 @@
     if (dragOrigins.length > 0) {
       // Check if ANY element actually moved. No-move click shouldn't push
       // a history entry (otherwise "click to select" would pollute the
-      // undo stack).
+      // undo stack). EXCEPTION: if this pointerdown created alt-drag
+      // duplicates, we must push history regardless — otherwise the
+      // duplicates are stranded in the scene with no undo path.
       let moved = false;
       for (const origin of dragOrigins) {
         if (origin.el.x !== origin.x || origin.el.y !== origin.y) {
@@ -3099,7 +3124,8 @@
       }
       dragOrigins = [];
       dragStart = null;
-      if (moved) pushHistory();
+      if (moved || altDragHadDuplicate) pushHistory();
+      altDragHadDuplicate = false;
       bumpSceneRepaint();
       tryRelease(event.currentTarget as HTMLElement | null, event.pointerId);
       return;

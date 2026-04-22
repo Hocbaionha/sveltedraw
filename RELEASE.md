@@ -92,10 +92,45 @@ Vite production build: 8.6s, 0 warnings on App.svelte.
   function calls can drop reactivity. Inline the `appState.*` access
   inside the derived body. See `memory/feedback_svelte5_derived_tracking.md`.
 
+## Post-tag audit findings (fixed after phase-6-done)
+
+A ~30-minute targeted audit caught two bugs hidden behind the passing
+smoke suite:
+
+1. **Unbounded history growth.** `history: HistorySnapshot[]` appended
+   a deep-cloned snapshot per mutation with no cap. At 100 elements +
+   1KB each + 1000 edits, the scene-history retention balloons to
+   ~100MB. Fixed: `MAX_HISTORY = 500` FIFO cap; `while
+   (history.length > MAX_HISTORY) { history.shift(); historyIndex--; }`
+   after each push.
+
+2. **Alt-click leaked duplicates out of the undo stack.** Alt + press
+   + release without moving created duplicates in `appState.newElement`
+   but the drag-finalize branch only pushed history `if (moved)` — so
+   the duplicate stranded in scene with no Ctrl+Z path to remove it.
+   Smoke probe before fix: before=10, afterClick=11, afterUndo=9
+   (undo reverted an *earlier* unrelated change). Fix: track
+   `altDragHadDuplicate` across pointerdown→pointerup, force
+   pushHistory on release even when cursor didn't move.
+
+Both verified via new smoke probes (`history-capped-below-max`,
+`alt-click-no-drag-is-undoable`). 113/113 assertions pass.
+
+## Known growth paths (not fixed; documented)
+
+- **IndexedDB binary store (`sveltedraw/files`)** grows monotonically
+  — every pasted image writes a record, nothing deletes. A proper
+  compaction pass would GC fileIds unreachable from `history[0..n]`;
+  deferred because it's coupled to history semantics (deleted images
+  must survive soft-delete + undo).
+- **`imageCacheMap` / `binaryFiles`** (in-memory siblings of IDB)
+  same concern.
+- **`idbPut` opens a fresh IDB connection per call.** Browsers treat
+  idle connections cheaply; only matters at very high paste volume.
+
 ## Next (not committed to a timeline)
 
-1. Memory/perf audit (alt-drag leak path, IDB-conn-per-call, render
-   hot-path benchmarks).
+1. Image-GC compaction tied to history cap eviction.
 2. Group/ungroup + shape library UI.
 3. Mobile/touch polish.
 4. Cut over `excalidraw-app/` (the original React app) to use
