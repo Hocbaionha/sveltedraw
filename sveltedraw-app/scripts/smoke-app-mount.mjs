@@ -363,6 +363,58 @@ async function main() {
         dx: (p.appState?.scrollX ?? 0) - xBeforeMidPan,
       };
 
+      // ── Batch 5: each shape tool draws its own element type ─────────
+      // Reset to a clean slate via Ctrl+A → Delete so assertion numbers
+      // don't drift due to earlier test state.
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 20));
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 20));
+      // Reset zoom so programmatic coords land where we expect.
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: '0', ctrlKey: true, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 20));
+
+      const drawShape = async (hotkey, sx, sy, ex, ey) => {
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: hotkey, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 10));
+        iv.dispatchEvent(mk('pointerdown', sx, sy));
+        await new Promise(r => setTimeout(r, 10));
+        iv.dispatchEvent(mk('pointermove', sx + (ex - sx) * 0.5, sy + (ey - sy) * 0.5));
+        await new Promise(r => setTimeout(r, 10));
+        iv.dispatchEvent(mk('pointermove', ex, ey));
+        await new Promise(r => setTimeout(r, 10));
+        iv.dispatchEvent(mk('pointerup', ex, ey));
+        await new Promise(r => setTimeout(r, 30));
+      };
+
+      await drawShape('2', rect.left + 100, rect.top + 100, rect.left + 200, rect.top + 150);  // rectangle
+      await drawShape('3', rect.left + 250, rect.top + 100, rect.left + 350, rect.top + 150);  // diamond
+      await drawShape('4', rect.left + 400, rect.top + 100, rect.left + 500, rect.top + 150);  // ellipse
+      await drawShape('5', rect.left + 100, rect.top + 250, rect.left + 200, rect.top + 300);  // arrow
+      await drawShape('6', rect.left + 250, rect.top + 250, rect.left + 350, rect.top + 300);  // line
+
+      // Freedraw — need multiple pointermoves to create a path.
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: '7', bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 10));
+      const fdStart = { x: rect.left + 400, y: rect.top + 250 };
+      iv.dispatchEvent(mk('pointerdown', fdStart.x, fdStart.y));
+      await new Promise(r => setTimeout(r, 10));
+      for (let i = 1; i <= 10; i++) {
+        iv.dispatchEvent(mk('pointermove', fdStart.x + i * 10, fdStart.y + Math.sin(i) * 20));
+        await new Promise(r => setTimeout(r, 5));
+      }
+      iv.dispatchEvent(mk('pointerup', fdStart.x + 100, fdStart.y));
+      await new Promise(r => setTimeout(r, 30));
+
+      const allShapes = p.scene?.getNonDeletedElements?.() ?? [];
+      const freedraw = allShapes.find(el => el.type === 'freedraw');
+      const shapeTypes = allShapes.map(el => el.type);
+      const afterShapes = {
+        count: allShapes.length,
+        types: shapeTypes,
+        freedrawPointCount: freedraw?.points?.length ?? 0,
+      };
+
       return {
         ...afterDraw,
         afterSelect, afterDrag, afterClickEmpty,
@@ -370,6 +422,7 @@ async function main() {
         afterDuplicate, afterDelete,
         afterUndoDelete, afterRedoDelete, afterCtrlY,
         zoomBefore, afterZoomIn, afterZoomReset, afterPan, afterKeyZoomIn, afterMiddlePan,
+        afterShapes,
       };
     })()`,
     returnByValue: true,
@@ -593,6 +646,27 @@ async function main() {
     "middle-mouse-pans",
     Math.abs(probe?.afterMiddlePan?.dx ?? 0) > 10,
     `dx=${probe?.afterMiddlePan?.dx}`,
+  );
+
+  // Batch 5: all 6 shape types.
+  const shapeTypes = probe?.afterShapes?.types ?? [];
+  const expected = ["rectangle", "diamond", "ellipse", "arrow", "line", "freedraw"];
+  pass(
+    "all-shape-tools-create-elements",
+    probe?.afterShapes?.count === 6,
+    `count=${probe?.afterShapes?.count} types=${JSON.stringify(shapeTypes)}`,
+  );
+  for (const t of expected) {
+    pass(
+      `shape-${t}-exists`,
+      shapeTypes.includes(t),
+      `types=${JSON.stringify(shapeTypes)}`,
+    );
+  }
+  pass(
+    "freedraw-has-many-points",
+    (probe?.afterShapes?.freedrawPointCount ?? 0) >= 5,
+    `points=${probe?.afterShapes?.freedrawPointCount}`,
   );
 
   console.log("\n=== Assertions ===");

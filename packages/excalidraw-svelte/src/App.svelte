@@ -64,7 +64,7 @@
   // prettier-ignore
   import { getFormFactor, createUserAgentDescriptor, MQ_RIGHT_SIDEBAR_MIN_WIDTH, supportsResizeObserver, POINTER_EVENTS, randomId, viewportCoordsToSceneCoords, DEFAULT_ELEMENT_PROPS, DEFAULT_FONT_FAMILY } from "@excalidraw/common";
   // @ts-ignore — upstream
-  import { newElement, hitElementItself, duplicateElements, deepCopyElement } from "@excalidraw/element";
+  import { newElement, newLinearElement, newArrowElement, newFreeDrawElement, hitElementItself, duplicateElements, deepCopyElement } from "@excalidraw/element";
   // @ts-ignore — upstream, resolved via Vite alias
   // prettier-ignore
   import { DEFAULT_COLLISION_THRESHOLD, ELEMENT_TRANSLATE_AMOUNT, ELEMENT_SHIFT_TRANSLATE_AMOUNT, ZOOM_STEP } from "@excalidraw/common";
@@ -572,14 +572,29 @@
   // pointerdown → create newElement, pointermove → extend, pointerup → commit.
   // Subsequent batches copy-paste for other shapes and add selection/drag.
 
-  // Map keyboard keys to tool types. Subset of upstream `findShapeByKey`
-  // (packages/excalidraw/components/shapes.tsx) — covers just the shapes
-  // wired in this batch; future batches append entries.
+  // Map keyboard keys to tool types. Approximates upstream `findShapeByKey`
+  // (packages/excalidraw/components/shapes.tsx). Numeric keys are the
+  // primary hotkeys; letter aliases match upstream where applicable.
   const TOOL_HOTKEYS: Record<string, string> = {
     "1": "selection",
     "2": "rectangle",
     r: "rectangle",
     R: "rectangle",
+    "3": "diamond",
+    "4": "ellipse",
+    o: "ellipse",
+    O: "ellipse",
+    "5": "arrow",
+    a: "arrow",
+    A: "arrow",
+    "6": "line",
+    l: "line",
+    L: "line",
+    "7": "freedraw",
+    p: "freedraw",
+    P: "freedraw",
+    x: "freedraw",
+    X: "freedraw",
   };
 
   const setActiveTool = (type: string) => {
@@ -1143,13 +1158,20 @@
       return;
     }
 
-    // ── Rectangle tool: create newElement ──
-    if (tool === "rectangle") {
+    // ── Shape tools: create a newElement of the requested type ──
+    const drawingTools = new Set([
+      "rectangle",
+      "diamond",
+      "ellipse",
+      "line",
+      "arrow",
+      "freedraw",
+    ]);
+    if (drawingTools.has(tool)) {
       dragStart = { x, y };
       dragOrigins = [];
 
-      const el = newElement({
-        type: "rectangle",
+      const baseOpts = {
         x,
         y,
         width: 1,
@@ -1161,8 +1183,31 @@
         strokeStyle: DEFAULT_ELEMENT_PROPS.strokeStyle,
         roughness: DEFAULT_ELEMENT_PROPS.roughness,
         opacity: DEFAULT_ELEMENT_PROPS.opacity,
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let el: any;
+      if (tool === "line") {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any);
+        el = newLinearElement({ ...baseOpts, type: "line", points: [[0, 0]] } as any);
+      } else if (tool === "arrow") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        el = newArrowElement({ ...baseOpts, type: "arrow", points: [[0, 0]], endArrowhead: "arrow" } as any);
+      } else if (tool === "freedraw") {
+        el = newFreeDrawElement({
+          ...baseOpts,
+          type: "freedraw",
+          simulatePressure: true,
+          points: [[0, 0]],
+          pressures: [0.5],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
+      } else {
+        // rectangle, diamond, ellipse — generic factory.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        el = newElement({ ...baseOpts, type: tool } as any);
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (appState as any).newElement = el;
       tryCapture(event.currentTarget as HTMLElement | null, event.pointerId);
@@ -1201,20 +1246,63 @@
       return;
     }
 
-    // ── Extending the in-progress newElement (rectangle tool) ──
+    // ── Extending the in-progress newElement (drawing tool) ──
     if (cur) {
-      const width = x - dragStart.x;
-      const height = y - dragStart.y;
-      // CRITICAL (memoize gotcha): spread-copy so Renderer cache busts.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (appState as any).newElement = {
-        ...cur,
-        x: width < 0 ? dragStart.x + width : dragStart.x,
-        y: height < 0 ? dragStart.y + height : dragStart.y,
-        width: Math.abs(width) || 1,
-        height: Math.abs(height) || 1,
-        version: (cur.version ?? 1) + 1,
-      };
+      const dx = x - dragStart.x;
+      const dy = y - dragStart.y;
+
+      if (cur.type === "line" || cur.type === "arrow") {
+        // Linear elements: x/y stays at drag-start; update points[1] to
+        // (dx, dy) so the second vertex tracks the cursor. `points` are
+        // LOCAL coords relative to element's x/y.
+        const nextPoints = [
+          [0, 0],
+          [dx, dy],
+        ];
+        // width/height must equal the points' bounding box; upstream render
+        // uses them for dirty-rect. Approximate with abs(dx)/abs(dy), min 1.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (appState as any).newElement = {
+          ...cur,
+          points: nextPoints,
+          width: Math.abs(dx) || 1,
+          height: Math.abs(dy) || 1,
+          version: (cur.version ?? 1) + 1,
+        };
+      } else if (cur.type === "freedraw") {
+        // Freedraw: append one point per move event. Points are local
+        // (relative to element origin). Keep pressures in lock-step.
+        const nextPoints = [...cur.points, [dx, dy]];
+        const nextPressures = [...(cur.pressures ?? []), 0.5];
+        // Track bbox for width/height so dirty-rect culls correctly.
+        let minX = 0, minY = 0, maxX = 0, maxY = 0;
+        for (const [px, py] of nextPoints) {
+          if (px < minX) minX = px;
+          if (py < minY) minY = py;
+          if (px > maxX) maxX = px;
+          if (py > maxY) maxY = py;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (appState as any).newElement = {
+          ...cur,
+          points: nextPoints,
+          pressures: nextPressures,
+          width: Math.max(1, maxX - minX),
+          height: Math.max(1, maxY - minY),
+          version: (cur.version ?? 1) + 1,
+        };
+      } else {
+        // Generic bbox shapes (rectangle, diamond, ellipse).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (appState as any).newElement = {
+          ...cur,
+          x: dx < 0 ? dragStart.x + dx : dragStart.x,
+          y: dy < 0 ? dragStart.y + dy : dragStart.y,
+          width: Math.abs(dx) || 1,
+          height: Math.abs(dy) || 1,
+          version: (cur.version ?? 1) + 1,
+        };
+      }
     }
   };
 
@@ -1248,10 +1336,23 @@
       return;
     }
 
-    // ── Finalize new rectangle ──
+    // ── Finalize in-progress newElement ──
     if (cur) {
+      // Per-type commit threshold:
+      // - bbox shapes: width & height > 1px
+      // - line/arrow: at least a small total distance to avoid 0-length
+      // - freedraw: at least 2 points (start + one move)
+      let meaningful = false;
+      if (cur.type === "line" || cur.type === "arrow") {
+        const [, [dx = 0, dy = 0] = []] = cur.points;
+        meaningful = Math.hypot(dx, dy) > 2;
+      } else if (cur.type === "freedraw") {
+        meaningful = (cur.points?.length ?? 0) >= 2;
+      } else {
+        meaningful = cur.width > 1 && cur.height > 1;
+      }
       let committed = false;
-      if (cur.width > 1 && cur.height > 1 && scene) {
+      if (meaningful && scene) {
         const existing = scene.getElementsIncludingDeleted();
         // skipValidation: fractional-index validator throws for fresh
         // elements; syncInvalidIndices inside replaceAllElements repairs.
