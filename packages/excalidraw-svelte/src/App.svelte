@@ -1218,6 +1218,101 @@
     return blob;
   };
 
+  // ── .excalidraw JSON file open/save ────────────────────────────
+  // Serializes the full scene (elements + appState subset + files) to
+  // a .excalidraw JSON file the user can download; load reads one
+  // back in via a file-picker.
+  const saveAsExcalidrawFile = async () => {
+    if (!scene) return;
+    const elements = scene.getNonDeletedElements();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const json = JSON.stringify({
+      type: "excalidraw",
+      version: 2,
+      source: window.location.origin,
+      elements,
+      appState: {
+        gridSize: (appState as any).gridSize,
+        gridStep: (appState as any).gridStep,
+        gridModeEnabled: (appState as any).gridModeEnabled,
+        viewBackgroundColor: (appState as any).viewBackgroundColor,
+        theme: (appState as any).theme,
+      },
+      files: binaryFiles,
+    }, null, 2);
+    const blob = new Blob([json], { type: "application/vnd.excalidraw+json" });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const name = (appState as any).name || "sveltedraw";
+    triggerDownload(blob, `${name}.excalidraw`);
+  };
+
+  const loadFromExcalidrawFile = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".excalidraw,application/json,application/vnd.excalidraw+json";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file || !scene) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (!parsed || !Array.isArray(parsed.elements)) {
+          throw new Error("Invalid .excalidraw file");
+        }
+        scene.replaceAllElements(parsed.elements, { skipValidation: true });
+        if (parsed.appState) {
+          for (const key of ["viewBackgroundColor", "theme", "gridModeEnabled"]) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            if (parsed.appState[key] !== undefined) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (appState as any)[key] = parsed.appState[key];
+            }
+          }
+        }
+        clearSelection();
+        pushHistory();
+        bumpSceneRepaint();
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error("sveltedraw: failed to load file", err);
+        window.alert("Failed to load .excalidraw file");
+      }
+    };
+    input.click();
+  };
+
+  const toggleGrid = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).gridModeEnabled = !(appState as any).gridModeEnabled;
+    scheduleSave();
+    bumpSceneRepaint();
+  };
+
+  // ── Burger main menu ────────────────────────────────────────────
+  let mainMenuOpen = $state(false);
+  let helpDialogOpen = $state(false);
+  const closeMainMenu = () => (mainMenuOpen = false);
+
+  $effect(() => {
+    if (!mainMenuOpen) return;
+    const onDocPointerDown = (e: PointerEvent) => {
+      // Stay open if click is inside the menu itself.
+      const t = e.target as HTMLElement | null;
+      if (t?.closest(".sveltedraw-main-menu")) return;
+      if (t?.closest(".sveltedraw-main-menu-trigger")) return;
+      closeMainMenu();
+    };
+    const onDocKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeMainMenu();
+    };
+    window.addEventListener("pointerdown", onDocPointerDown);
+    window.addEventListener("keydown", onDocKey);
+    return () => {
+      window.removeEventListener("pointerdown", onDocPointerDown);
+      window.removeEventListener("keydown", onDocKey);
+    };
+  });
+
   const downloadPng = async () => {
     const blob = await exportAsPng();
     if (!blob) return;
@@ -3667,6 +3762,198 @@
 
   <!-- Top-right utility bar: theme toggle + language picker. Kept
        minimal; upstream-style MainMenu is a Phase 7 concern. -->
+  <!-- Main menu burger button — top-left. Dropdown with file +
+       view + help commands. Uses the same outside-click / Escape
+       pattern as the right-click context menu. -->
+  <button
+    type="button"
+    class="sveltedraw-main-menu-trigger"
+    aria-label="Menu"
+    title="Menu"
+    aria-expanded={mainMenuOpen}
+    onclick={() => (mainMenuOpen = !mainMenuOpen)}
+  >
+    <Icon name="HamburgerMenuIcon" />
+  </button>
+  {#if mainMenuOpen}
+    <div class="sveltedraw-main-menu" role="menu" tabindex="-1">
+      <button type="button" class="mm-item" onclick={() => { loadFromExcalidrawFile(); closeMainMenu(); }}>{t("buttons.load", undefined, "Open…")}</button>
+      <button type="button" class="mm-item" onclick={() => { saveAsExcalidrawFile(); closeMainMenu(); }}>{t("buttons.save", undefined, "Save as…")}</button>
+      <div class="mm-sep"></div>
+      <button type="button" class="mm-item" onclick={() => { downloadPng(); closeMainMenu(); }}>{t("buttons.exportImage", undefined, "Export as image")}</button>
+      <button type="button" class="mm-item" onclick={() => { downloadSvg(); closeMainMenu(); }}>{t("buttons.exportToSvg", undefined, "Export as SVG")}</button>
+      <div class="mm-sep"></div>
+      <button type="button" class="mm-item" onclick={() => { toggleGrid(); closeMainMenu(); }}>
+        {((appState as any).gridModeEnabled ? "✓ " : "")}{t("labels.showGrid", undefined, "Show grid")}
+      </button>
+      <button type="button" class="mm-item" onclick={() => { toggleTheme(); closeMainMenu(); }}>
+        {((appState as any).theme === "dark" ? "✓ " : "")}{t("buttons.darkMode", undefined, "Dark mode")}
+      </button>
+      <div class="mm-sep"></div>
+      <button type="button" class="mm-item" onclick={() => { helpDialogOpen = true; closeMainMenu(); }}>{t("helpDialog.title", undefined, "Keyboard shortcuts")}</button>
+      <button type="button" class="mm-item mm-item--danger" onclick={() => { if (window.confirm(t("alerts.clearReset", undefined, "Clear the canvas?"))) { clearCanvas(); } closeMainMenu(); }}>{t("buttons.clearReset", undefined, "Reset canvas")}</button>
+    </div>
+  {/if}
+
+  <!-- Help dialog — keyboard shortcut reference. Overlay + card. -->
+  {#if helpDialogOpen}
+    <div
+      class="sveltedraw-help-overlay"
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
+      onpointerdown={() => (helpDialogOpen = false)}
+    >
+      <div
+        class="sveltedraw-help-card"
+        role="document"
+        onpointerdown={(e) => e.stopPropagation()}
+      >
+        <div class="hd-header">
+          <strong>{t("helpDialog.title", undefined, "Keyboard shortcuts")}</strong>
+          <button type="button" class="hd-close" aria-label="Close" onclick={() => (helpDialogOpen = false)}>×</button>
+        </div>
+        <div class="hd-body">
+          <div class="hd-section">
+            <h4>Tools</h4>
+            <div class="hd-row"><kbd>V</kbd>/<kbd>1</kbd><span>Selection</span></div>
+            <div class="hd-row"><kbd>R</kbd>/<kbd>2</kbd><span>Rectangle</span></div>
+            <div class="hd-row"><kbd>D</kbd>/<kbd>3</kbd><span>Diamond</span></div>
+            <div class="hd-row"><kbd>O</kbd>/<kbd>4</kbd><span>Ellipse</span></div>
+            <div class="hd-row"><kbd>A</kbd>/<kbd>5</kbd><span>Arrow</span></div>
+            <div class="hd-row"><kbd>L</kbd>/<kbd>6</kbd><span>Line</span></div>
+            <div class="hd-row"><kbd>P</kbd>/<kbd>7</kbd><span>Draw</span></div>
+            <div class="hd-row"><kbd>T</kbd>/<kbd>8</kbd><span>Text</span></div>
+          </div>
+          <div class="hd-section">
+            <h4>Edit</h4>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>Z</kbd><span>Undo</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>Y</kbd><span>Redo</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>A</kbd><span>Select all</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>D</kbd><span>Duplicate</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>G</kbd><span>Group</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd><span>Ungroup</span></div>
+            <div class="hd-row"><kbd>Del</kbd><span>Delete</span></div>
+            <div class="hd-row"><kbd>Alt</kbd>+drag<span>Duplicate while dragging</span></div>
+          </div>
+          <div class="hd-section">
+            <h4>Z-order</h4>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>]</kbd><span>Bring forward</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>]</kbd><span>Bring to front</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>[</kbd><span>Send backward</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>[</kbd><span>Send to back</span></div>
+          </div>
+          <div class="hd-section">
+            <h4>View</h4>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>0</kbd><span>Reset zoom</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>+</kbd><span>Zoom in</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>-</kbd><span>Zoom out</span></div>
+            <div class="hd-row"><kbd>Space</kbd>+drag<span>Pan canvas</span></div>
+            <div class="hd-row">Pinch<span>Zoom on touch</span></div>
+          </div>
+          <div class="hd-section">
+            <h4>Export</h4>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>S</kbd><span>Export PNG</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd><span>Export SVG</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Welcome screen — centered hint shown only when canvas is empty
+       and no tool is active. Disappears as soon as the user adds an
+       element or picks a non-selection tool. -->
+  {#if scene && scene.getNonDeletedElements().length === 0 && (appState.activeTool as any)?.type === "selection"}
+    <div class="sveltedraw-welcome">
+      <div class="sw-title">Sveltedraw</div>
+      <div class="sw-hint">
+        Pick a tool above or press <kbd>R</kbd> <kbd>D</kbd> <kbd>O</kbd> <kbd>L</kbd> <kbd>A</kbd> <kbd>P</kbd> <kbd>T</kbd> to start drawing.
+      </div>
+      <div class="sw-hint-alt">
+        <kbd>?</kbd> for keyboard shortcuts ·
+        <button type="button" class="sw-link" onclick={() => (helpDialogOpen = true)}>Open help</button>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Hint viewer — contextual one-liner at bottom-center showing
+       what the current tool does. Upstream has richer per-state hints;
+       ours is minimal. -->
+  {#if (appState.activeTool as any)?.type && (appState.activeTool as any).type !== "selection"}
+    <div class="sveltedraw-hint">
+      {#if (appState.activeTool as any).type === "text"}
+        Click to place text, then type. <kbd>Esc</kbd> or click elsewhere to commit.
+      {:else if (appState.activeTool as any).type === "line" || (appState.activeTool as any).type === "arrow"}
+        Drag for a straight line, or click successive points + press <kbd>Enter</kbd> for a polyline.
+      {:else if (appState.activeTool as any).type === "freedraw"}
+        Draw freehand. Pressure-sensitive if your device supports it.
+      {:else}
+        Click and drag to draw a {(appState.activeTool as any).type}. <kbd>Esc</kbd> to cancel.
+      {/if}
+    </div>
+  {/if}
+
+  <!-- Toolbox — top-center. Single row of shape buttons + a
+       keyboard-shortcut hint. Active tool gets highlighted. -->
+  {#snippet toolBtn(
+    tool: string,
+    iconName: string,
+    key: string,
+    label: string,
+  )}
+    <button
+      type="button"
+      class="sveltedraw-tool-btn"
+      class:active={(appState.activeTool as any)?.type === tool}
+      aria-label={label}
+      aria-pressed={(appState.activeTool as any)?.type === tool}
+      title={`${label} — ${key.toUpperCase()}`}
+      data-tool={tool}
+      onclick={() => setActiveTool(tool)}
+    >
+      <Icon name={iconName} />
+    </button>
+  {/snippet}
+  <div class="sveltedraw-toolbox" role="toolbar" aria-label="Shape tools">
+    {@render toolBtn("selection", "SelectionIcon", "v", "Selection")}
+    <div class="tb-sep"></div>
+    {@render toolBtn("rectangle", "RectangleIcon", "r", "Rectangle")}
+    {@render toolBtn("diamond", "DiamondIcon", "d", "Diamond")}
+    {@render toolBtn("ellipse", "EllipseIcon", "o", "Ellipse")}
+    {@render toolBtn("arrow", "ArrowIcon", "a", "Arrow")}
+    {@render toolBtn("line", "LineIcon", "l", "Line")}
+    {@render toolBtn("freedraw", "FreedrawIcon", "p", "Draw")}
+    {@render toolBtn("text", "TextIcon", "t", "Text")}
+  </div>
+
+  <!-- Zoom controls — bottom-right. −, percent (reset on click), +. -->
+  <div class="sveltedraw-zoom-ctrls" role="toolbar" aria-label="Zoom">
+    <button
+      type="button"
+      class="sveltedraw-zoom-btn"
+      aria-label="Zoom out"
+      title="Zoom out (Ctrl+-)"
+      onclick={() => zoomCentered(((appState.zoom as any).value || 1) - ZOOM_STEP)}
+    >−</button>
+    <button
+      type="button"
+      class="sveltedraw-zoom-btn sveltedraw-zoom-reset"
+      aria-label="Reset zoom"
+      title="Reset zoom (Ctrl+0)"
+      onclick={resetZoom}
+    >
+      {Math.round(((appState.zoom as any).value || 1) * 100)}%
+    </button>
+    <button
+      type="button"
+      class="sveltedraw-zoom-btn"
+      aria-label="Zoom in"
+      title="Zoom in (Ctrl++)"
+      onclick={() => zoomCentered(((appState.zoom as any).value || 1) + ZOOM_STEP)}
+    >+</button>
+  </div>
+
   <div class="sveltedraw-utility-bar">
     <button
       type="button"
@@ -4322,6 +4609,345 @@
   .sveltedraw-ctx-menu .ctx-item--danger {
     color: #e03131;
   }
+  .sveltedraw-toolbox {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    background: #fff;
+    border: 1px solid #d1d4da;
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+    z-index: 50;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-toolbox {
+    background: #232329;
+    border-color: #363636;
+  }
+  .sveltedraw-toolbox .tb-sep {
+    width: 1px;
+    height: 22px;
+    background: #e5e7ea;
+    margin: 0 4px;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-toolbox .tb-sep {
+    background: #363636;
+  }
+  .sveltedraw-toolbox .sveltedraw-tool-btn {
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #1e1e1e;
+  }
+  .sveltedraw-toolbox .sveltedraw-tool-btn:hover {
+    background: #f1f3f5;
+  }
+  .sveltedraw-toolbox .sveltedraw-tool-btn.active {
+    background: #eeedfa;
+    border-color: #6965db;
+    color: #5349d6;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-toolbox .sveltedraw-tool-btn {
+    color: #e5e7ea;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-toolbox .sveltedraw-tool-btn:hover {
+    background: #2e2e36;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-toolbox .sveltedraw-tool-btn.active {
+    background: #3b3a66;
+    border-color: #6965db;
+    color: #b5b2ee;
+  }
+  :global(.sveltedraw-toolbox .sveltedraw-tool-btn svg) {
+    width: 20px;
+    height: 20px;
+  }
+
+  .sveltedraw-zoom-ctrls {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    display: flex;
+    align-items: stretch;
+    background: #fff;
+    border: 1px solid #d1d4da;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+    z-index: 50;
+    overflow: hidden;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-zoom-ctrls {
+    background: #232329;
+    border-color: #363636;
+  }
+  .sveltedraw-zoom-ctrls .sveltedraw-zoom-btn {
+    width: 32px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-left: 1px solid #e5e7ea;
+    cursor: pointer;
+    font-size: 16px;
+    color: #1e1e1e;
+    font-variant-numeric: tabular-nums;
+  }
+  .sveltedraw-zoom-ctrls .sveltedraw-zoom-btn:first-child {
+    border-left: none;
+  }
+  .sveltedraw-zoom-ctrls .sveltedraw-zoom-btn:hover {
+    background: #f1f3f5;
+  }
+  .sveltedraw-zoom-ctrls .sveltedraw-zoom-reset {
+    min-width: 52px;
+    font-size: 12px;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-zoom-ctrls .sveltedraw-zoom-btn {
+    color: #e5e7ea;
+    border-left-color: #363636;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-zoom-ctrls .sveltedraw-zoom-btn:hover {
+    background: #2e2e36;
+  }
+
+  .sveltedraw-main-menu-trigger {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: #fff;
+    border: 1px solid #d1d4da;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #1e1e1e;
+    z-index: 50;
+  }
+  .sveltedraw-main-menu-trigger:hover {
+    background: #f1f3f5;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-main-menu-trigger {
+    background: #232329;
+    border-color: #363636;
+    color: #e5e7ea;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-main-menu-trigger:hover {
+    background: #2e2e36;
+  }
+  :global(.sveltedraw-main-menu-trigger svg) {
+    width: 18px;
+    height: 18px;
+  }
+
+  .sveltedraw-main-menu {
+    position: absolute;
+    top: 54px;
+    left: 12px;
+    min-width: 200px;
+    background: #fff;
+    border: 1px solid #d1d4da;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    padding: 4px 0;
+    z-index: 60;
+    font-size: 13px;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-main-menu {
+    background: #232329;
+    border-color: #363636;
+    color: #e5e7ea;
+  }
+  .sveltedraw-main-menu .mm-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 7px 14px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: inherit;
+    font-size: 13px;
+  }
+  .sveltedraw-main-menu .mm-item:hover {
+    background: #eeedfa;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-main-menu .mm-item:hover {
+    background: #3b3a66;
+  }
+  .sveltedraw-main-menu .mm-item--danger {
+    color: #e03131;
+  }
+  .sveltedraw-main-menu .mm-sep {
+    height: 1px;
+    background: #e5e7ea;
+    margin: 4px 0;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-main-menu .mm-sep {
+    background: #363636;
+  }
+
+  .sveltedraw-help-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  .sveltedraw-help-card {
+    width: min(680px, 92vw);
+    max-height: 85vh;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-size: 13px;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-help-card {
+    background: #232329;
+    color: #e5e7ea;
+  }
+  .sveltedraw-help-card .hd-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid #e5e7ea;
+    font-size: 16px;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-help-card .hd-header {
+    border-bottom-color: #363636;
+  }
+  .sveltedraw-help-card .hd-close {
+    background: transparent;
+    border: none;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    color: inherit;
+  }
+  .sveltedraw-help-card .hd-body {
+    padding: 16px 20px;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px 24px;
+  }
+  .sveltedraw-help-card .hd-section h4 {
+    margin: 0 0 8px 0;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6b7280;
+  }
+  .sveltedraw-help-card .hd-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 0;
+    color: #1e1e1e;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-help-card .hd-row {
+    color: #e5e7ea;
+  }
+  .sveltedraw-help-card .hd-row span {
+    margin-left: auto;
+    color: #6b7280;
+  }
+  :global(.sveltedraw-help-card kbd),
+  :global(.sveltedraw-hint kbd),
+  :global(.sveltedraw-welcome kbd) {
+    display: inline-block;
+    padding: 1px 6px;
+    font: 11px ui-monospace, Menlo, Consolas, monospace;
+    background: #f1f3f5;
+    border: 1px solid #d1d4da;
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    color: #1e1e1e;
+  }
+  :global(.excalidraw.theme--dark .sveltedraw-help-card kbd),
+  :global(.excalidraw.theme--dark .sveltedraw-hint kbd),
+  :global(.excalidraw.theme--dark .sveltedraw-welcome kbd) {
+    background: #2e2e36;
+    border-color: #464651;
+    color: #e5e7ea;
+  }
+
+  .sveltedraw-welcome {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .sveltedraw-welcome .sw-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: #c5c7cc;
+    margin-bottom: 12px;
+    font-family: Excalifont, Xiaolai, sans-serif;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-welcome .sw-title {
+    color: #4a4a52;
+  }
+  .sveltedraw-welcome .sw-hint {
+    color: #6b7280;
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+  .sveltedraw-welcome .sw-hint-alt {
+    color: #9ca3af;
+    font-size: 12px;
+    pointer-events: auto;
+  }
+  .sveltedraw-welcome .sw-link {
+    background: transparent;
+    border: none;
+    color: #6965db;
+    cursor: pointer;
+    text-decoration: underline;
+    font-size: 12px;
+    padding: 0;
+  }
+
+  .sveltedraw-hint {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 6px 14px;
+    background: rgba(30, 30, 30, 0.85);
+    color: #fff;
+    border-radius: 16px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 30;
+  }
+
   .sveltedraw-utility-bar {
     position: absolute;
     top: 12px;
