@@ -1,23 +1,14 @@
 // Global stylesheet for sveltedraw-app.
 //
 // Imports upstream Excalidraw SCSS so the ported Svelte components inherit
-// the same look. Excalidraw's own components import their .scss sidecars in
-// React (`import "./X.scss"`); the Svelte ports do not, so we aggregate all
-// of them here once.
+// the same look. Excalidraw's own components import their .scss sidecars
+// per-file; the Svelte ports do not, so we aggregate all of them here once.
 //
 // All Excalidraw rules are nested under `.excalidraw` — wrap any region that
 // uses ported components in a `<div class="excalidraw">` so the rules apply.
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-}
+//
+// NOTE: Sass requires all `@use` rules to appear BEFORE any CSS rules, so the
+// upstream imports live first and the local reset is at the bottom.
 
 // ─── Upstream Excalidraw global styles + theme variables ─────────────────
 @use "../../packages/excalidraw/css/app";
@@ -94,3 +85,15 @@ body {
 @use "../../packages/excalidraw/components/UnlockPopup";
 @use "../../packages/excalidraw/components/UserList";
 @use "../../packages/excalidraw/components/welcome-screen/WelcomeScreen";
+
+// ─── Local reset (after upstream @use) ──────────────────────────────────
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
