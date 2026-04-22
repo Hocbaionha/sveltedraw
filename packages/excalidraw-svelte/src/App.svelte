@@ -1676,15 +1676,27 @@
     { name: "cartoonist", value: ROUGHNESS.cartoonist, icon: "SloppinessCartoonistIcon" },
   ];
   const OPACITY_PRESETS = [25, 50, 75, 100];
-  // Arrowhead quick-picks: a subset of the full upstream Arrowhead type.
-  // Full set (triangle_outline, diamond*, cardinality_*) is overwhelming
-  // for a PoC side-panel; these five cover 95% of use.
+  // Font size quick-picks — matches upstream Excalidraw's 4 canonical
+  // sizes. DEFAULT_FONT_SIZE = 20 (Medium).
+  const FONT_SIZE_PRESETS = [
+    { name: "Small", value: 16, icon: "FontSizeSmallIcon" },
+    { name: "Medium", value: 20, icon: "FontSizeMediumIcon" },
+    { name: "Large", value: 28, icon: "FontSizeLargeIcon" },
+    { name: "Extra large", value: 36, icon: "FontSizeExtraLargeIcon" },
+  ];
+  // Arrowhead quick-picks — full upstream Arrowhead enum minus
+  // cardinality_* (DB-notation icons, rarely used outside ERD
+  // diagrams). 8 presets fit one panel row.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ARROWHEAD_PRESETS = [
     { name: "none", value: null },
     { name: "arrow", value: "arrow" as const },
     { name: "triangle", value: "triangle" as const },
+    { name: "triangle outline", value: "triangle_outline" as const },
+    { name: "diamond", value: "diamond" as const },
+    { name: "diamond outline", value: "diamond_outline" as const },
     { name: "circle", value: "circle" as const },
+    { name: "circle outline", value: "circle_outline" as const },
     { name: "bar", value: "bar" as const },
   ];
   const TEXT_ALIGN_PRESETS = [
@@ -1740,6 +1752,8 @@
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         verticalAlign: (el as any).verticalAlign,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        fontSize: (el as any).fontSize,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         roundness: (el as any).roundness,
       };
     }
@@ -1766,6 +1780,8 @@
       textAlign: (appState as any).currentItemTextAlign,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       verticalAlign: (appState as any).currentItemVerticalAlign,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      fontSize: (appState as any).currentItemFontSize ?? DEFAULT_FONT_SIZE,
     };
   });
 
@@ -4466,38 +4482,63 @@
       </div>
     </div>
 
-    <div class="sp-row">
-      <div class="sp-label">{t("labels.fontFamily")}</div>
-      <div class="sp-picker sp-font-picker">
-        {#snippet handDrawnIcon()}<Icon name="FreedrawIcon" />{/snippet}
-        {#snippet normalIcon()}<Icon name="FontFamilyNormalIcon" />{/snippet}
-        {#snippet codeIcon()}<Icon name="FontFamilyCodeIcon" />{/snippet}
-        <FontPicker
-          isOpened={fontPickerOpen}
-          selectedFontFamily={panelFontFamily}
-          hoveredFontFamily={fontPickerHover}
-          defaultFonts={[
-            { value: FONT_FAMILY.Excalifont, icon: handDrawnIcon, text: "Hand-drawn", testId: "font-family-hand-drawn" },
-            { value: FONT_FAMILY.Helvetica, icon: normalIcon, text: "Normal", testId: "font-family-normal" },
-            { value: FONT_FAMILY.Cascadia, icon: codeIcon, text: "Code", testId: "font-family-code" },
-          ]}
-          sceneFonts={Object.entries(fontFamilyLabels)
-            .filter(([v]) => sceneFontFamilies.has(Number(v)) && !defaultFontValues.includes(Number(v)))
-            .map(([v, text]) => ({ value: Number(v), icon: normalIcon, text }))}
-          availableFonts={Object.entries(fontFamilyLabels)
-            .filter(([v]) => !sceneFontFamilies.has(Number(v)) && !defaultFontValues.includes(Number(v)))
-            .map(([v, text]) => ({ value: Number(v), icon: normalIcon, text }))}
-          onSelect={(v) => {
-            applyStyle({ fontFamily: v });
-            fontPickerOpen = false;
-          }}
-          onHover={(v) => (fontPickerHover = v)}
-          onLeave={() => (fontPickerHover = null)}
-          onPopupChange={(open) => (fontPickerOpen = open)}
-          container={containerEl}
-        />
+    {#if hasTextSelected}
+      <!-- Font size — Small / Medium / Large / Extra large.
+           Upstream's canonical values are 16 / 20 / 28 / 36. Applies
+           via applyStyle so it flows through currentItemFontSize
+           when no text is selected (defaults for next-drawn). -->
+      <div class="sp-row">
+        <div class="sp-label">{t("labels.fontSize")}</div>
+        <div class="sp-swatches">
+          {#each FONT_SIZE_PRESETS as fs}
+            <button
+              type="button"
+              class="sp-icon-btn"
+              class:active={panelStyle.fontSize === fs.value}
+              data-preset="fontSize"
+              data-value={fs.value}
+              aria-label={fs.name}
+              title={fs.name}
+              onclick={() => applyStyle({ fontSize: fs.value })}
+            >
+              <Icon name={fs.icon} />
+            </button>
+          {/each}
+        </div>
       </div>
-    </div>
+      <div class="sp-row">
+        <div class="sp-label">{t("labels.fontFamily")}</div>
+        <div class="sp-picker sp-font-picker">
+          {#snippet handDrawnIcon()}<Icon name="FreedrawIcon" />{/snippet}
+          {#snippet normalIcon()}<Icon name="FontFamilyNormalIcon" />{/snippet}
+          {#snippet codeIcon()}<Icon name="FontFamilyCodeIcon" />{/snippet}
+          <FontPicker
+            isOpened={fontPickerOpen}
+            selectedFontFamily={panelFontFamily}
+            hoveredFontFamily={fontPickerHover}
+            defaultFonts={[
+              { value: FONT_FAMILY.Excalifont, icon: handDrawnIcon, text: "Hand-drawn", testId: "font-family-hand-drawn" },
+              { value: FONT_FAMILY.Helvetica, icon: normalIcon, text: "Normal", testId: "font-family-normal" },
+              { value: FONT_FAMILY.Cascadia, icon: codeIcon, text: "Code", testId: "font-family-code" },
+            ]}
+            sceneFonts={Object.entries(fontFamilyLabels)
+              .filter(([v]) => sceneFontFamilies.has(Number(v)) && !defaultFontValues.includes(Number(v)))
+              .map(([v, text]) => ({ value: Number(v), icon: normalIcon, text }))}
+            availableFonts={Object.entries(fontFamilyLabels)
+              .filter(([v]) => !sceneFontFamilies.has(Number(v)) && !defaultFontValues.includes(Number(v)))
+              .map(([v, text]) => ({ value: Number(v), icon: normalIcon, text }))}
+            onSelect={(v) => {
+              applyStyle({ fontFamily: v });
+              fontPickerOpen = false;
+            }}
+            onHover={(v) => (fontPickerHover = v)}
+            onLeave={() => (fontPickerHover = null)}
+            onPopupChange={(open) => (fontPickerOpen = open)}
+            container={containerEl}
+          />
+        </div>
+      </div>
+    {/if}
   </div>
 
   <StaticCanvas
