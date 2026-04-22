@@ -640,6 +640,38 @@ async function main() {
         firstText: textEls[0]?.text ?? null,
       };
 
+      // Vietnamese text roundtrip — exercises the Patrick Hand font fallback.
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 't', bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 20));
+      const vnClickVp = sceneToVp(200, 500);
+      iv.dispatchEvent(mk('pointerdown', vnClickVp.x, vnClickVp.y));
+      iv.dispatchEvent(mk('pointerup', vnClickVp.x, vnClickVp.y));
+      await new Promise(r => setTimeout(r, 100));
+      const vnTa = document.querySelector('.sveltedraw-text-editor');
+      const vnPhrase = 'xin chào ả ẫ ặ đ ế';
+      if (vnTa) {
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+        setter.call(vnTa, vnPhrase);
+        vnTa.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 50));
+        vnTa.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 50));
+      }
+      const vnTextEl = (p.scene?.getNonDeletedElements?.() ?? []).find(el => el.type === 'text' && el.text === vnPhrase);
+      const afterVnText = {
+        found: !!vnTextEl,
+        text: vnTextEl?.text ?? null,
+      };
+
+      // document.fonts.check(font, text) returns true iff at least one
+      // loaded @font-face with matching family covers every codepoint
+      // in text. Our @font-face Vietnamese alias for Excalifont should
+      // make this return true for tone-mark chars.
+      const fontCanRenderVn = {
+        excalifont: document.fonts.check('20px Excalifont', 'ả ẫ ặ ế'),
+        patrickhand: document.fonts.check('20px "Patrick Hand"', 'ả ẫ ặ ế'),
+      };
+
       // ── Batch 12: export PNG + SVG ───────────────────────────────
       // Call probe helpers directly; avoids dealing with blob downloads
       // in headless. Asserts each returns a non-trivial output.
@@ -678,6 +710,7 @@ async function main() {
         afterShiftClick1, afterShiftClick2, afterShiftClickToggleOff,
         afterMarquee, afterShiftMarquee,
         afterTextOpen, afterTextCommit,
+        afterVnText, fontCanRenderVn,
         exportPng, exportSvg,
       };
     })()`,
@@ -1070,6 +1103,23 @@ async function main() {
     probe?.afterTextCommit?.firstText === "hello world",
     `firstText=${JSON.stringify(probe?.afterTextCommit?.firstText)}`,
   );
+  pass(
+    "text-vietnamese-roundtrip",
+    probe?.afterVnText?.found === true,
+    `text=${JSON.stringify(probe?.afterVnText?.text)}`,
+  );
+  pass(
+    "excalifont-covers-vietnamese",
+    probe?.fontCanRenderVn?.excalifont === true,
+    `excalifont=${probe?.fontCanRenderVn?.excalifont} ` +
+      `(Patrick Hand aliased under Excalifont for VN unicode-range; ` +
+      `document.fonts.check returns true iff merged cascade covers codepoints)`,
+  );
+  // NOTE: `patrick-hand-loaded` (standalone family check) would require
+  // eager load via document.fonts.load('20px "Patrick Hand"', 'ả') first —
+  // CSS @font-face with unicode-range is lazy. Skipped as not meaningful:
+  // the important signal is the Excalifont-aliased path above, which is
+  // what actually renders in the editor.
 
   // Batch 12: export.
   pass(
@@ -1100,10 +1150,8 @@ async function main() {
 
   pass(
     "reload-restores-scene",
-    // 6 shapes from batch 5 + 1 text from batch 9. (Marquee/resize
-    // mutate but don't add/remove elements; batch 11's shift-marquee
-    // is pure selection.)
-    afterReload?.count === 7,
+    // 6 shapes from batch 5 + 2 text (English + Vietnamese) from batch 9.
+    afterReload?.count === 8,
     `count=${afterReload?.count} types=${JSON.stringify(afterReload?.types)}`,
   );
 
