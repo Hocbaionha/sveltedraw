@@ -605,6 +605,41 @@ async function main() {
         selectedCount: Object.keys(p.appState?.selectedElementIds ?? {}).length,
       };
 
+      // ── Batch 9: text tool ────────────────────────────────────────
+      // Press "t", click on canvas, type into the textarea, Escape to
+      // commit. Verify scene has a text element with the expected text.
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 't', bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 20));
+
+      const textClickVp = sceneToVp(200, 400);
+      iv.dispatchEvent(mk('pointerdown', textClickVp.x, textClickVp.y));
+      iv.dispatchEvent(mk('pointerup', textClickVp.x, textClickVp.y));
+      await new Promise(r => setTimeout(r, 100));
+
+      const textarea = document.querySelector('.sveltedraw-text-editor');
+      const afterTextOpen = {
+        hasTextarea: !!textarea,
+      };
+
+      // Type by setting value + dispatching input (native keystrokes
+      // in headless are flaky).
+      if (textarea) {
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+        setter.call(textarea, 'hello world');
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 50));
+        // Dispatch Escape on the textarea directly → commit.
+        textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 50));
+      }
+
+      const textEls = (p.scene?.getNonDeletedElements?.() ?? []).filter(el => el.type === 'text');
+      const afterTextCommit = {
+        textareaGone: !document.querySelector('.sveltedraw-text-editor'),
+        count: textEls.length,
+        firstText: textEls[0]?.text ?? null,
+      };
+
       // ── Batch 12: export PNG + SVG ───────────────────────────────
       // Call probe helpers directly; avoids dealing with blob downloads
       // in headless. Asserts each returns a non-trivial output.
@@ -642,6 +677,7 @@ async function main() {
         afterResizeSE, afterResizeNW, afterUndoResize,
         afterShiftClick1, afterShiftClick2, afterShiftClickToggleOff,
         afterMarquee, afterShiftMarquee,
+        afterTextOpen, afterTextCommit,
         exportPng, exportSvg,
       };
     })()`,
@@ -728,8 +764,18 @@ async function main() {
   console.log("=== DOM snapshot ===");
   console.log(JSON.stringify(domInfo.result?.value ?? domInfo, null, 2));
 
+  // Known-benign errors upstream logs: Excalidraw's Fonts class fetches
+  // woff2 files from a broken esm.sh URL that doesn't resolve in this
+  // dev setup. Export succeeds (text renders with system-font fallback).
+  // Filter them out so they don't mask real regressions.
+  const isBenignFontError = (text) =>
+    typeof text === "string" &&
+    (text.includes("Failed to load font") ||
+      text.includes("Failed to fetch font family"));
   const errors = consoleMsgs.filter(
-    (m) => m.level === "error" || m.level === "severe",
+    (m) =>
+      (m.level === "error" || m.level === "severe") &&
+      !isBenignFontError(m.text),
   );
   console.log(`\n=== Console: ${consoleMsgs.length} messages, ${errors.length} errors, ${exceptions.length} exceptions ===`);
   for (const m of consoleMsgs) {
@@ -1003,6 +1049,28 @@ async function main() {
     `before=${probe?.afterMarquee?.selectedCount} after=${probe?.afterShiftMarquee?.selectedCount}`,
   );
 
+  // Batch 9: text tool.
+  pass(
+    "text-tool-opens-editor",
+    probe?.afterTextOpen?.hasTextarea === true,
+    `hasTextarea=${probe?.afterTextOpen?.hasTextarea}`,
+  );
+  pass(
+    "text-commit-removes-editor",
+    probe?.afterTextCommit?.textareaGone === true,
+    `textareaGone=${probe?.afterTextCommit?.textareaGone}`,
+  );
+  pass(
+    "text-commit-creates-element",
+    probe?.afterTextCommit?.count >= 1,
+    `count=${probe?.afterTextCommit?.count} text=${probe?.afterTextCommit?.firstText}`,
+  );
+  pass(
+    "text-commit-stores-string",
+    probe?.afterTextCommit?.firstText === "hello world",
+    `firstText=${JSON.stringify(probe?.afterTextCommit?.firstText)}`,
+  );
+
   // Batch 12: export.
   pass(
     "export-png-returns-blob",
@@ -1032,7 +1100,10 @@ async function main() {
 
   pass(
     "reload-restores-scene",
-    afterReload?.count === 6,
+    // 6 shapes from batch 5 + 1 text from batch 9. (Marquee/resize
+    // mutate but don't add/remove elements; batch 11's shift-marquee
+    // is pure selection.)
+    afterReload?.count === 7,
     `count=${afterReload?.count} types=${JSON.stringify(afterReload?.types)}`,
   );
 

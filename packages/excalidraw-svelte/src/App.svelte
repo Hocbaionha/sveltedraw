@@ -64,7 +64,9 @@
   // prettier-ignore
   import { getFormFactor, createUserAgentDescriptor, MQ_RIGHT_SIDEBAR_MIN_WIDTH, supportsResizeObserver, POINTER_EVENTS, randomId, viewportCoordsToSceneCoords, DEFAULT_ELEMENT_PROPS, DEFAULT_FONT_FAMILY } from "@excalidraw/common";
   // @ts-ignore — upstream
-  import { newElement, newLinearElement, newArrowElement, newFreeDrawElement, hitElementItself, duplicateElements, deepCopyElement } from "@excalidraw/element";
+  import { newElement, newLinearElement, newArrowElement, newFreeDrawElement, newTextElement, hitElementItself, duplicateElements, deepCopyElement } from "@excalidraw/element";
+  // @ts-ignore — upstream
+  import { DEFAULT_FONT_SIZE, getFontFamilyString } from "@excalidraw/common";
   // @ts-ignore — upstream, resolved via Vite alias
   import { exportToBlob, exportToSvg } from "@excalidraw/utils/export";
   // @ts-ignore — upstream, resolved via Vite alias
@@ -627,6 +629,9 @@
     P: "freedraw",
     x: "freedraw",
     X: "freedraw",
+    "8": "text",
+    t: "text",
+    T: "text",
   };
 
   const setActiveTool = (type: string) => {
@@ -931,7 +936,13 @@
   const exportAsSvg = async (): Promise<SVGSVGElement | null> => {
     const opts = buildExportOpts();
     if (!opts) return null;
-    const svg = await exportToSvg(opts);
+    // `skipInliningFonts: true` — upstream's font-inlining fetches woff2
+    // files from an esm.sh URL that doesn't resolve in this Vite dev
+    // setup (and may not resolve even in production without CDN config).
+    // Text renders with system-font fallback, which is visually off but
+    // opens correctly everywhere. Swap in inlining when we ship with a
+    // reliable font CDN.
+    const svg = await exportToSvg({ ...opts, skipInliningFonts: true });
     return svg;
   };
 
@@ -1468,6 +1479,108 @@
     (appState as any).selectedElementIds = cur;
   };
 
+  // ── Text editing (WYSIWYG) state ─────────────────────────────────
+  //
+  // Simple PoC: when user clicks with the text tool, open a `<textarea>`
+  // positioned at the click's viewport coords. On blur/Escape, commit the
+  // text to the scene via `newTextElement` (which measures dims from the
+  // final string). While editing we do NOT render the in-progress text
+  // on canvas — the textarea IS the preview. Upstream has a more elaborate
+  // "contenteditable that ALSO paints to canvas" flow; out of PoC scope.
+  //
+  // Editing state lives in a $state object so the overlay re-renders.
+  let textEditor: {
+    sceneX: number;
+    sceneY: number;
+    initialValue: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // Used when editing an existing text element; null for new text.
+    editingElementId: string | null;
+  } | null = $state(null);
+  let textEditorEl: HTMLTextAreaElement | null = $state(null);
+
+  const commitTextEditor = () => {
+    if (!textEditor || !scene) return;
+    const { sceneX, sceneY, editingElementId } = textEditor;
+    const text = (textEditorEl?.value ?? "").replace(/\s+$/, "");
+    // Close the editor first so blur handler doesn't re-enter.
+    textEditor = null;
+
+    if (!text) {
+      // Empty text: if we were editing an existing text element, delete
+      // it (standard Excalidraw behavior). New text with no content →
+      // silent discard.
+      if (editingElementId) {
+        const existing = scene.getElementsIncludingDeleted();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const next = existing.filter((el: any) => el.id !== editingElementId);
+        scene.replaceAllElements(next, { skipValidation: true });
+        pushHistory();
+        bumpSceneRepaint();
+      }
+      return;
+    }
+
+    if (editingElementId) {
+      // Update existing text — replace rather than mutate so the Renderer
+      // memoize busts. Simpler than `scene.mutateElement` which needs to
+      // re-run measureText internally.
+      const existing = scene.getElementsIncludingDeleted();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const next = existing.map((el: any) =>
+        el.id === editingElementId
+          ? newTextElement({
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              ...(el as any),
+              text,
+              originalText: text,
+            })
+          : el,
+      );
+      scene.replaceAllElements(next, { skipValidation: true });
+    } else {
+      const el = newTextElement({
+        x: sceneX,
+        y: sceneY,
+        text,
+        originalText: text,
+        fontSize: DEFAULT_FONT_SIZE,
+        fontFamily: DEFAULT_FONT_FAMILY,
+        strokeColor: DEFAULT_ELEMENT_PROPS.strokeColor,
+        backgroundColor: DEFAULT_ELEMENT_PROPS.backgroundColor,
+        fillStyle: DEFAULT_ELEMENT_PROPS.fillStyle,
+        strokeWidth: DEFAULT_ELEMENT_PROPS.strokeWidth,
+        strokeStyle: DEFAULT_ELEMENT_PROPS.strokeStyle,
+        roughness: DEFAULT_ELEMENT_PROPS.roughness,
+        opacity: DEFAULT_ELEMENT_PROPS.opacity,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+      const existing = scene.getElementsIncludingDeleted();
+      scene.replaceAllElements([...existing, el], { skipValidation: true });
+    }
+    pushHistory();
+    bumpSceneRepaint();
+  };
+
+  // Open the editor at given scene coords. Also used by the future
+  // double-click-to-edit-existing-text flow.
+  const openTextEditor = (sceneX: number, sceneY: number, opts: {
+    initialValue?: string;
+    editingElementId?: string | null;
+  } = {}) => {
+    textEditor = {
+      sceneX,
+      sceneY,
+      initialValue: opts.initialValue ?? "",
+      editingElementId: opts.editingElementId ?? null,
+    };
+    // Focus after Svelte commits the DOM — tick via rAF.
+    requestAnimationFrame(() => {
+      textEditorEl?.focus();
+      textEditorEl?.select();
+    });
+  };
+
   // ── Marquee (rubber-band) state ───────────────────────────────────
   // Represented as 4 scene-coords + a shiftHeld flag (additive vs replace
   // on commit). Rendered in the DOM overlay, not the canvas, to avoid
@@ -1625,6 +1738,19 @@
       // (see finalize branch). Recording on pointerdown would store the
       // pre-drag state; we want the post-drag state per the invariant.
       tryCapture(event.currentTarget as HTMLElement | null, event.pointerId);
+      return;
+    }
+
+    // ── Text tool: open the textarea overlay at click point ──
+    if (tool === "text") {
+      // If there's already an active editor, commit it first (user
+      // clicking elsewhere = "done editing").
+      if (textEditor) commitTextEditor();
+      openTextEditor(x, y);
+      // Auto-switch to selection after click so next click doesn't spawn
+      // another editor. Matches Excalidraw UX.
+      setActiveTool("selection");
+      event.preventDefault();
       return;
     }
 
@@ -1976,6 +2102,70 @@
     renderConfig={undefined}
     render={newElementRender}
   />
+
+  <!-- Text editor overlay. A plain <textarea> that grows with its content.
+       On blur OR Escape → commitTextEditor(). Ctrl+Enter also commits
+       (without inserting a newline). The textarea's own keydown handler
+       prevents these keys from bubbling into the container's hotkey
+       routing so "Escape" doesn't also run setActiveTool("selection"). -->
+  {#if textEditor}
+    {@const zoomV = (appState.zoom as any).value || 1}
+    <!-- Position inside the container (which is position:relative at
+         the viewport offset). Scene→container coords: (sceneX + scrollX)
+         * zoom, ignoring viewport offset since the container already
+         lives there. -->
+    {@const vpX = (textEditor.sceneX + ((appState.scrollX as any) ?? 0)) * zoomV}
+    {@const vpY = (textEditor.sceneY + ((appState.scrollY as any) ?? 0)) * zoomV}
+    <textarea
+      bind:this={textEditorEl}
+      value={textEditor.initialValue}
+      class="sveltedraw-text-editor"
+      style="position: absolute;
+             left: {vpX}px;
+             top: {vpY}px;
+             min-width: 40px;
+             min-height: {DEFAULT_FONT_SIZE * 1.2 * zoomV}px;
+             font: {DEFAULT_FONT_SIZE * zoomV}px {getFontFamilyString({ fontFamily: DEFAULT_FONT_FAMILY })};
+             background: transparent;
+             border: 1px dashed #6965db;
+             outline: none;
+             resize: none;
+             padding: 2px;
+             margin: 0;
+             overflow: hidden;
+             white-space: pre;
+             color: {(appState as any).currentItemStrokeColor || '#000'};
+             z-index: 20;"
+      onblur={commitTextEditor}
+      onkeydown={(event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          commitTextEditor();
+          return;
+        }
+        if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+          event.preventDefault();
+          event.stopPropagation();
+          commitTextEditor();
+          return;
+        }
+        // Stop other hotkeys (Ctrl+A etc.) from bubbling into the
+        // container keyhandler and selecting canvas elements.
+        event.stopPropagation();
+      }}
+      oninput={(event) => {
+        // Auto-grow: match textarea box to content so the WYSIWYG preview
+        // is roughly accurate. Upstream uses a hidden span for exact
+        // measurement; we settle for scrollHeight/scrollWidth.
+        const ta = event.currentTarget as HTMLTextAreaElement;
+        ta.style.height = 'auto';
+        ta.style.height = ta.scrollHeight + 'px';
+        ta.style.width = 'auto';
+        ta.style.width = ta.scrollWidth + 'px';
+      }}
+    ></textarea>
+  {/if}
 
   <!-- Marquee rubber-band overlay. Rendered as a DOM div (not on canvas)
        to avoid touching upstream renderer configs. Position is in VIEWPORT
