@@ -164,16 +164,71 @@ async function main() {
       iv.dispatchEvent(mk('pointerup', endX, endY));
       await new Promise(r => setTimeout(r, 100));
 
-      // Probe: check window.__sveltedrawProbe for scene + appState.
       const p = window.__sveltedrawProbe;
       if (!p) return { error: 'no __sveltedrawProbe exposed' };
-      return {
+
+      const afterDraw = {
         activeToolType: p.appState?.activeTool?.type,
         elementsCount: p.scene?.getNonDeletedElements?.()?.length ?? null,
         firstElementType: p.scene?.getNonDeletedElements?.()?.[0]?.type ?? null,
         firstElementW: p.scene?.getNonDeletedElements?.()?.[0]?.width ?? null,
         firstElementH: p.scene?.getNonDeletedElements?.()?.[0]?.height ?? null,
+        firstElementX: p.scene?.getNonDeletedElements?.()?.[0]?.x ?? null,
+        firstElementY: p.scene?.getNonDeletedElements?.()?.[0]?.y ?? null,
       };
+
+      // ── Batch 6: switch to selection, click to select, drag to move ──
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: '1', bubbles: true }));
+      await new Promise(r => setTimeout(r, 50));
+
+      // Click near the center of the drawn rectangle.
+      const el0 = p.scene?.getNonDeletedElements?.()?.[0];
+      const origX = el0?.x ?? 0;
+      const origY = el0?.y ?? 0;
+      // Convert scene coords to viewport coords for the click.
+      const zoom = p.appState?.zoom?.value ?? 1;
+      const offsetLeft = p.appState?.offsetLeft ?? 0;
+      const offsetTop = p.appState?.offsetTop ?? 0;
+      const scrollX = p.appState?.scrollX ?? 0;
+      const scrollY = p.appState?.scrollY ?? 0;
+      const centerSceneX = origX + (el0?.width ?? 100) / 2;
+      const centerSceneY = origY + (el0?.height ?? 100) / 2;
+      const clickX = (centerSceneX + scrollX) * zoom + offsetLeft;
+      const clickY = (centerSceneY + scrollY) * zoom + offsetTop;
+
+      iv.dispatchEvent(mk('pointerdown', clickX, clickY));
+      await new Promise(r => setTimeout(r, 30));
+      iv.dispatchEvent(mk('pointerup', clickX, clickY));
+      await new Promise(r => setTimeout(r, 50));
+
+      const afterSelect = {
+        selectedIds: Object.keys(p.appState?.selectedElementIds ?? {}),
+      };
+
+      // Drag: pointerdown → pointermove (+80, +40) → pointerup.
+      iv.dispatchEvent(mk('pointerdown', clickX, clickY));
+      await new Promise(r => setTimeout(r, 30));
+      iv.dispatchEvent(mk('pointermove', clickX + 80, clickY + 40));
+      await new Promise(r => setTimeout(r, 30));
+      iv.dispatchEvent(mk('pointerup', clickX + 80, clickY + 40));
+      await new Promise(r => setTimeout(r, 50));
+
+      const el1 = p.scene?.getNonDeletedElements?.()?.[0];
+      const afterDrag = {
+        movedX: (el1?.x ?? 0) - origX,
+        movedY: (el1?.y ?? 0) - origY,
+      };
+
+      // Click empty space (far outside the rectangle) → clear selection.
+      iv.dispatchEvent(mk('pointerdown', rect.left + 10, rect.top + 10));
+      iv.dispatchEvent(mk('pointerup', rect.left + 10, rect.top + 10));
+      await new Promise(r => setTimeout(r, 50));
+
+      const afterClickEmpty = {
+        selectedIds: Object.keys(p.appState?.selectedElementIds ?? {}),
+      };
+
+      return { ...afterDraw, afterSelect, afterDrag, afterClickEmpty };
     })()`,
     returnByValue: true,
     awaitPromise: true,
@@ -298,6 +353,28 @@ async function main() {
     "drawn-element-has-size",
     (probe?.firstElementW ?? 0) > 10 && (probe?.firstElementH ?? 0) > 10,
     `${probe?.firstElementW}x${probe?.firstElementH}`,
+  );
+
+  // Batch 6: select + drag + clear.
+  pass(
+    "click-selects-element",
+    (probe?.afterSelect?.selectedIds?.length ?? 0) === 1,
+    `selectedIds=${JSON.stringify(probe?.afterSelect?.selectedIds)}`,
+  );
+  pass(
+    "drag-moves-element-x",
+    Math.abs((probe?.afterDrag?.movedX ?? 0) - 80) < 5,
+    `movedX=${probe?.afterDrag?.movedX} (expected ~80)`,
+  );
+  pass(
+    "drag-moves-element-y",
+    Math.abs((probe?.afterDrag?.movedY ?? 0) - 40) < 5,
+    `movedY=${probe?.afterDrag?.movedY} (expected ~40)`,
+  );
+  pass(
+    "click-empty-clears-selection",
+    (probe?.afterClickEmpty?.selectedIds?.length ?? -1) === 0,
+    `selectedIds=${JSON.stringify(probe?.afterClickEmpty?.selectedIds)}`,
   );
 
   console.log("\n=== Assertions ===");

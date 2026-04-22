@@ -64,7 +64,11 @@
   // prettier-ignore
   import { getFormFactor, createUserAgentDescriptor, MQ_RIGHT_SIDEBAR_MIN_WIDTH, supportsResizeObserver, POINTER_EVENTS, randomId, viewportCoordsToSceneCoords, DEFAULT_ELEMENT_PROPS, DEFAULT_FONT_FAMILY } from "@excalidraw/common";
   // @ts-ignore — upstream
-  import { newElement } from "@excalidraw/element";
+  import { newElement, hitElementItself } from "@excalidraw/element";
+  // @ts-ignore — upstream
+  import { DEFAULT_COLLISION_THRESHOLD } from "@excalidraw/common";
+  // @ts-ignore — upstream
+  import { pointFrom } from "@excalidraw/math";
 
   import {
     EDITOR_STORE_KEY,
@@ -375,7 +379,14 @@
             sceneNonce: scene.getSceneNonce(),
           });
 
-        const selectedElements: unknown[] = []; // batch 4 populates from appState.selectedElementIds
+        // Build selectedElements list for this tick (batch 6 wires).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const selectedIds = (appState as any).selectedElementIds ?? {};
+        const selectedElements: unknown[] = [];
+        for (const el of visibleElements) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if (selectedIds[(el as any).id]) selectedElements.push(el);
+        }
 
         const result = renderInteractiveScene({
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -612,85 +623,203 @@
     );
   };
 
-  // Drag start point (scene coords) for the in-progress element.
+  // Drag state for the in-progress element (rectangle tool) OR for the
+  // currently-dragged selection (selection tool).
   let dragStart: { x: number; y: number } | null = null;
+  // For selection drag: snapshot of each selected element's x/y at
+  // pointerdown time so pointermove can compute absolute positions without
+  // accumulating floating-point error.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let dragOrigins: Array<{ id: string; x: number; y: number; el: any }> = [];
+
+  // Hit-test helper: returns topmost (last-drawn) element at scene coords,
+  // or null if empty. Iterates scene elements in reverse document order so
+  // the highest-z element wins. Threshold allows a small slop (~10px in
+  // scene units) so stroke edges are clickable.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const hitTestAt = (sceneX: number, sceneY: number): any | null => {
+    if (!scene) return null;
+    const elements = scene.getNonDeletedElements();
+    const elementsMap = scene.getNonDeletedElementsMap();
+    // @excalidraw/math's pointFrom returns `GlobalPoint | LocalPoint`
+    // (branded types). hitElementItself expects GlobalPoint. Cast is safe —
+    // scene coords ARE global coords by definition.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const point = pointFrom(sceneX, sceneY) as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const threshold = DEFAULT_COLLISION_THRESHOLD / (appState.zoom as any).value;
+    for (let i = elements.length - 1; i >= 0; i--) {
+      const el = elements[i];
+      if (el.locked) continue;
+      if (
+        hitElementItself({
+          point,
+          element: el,
+          threshold,
+          elementsMap,
+          // Selection click: interior must count even when the element has
+          // a transparent background. Without this, only the stroke outline
+          // is clickable, which is surprising UX.
+          overrideShouldTestInside: true,
+        })
+      ) {
+        return el;
+      }
+    }
+    return null;
+  };
+
+  const clearSelection = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).selectedElementIds = {};
+  };
+
+  const selectOnly = (id: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).selectedElementIds = { [id]: true };
+  };
 
   const onInteractivePointerDown = (event: PointerEvent) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tool = (appState.activeTool as any)?.type;
-    if (tool !== "rectangle") return;
-
     const { x, y } = toSceneCoords(event.clientX, event.clientY);
-    dragStart = { x, y };
 
-    const el = newElement({
-      type: "rectangle",
-      x,
-      y,
-      width: 1,
-      height: 1,
-      strokeColor: DEFAULT_ELEMENT_PROPS.strokeColor,
-      backgroundColor: DEFAULT_ELEMENT_PROPS.backgroundColor,
-      fillStyle: DEFAULT_ELEMENT_PROPS.fillStyle,
-      strokeWidth: DEFAULT_ELEMENT_PROPS.strokeWidth,
-      strokeStyle: DEFAULT_ELEMENT_PROPS.strokeStyle,
-      roughness: DEFAULT_ELEMENT_PROPS.roughness,
-      opacity: DEFAULT_ELEMENT_PROPS.opacity,
+    // ── Selection tool: hit-test, update selection, maybe start drag ──
+    if (tool === "selection") {
+      const hit = hitTestAt(x, y);
+      if (!hit) {
+        clearSelection();
+        dragStart = null;
+        dragOrigins = [];
+        return;
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (appState as any).newElement = el;
+      const sel = (appState as any).selectedElementIds ?? {};
+      if (!sel[hit.id]) {
+        // Clicking unselected element replaces selection (shift-click for
+        // additive selection lands in a later batch).
+        selectOnly(hit.id);
+      }
 
-    // Pointer capture so we still get move/up after the cursor leaves the canvas.
-    (event.currentTarget as HTMLElement | null)?.setPointerCapture?.(event.pointerId);
+      // Snapshot every currently-selected element's origin for the drag.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const selectedIds = Object.keys((appState as any).selectedElementIds);
+      const map = scene.getNonDeletedElementsMap();
+      dragOrigins = selectedIds
+        .map((id: string) => {
+          const el = map.get(id);
+          return el ? { id, x: el.x, y: el.y, el } : null;
+        })
+        .filter(Boolean) as typeof dragOrigins;
+      dragStart = { x, y };
+      (event.currentTarget as HTMLElement | null)?.setPointerCapture?.(
+        event.pointerId,
+      );
+      return;
+    }
+
+    // ── Rectangle tool: create newElement ──
+    if (tool === "rectangle") {
+      dragStart = { x, y };
+      dragOrigins = [];
+
+      const el = newElement({
+        type: "rectangle",
+        x,
+        y,
+        width: 1,
+        height: 1,
+        strokeColor: DEFAULT_ELEMENT_PROPS.strokeColor,
+        backgroundColor: DEFAULT_ELEMENT_PROPS.backgroundColor,
+        fillStyle: DEFAULT_ELEMENT_PROPS.fillStyle,
+        strokeWidth: DEFAULT_ELEMENT_PROPS.strokeWidth,
+        strokeStyle: DEFAULT_ELEMENT_PROPS.strokeStyle,
+        roughness: DEFAULT_ELEMENT_PROPS.roughness,
+        opacity: DEFAULT_ELEMENT_PROPS.opacity,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (appState as any).newElement = el;
+      (event.currentTarget as HTMLElement | null)?.setPointerCapture?.(
+        event.pointerId,
+      );
+      return;
+    }
   };
 
   const onInteractivePointerMove = (event: PointerEvent) => {
+    if (!dragStart) return;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cur = (appState as any).newElement;
-    if (!cur || !dragStart) return;
 
     const { x, y } = toSceneCoords(event.clientX, event.clientY);
-    const width = x - dragStart.x;
-    const height = y - dragStart.y;
 
-    // CRITICAL (memoize gotcha from review pass): the Renderer memoizes on
-    // object IDENTITY of its inputs. Mutating `cur.width = …` would leave
-    // the same object ref and the canvas wouldn't repaint. Spread-copy to
-    // produce a fresh object.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (appState as any).newElement = {
-      ...cur,
-      // If the drag went negative, flip x/y so width/height stay positive.
-      x: width < 0 ? dragStart.x + width : dragStart.x,
-      y: height < 0 ? dragStart.y + height : dragStart.y,
-      width: Math.abs(width) || 1,
-      height: Math.abs(height) || 1,
-      // Version bump so element-map memoization (keyed on version) busts.
-      version: (cur.version ?? 1) + 1,
-    };
+    // ── Drag selected elements ──
+    if (dragOrigins.length > 0 && scene) {
+      const dx = x - dragStart.x;
+      const dy = y - dragStart.y;
+      for (const origin of dragOrigins) {
+        // scene.mutateElement applies the update AND bumps scene nonce via
+        // triggerUpdate() — but the static-render $effect doesn't track
+        // sceneNonce directly, so we bumpSceneRepaint() ourselves after
+        // all mutations to force a repaint in one batch.
+        scene.mutateElement(
+          origin.el,
+          { x: origin.x + dx, y: origin.y + dy },
+          { informMutation: false, isDragging: true },
+        );
+      }
+      bumpSceneRepaint();
+      return;
+    }
+
+    // ── Extending the in-progress newElement (rectangle tool) ──
+    if (cur) {
+      const width = x - dragStart.x;
+      const height = y - dragStart.y;
+      // CRITICAL (memoize gotcha): spread-copy so Renderer cache busts.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (appState as any).newElement = {
+        ...cur,
+        x: width < 0 ? dragStart.x + width : dragStart.x,
+        y: height < 0 ? dragStart.y + height : dragStart.y,
+        width: Math.abs(width) || 1,
+        height: Math.abs(height) || 1,
+        version: (cur.version ?? 1) + 1,
+      };
+    }
   };
 
   const onInteractivePointerUp = (event: PointerEvent) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cur = (appState as any).newElement;
-    if (!cur) return;
 
-    // Commit to scene only if the element has meaningful dimensions; drop
-    // zero-size accidental clicks.
-    if (cur.width > 1 && cur.height > 1 && scene) {
-      const existing = scene.getElementsIncludingDeleted();
-      // `skipValidation: true` — the fractional-index validator throws for
-      // freshly-minted elements whose index isn't yet synced. `syncInvalidIndices`
-      // (inside replaceAllElements) repairs them; we just bypass the throw-y
-      // validator. Upstream App.tsx does the same via `CaptureUpdateAction`.
-      scene.replaceAllElements([...existing, cur], { skipValidation: true });
+    // ── Finalize selection drag ──
+    if (dragOrigins.length > 0) {
+      dragOrigins = [];
+      dragStart = null;
+      bumpSceneRepaint();
+      (event.currentTarget as HTMLElement | null)?.releasePointerCapture?.(
+        event.pointerId,
+      );
+      return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (appState as any).newElement = null;
-    dragStart = null;
-    bumpSceneRepaint();
+    // ── Finalize new rectangle ──
+    if (cur) {
+      if (cur.width > 1 && cur.height > 1 && scene) {
+        const existing = scene.getElementsIncludingDeleted();
+        // skipValidation: fractional-index validator throws for fresh
+        // elements; syncInvalidIndices inside replaceAllElements repairs.
+        scene.replaceAllElements([...existing, cur], { skipValidation: true });
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (appState as any).newElement = null;
+      dragStart = null;
+      bumpSceneRepaint();
+    }
 
     (event.currentTarget as HTMLElement | null)?.releasePointerCapture?.(
       event.pointerId,
