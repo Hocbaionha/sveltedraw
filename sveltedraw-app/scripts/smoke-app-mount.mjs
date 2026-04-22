@@ -729,8 +729,10 @@ async function main() {
         await new Promise(r => setTimeout(r, 30));
 
         const origStroke = rectForStyle.strokeColor;
-        // Click the red stroke preset (2nd swatch in the stroke row).
-        const redStrokeBtn = document.querySelector('.sveltedraw-style-panel .sp-row:first-child .sp-sw:nth-child(2)');
+        // Click the red stroke TopPick (2nd quick-pick in the ColorPicker
+        // stroke row — red[4] per DEFAULT_ELEMENT_STROKE_COLOR_INDEX).
+        const topPicksStrokeRow = document.querySelector('.sveltedraw-style-panel .sp-row:first-child .color-picker__top-picks');
+        const redStrokeBtn = topPicksStrokeRow?.querySelectorAll('button')?.[1] ?? null;
         if (redStrokeBtn) redStrokeBtn.click();
         await new Promise(r => setTimeout(r, 30));
         const afterRedEl = p.scene?.getNonDeletedElements?.()?.find(el => el.id === rectForStyle.id);
@@ -738,6 +740,28 @@ async function main() {
           foundButton: !!redStrokeBtn,
           origStroke,
           newStroke: afterRedEl?.strokeColor ?? null,
+        };
+
+        // ColorPicker trigger popover: click stroke trigger → assert the
+        // bits-ui popover content appears + contains a hex input; click
+        // elsewhere to close. Covers the popover path end-to-end.
+        const strokeTrigger = document.querySelector('.sveltedraw-style-panel .sp-row:first-child [data-openpopup="elementStroke"]');
+        let popoverOpened = false;
+        let popoverClosed = false;
+        if (strokeTrigger) {
+          strokeTrigger.click();
+          await new Promise(r => setTimeout(r, 80));
+          const popoverInput = document.querySelector('.color-picker-input');
+          popoverOpened = !!popoverInput;
+          // Click trigger again to close (onToggle flips the controlled state).
+          strokeTrigger.click();
+          await new Promise(r => setTimeout(r, 80));
+          popoverClosed = !document.querySelector('.color-picker-input');
+        }
+        var afterStylePopover = {
+          triggerFound: !!strokeTrigger,
+          opened: popoverOpened,
+          closed: popoverClosed,
         };
 
         // Click extrabold width (3rd button in width row).
@@ -762,6 +786,7 @@ async function main() {
         var afterStyleStroke = { err: 'no rect' };
         var afterStyleWidth = { err: 'no rect' };
         var afterStyleUndo = { err: 'no rect' };
+        var afterStylePopover = { err: 'no rect' };
       }
 
       // ── Batch 15: rotation handle ─────────────────────────────────
@@ -1153,7 +1178,7 @@ async function main() {
         afterTextOpen, afterTextCommit,
         afterVnText, fontCanRenderVn,
         afterRotation, afterUndoRotation,
-        afterStyleStroke, afterStyleWidth, afterStyleUndo,
+        afterStyleStroke, afterStyleWidth, afterStyleUndo, afterStylePopover,
         afterImagePaste,
         afterImageResize, afterLineEndpoint,
         afterDblClickOpen, afterDblClickEdit,
@@ -1524,13 +1549,21 @@ async function main() {
   );
   pass(
     "style-stroke-changes",
-    probe?.afterStyleStroke?.newStroke === "#fa5252",
-    `newStroke=${probe?.afterStyleStroke?.newStroke} (expected red #fa5252)`,
+    // ColorPicker TopPicks uses red[4]=#e03131 via DEFAULT_ELEMENT_STROKE_COLOR_INDEX.
+    probe?.afterStyleStroke?.newStroke === "#e03131",
+    `newStroke=${probe?.afterStyleStroke?.newStroke} (expected red #e03131)`,
   );
   pass(
     "style-width-changes",
     probe?.afterStyleWidth?.newWidth === 4,
     `newWidth=${probe?.afterStyleWidth?.newWidth} (expected 4)`,
+  );
+  pass(
+    "style-picker-popover-opens-and-closes",
+    probe?.afterStylePopover?.triggerFound === true &&
+      probe?.afterStylePopover?.opened === true &&
+      probe?.afterStylePopover?.closed === true,
+    `trigger=${probe?.afterStylePopover?.triggerFound} opened=${probe?.afterStylePopover?.opened} closed=${probe?.afterStylePopover?.closed}`,
   );
   pass(
     "style-change-undoable",

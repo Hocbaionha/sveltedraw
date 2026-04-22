@@ -89,6 +89,7 @@
     createTunnelsContext,
     TUNNELS_KEY,
   } from "./state/index.js";
+  import ColorPicker from "./components/color-picker/ColorPicker.svelte";
 
   import LayerUI from "./components/LayerUI.svelte";
   import StaticCanvas from "./components/canvases/StaticCanvas.svelte";
@@ -1259,31 +1260,30 @@
     }
   };
 
-  // Style panel palette. Excerpts of upstream's default palettes —
-  // enough for a usable style picker without rebuilding the full 5×3
-  // color picker UI. Future batch can swap in the ported ColorPicker
-  // component for the full experience.
-  type StylePreset = { name: string; value: string };
-  const STROKE_PRESETS: StylePreset[] = [
-    { name: "black", value: COLOR_PALETTE.black },
-    { name: "red", value: COLOR_PALETTE.red[3] },
-    { name: "green", value: COLOR_PALETTE.green[3] },
-    { name: "blue", value: COLOR_PALETTE.blue[3] },
-    { name: "orange", value: COLOR_PALETTE.orange[3] },
-  ];
-  const BG_PRESETS: StylePreset[] = [
-    { name: "transparent", value: COLOR_PALETTE.transparent },
-    { name: "red", value: COLOR_PALETTE.red[1] },
-    { name: "green", value: COLOR_PALETTE.green[1] },
-    { name: "blue", value: COLOR_PALETTE.blue[1] },
-    { name: "yellow", value: COLOR_PALETTE.yellow[1] },
-  ];
+  // Stroke/fill color now rendered via <ColorPicker> (TopPicks + popover).
+  // Width + opacity still use local preset buttons below.
   const STROKE_WIDTHS = [
     { name: "thin", value: STROKE_WIDTH.thin },
     { name: "bold", value: STROKE_WIDTH.bold },
     { name: "extrabold", value: STROKE_WIDTH.extraBold },
   ];
   const OPACITY_PRESETS = [25, 50, 75, 100];
+
+  // Open-state for the two picker popovers (controlled). Only one open at
+  // a time; opening the other auto-closes the first.
+  let strokePickerOpen = $state(false);
+  let bgPickerOpen = $state(false);
+
+  // Reactive list the ColorPicker reads for "most used" custom-color
+  // extraction — ideally the current selection if any, else the whole
+  // scene. Re-computes on scene mutations (via `sceneReady` bumps).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pickerElements = $derived.by<readonly any[]>(() => {
+    void sceneReady;
+    if (!scene) return [];
+    const selected = getSelectedElements();
+    return selected.length > 0 ? selected : scene.getNonDeletedElements();
+  });
 
   // What to display in the panel — reflects either the last-selected
   // element's style or the currentItem* defaults when no selection.
@@ -2750,37 +2750,45 @@
   <div class="sveltedraw-style-panel">
     <div class="sp-row">
       <div class="sp-label">Stroke</div>
-      <div class="sp-swatches">
-        {#each STROKE_PRESETS as c}
-          <button
-            type="button"
-            class="sp-sw"
-            class:active={panelStyle.strokeColor === c.value}
-            data-preset="stroke"
-            data-value={c.value}
-            aria-label={`Stroke ${c.name}`}
-            style="background: {c.value === 'transparent' ? '#fff' : c.value}; {c.value === 'transparent' ? 'background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%); background-size: 8px 8px;' : ''}"
-            onclick={() => applyStyle({ strokeColor: c.value })}
-          ></button>
-        {/each}
+      <div class="sp-picker">
+        <ColorPicker
+          type="elementStroke"
+          color={panelStyle.strokeColor}
+          label="Stroke"
+          elements={pickerElements}
+          updateData={() => {}}
+          open={strokePickerOpen}
+          onToggle={() => {
+            strokePickerOpen = !strokePickerOpen;
+            if (strokePickerOpen) bgPickerOpen = false;
+          }}
+          onClose={() => (strokePickerOpen = false)}
+          onChange={(c) => applyStyle({ strokeColor: c })}
+          onEyeDropperToggle={() => {}}
+          container={containerEl}
+        />
       </div>
     </div>
 
     <div class="sp-row">
       <div class="sp-label">Fill</div>
-      <div class="sp-swatches">
-        {#each BG_PRESETS as c}
-          <button
-            type="button"
-            class="sp-sw"
-            class:active={panelStyle.backgroundColor === c.value}
-            data-preset="bg"
-            data-value={c.value}
-            aria-label={`Background ${c.name}`}
-            style="background: {c.value === 'transparent' ? '#fff' : c.value}; {c.value === 'transparent' ? 'background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%); background-size: 8px 8px;' : ''}"
-            onclick={() => applyStyle({ backgroundColor: c.value })}
-          ></button>
-        {/each}
+      <div class="sp-picker">
+        <ColorPicker
+          type="elementBackground"
+          color={panelStyle.backgroundColor}
+          label="Background"
+          elements={pickerElements}
+          updateData={() => {}}
+          open={bgPickerOpen}
+          onToggle={() => {
+            bgPickerOpen = !bgPickerOpen;
+            if (bgPickerOpen) strokePickerOpen = false;
+          }}
+          onClose={() => (bgPickerOpen = false)}
+          onChange={(c) => applyStyle({ backgroundColor: c })}
+          onEyeDropperToggle={() => {}}
+          container={containerEl}
+        />
       </div>
     </div>
 
@@ -2997,17 +3005,8 @@
     display: flex;
     gap: 4px;
   }
-  .sveltedraw-style-panel .sp-sw {
-    width: 22px;
-    height: 22px;
-    border: 1px solid #d1d4da;
-    border-radius: 4px;
-    padding: 0;
-    cursor: pointer;
-  }
-  .sveltedraw-style-panel .sp-sw.active {
-    border-color: #6965db;
-    box-shadow: 0 0 0 1px #6965db;
+  .sveltedraw-style-panel .sp-picker {
+    flex: 1;
   }
   .sveltedraw-style-panel .sp-width,
   .sveltedraw-style-panel .sp-opacity {
