@@ -691,15 +691,34 @@
     // Commit any in-progress polyline before switching tool — otherwise
     // the floating newElement would leak across tool changes.
     if (polylineActive) commitPolyline();
+    // Preserve the lock flag across tool changes: if the user had
+    // "tool lock" enabled with a drawing tool and draws a shape,
+    // the pointerup handler skips the auto-switch — but when the
+    // user DOES explicitly switch tool (via hotkey or toolbar),
+    // we carry the lock forward so the next tool also stays.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const locked = !!(appState as any).activeTool?.locked;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (appState as any).activeTool = {
       type,
       customType: null,
-      locked: false,
+      // Only meaningful for drawing tools; locked selection/hand etc.
+      // would be a no-op so we just pass it through uniformly.
+      locked,
       fromSelection: false,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       lastActiveTool: (appState as any).activeTool ?? null,
     };
+  };
+
+  // Toggle tool lock (Q in upstream). When on, the current drawing
+  // tool stays active after a draw instead of falling back to
+  // selection.
+  const toggleToolLock = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const at = (appState as any).activeTool ?? {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).activeTool = { ...at, locked: !at.locked };
   };
 
   // ── Persistence (localStorage) ───────────────────────────────────────
@@ -1720,6 +1739,8 @@
         textAlign: (el as any).textAlign,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         verticalAlign: (el as any).verticalAlign,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        roundness: (el as any).roundness,
       };
     }
     return {
@@ -2207,6 +2228,21 @@
       return;
     }
 
+    // Tool lock toggle (Q). When on, the active drawing tool stays
+    // active after each draw instead of auto-switching to selection.
+    if (event.key === "q" || event.key === "Q") {
+      toggleToolLock();
+      event.preventDefault();
+      return;
+    }
+
+    // Show help dialog on `?`.
+    if (event.key === "?" || (event.key === "/" && event.shiftKey)) {
+      helpDialogOpen = true;
+      event.preventDefault();
+      return;
+    }
+
     const nextTool = TOOL_HOTKEYS[event.key];
     if (nextTool) {
       setActiveTool(nextTool);
@@ -2434,17 +2470,21 @@
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const el of scene.getNonDeletedElements() as any[]) {
       if (!selectedIds[el.id]) continue;
-      if (el.type === "line" || el.type === "arrow" || el.type === "freedraw")
-        continue;
 
-      // Rotation handle first — it sits above the bbox so it's visually
-      // on top of the N edge handle but not overlapping unless very small.
+      // Rotation handle works on EVERY element type (including linear
+      // and freedraw). Resize handles are only meaningful for bbox
+      // shapes; for linear we have the endpoint editor + midpoint bend
+      // handles instead.
       const rot = getRotationHandlePos(el);
       if (
         Math.abs(sceneX - rot.x) <= rotTol &&
         Math.abs(sceneY - rot.y) <= rotTol
       ) {
         return { kind: "rotate", el };
+      }
+
+      if (el.type === "line" || el.type === "arrow" || el.type === "freedraw") {
+        continue;
       }
 
       // Resize handles work on ROTATED elements too. Compute each handle's
@@ -3731,14 +3771,12 @@
       (appState as any).newElement = null;
       dragStart = null;
       if (committed) {
-        // Auto-switch to selection + auto-select the just-drawn
-        // element. Matches upstream Excalidraw UX: after every draw
-        // the tool returns to selection so the user can immediately
-        // click other elements. Without this, clicking on the
-        // freshly-drawn shape would start a new draw of the same
-        // type. (We skip this for freedraw because users typically
-        // want to keep sketching.)
-        if (cur.type !== "freedraw") {
+        // After every draw: either keep the tool active (if the user
+        // has "tool lock" on — upstream Q shortcut) or switch back
+        // to selection + auto-select the fresh element.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const locked = !!(appState as any).activeTool?.locked;
+        if (cur.type !== "freedraw" && !locked) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (appState as any).selectedElementIds = { [cur.id]: true };
           setActiveTool("selection");
@@ -4028,6 +4066,18 @@
     {@render toolBtn("line", "LineIcon", "l", "Line")}
     {@render toolBtn("freedraw", "FreedrawIcon", "p", "Draw")}
     {@render toolBtn("text", "TextIcon", "t", "Text")}
+    <div class="tb-sep"></div>
+    <button
+      type="button"
+      class="sveltedraw-tool-btn"
+      class:active={(appState.activeTool as any)?.locked}
+      aria-label="Tool lock"
+      aria-pressed={(appState.activeTool as any)?.locked}
+      title="Tool lock — Q"
+      onclick={toggleToolLock}
+    >
+      {(appState.activeTool as any)?.locked ? "🔒" : "🔓"}
+    </button>
   </div>
 
   <!-- Zoom controls — bottom-right. −, percent (reset on click), +. -->
@@ -4262,6 +4312,44 @@
     </div>
 
     {#if hasLinearSelected}
+      <!-- Edge style: sharp corners vs smooth curves. Applies the
+           ROUNDNESS.PROPORTIONAL_RADIUS flag — rough.js reads it and
+           interpolates a smooth curve through the polyline points.
+           Null = sharp; {type: 2} = round. -->
+      <div class="sp-row">
+        <div class="sp-label">Edges</div>
+        <div class="sp-swatches">
+          <button
+            type="button"
+            class="sp-icon-btn"
+            class:active={!panelStyle.roundness}
+            data-preset="edges"
+            data-value="sharp"
+            aria-label="Sharp"
+            title="Sharp"
+            onclick={() => applyStyle({ roundness: null })}
+          >
+            <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M4 14 L4 6 L16 6" stroke-linecap="round" stroke-linejoin="miter"/>
+            </svg>
+          </button>
+          <button
+            type="button"
+            class="sp-icon-btn"
+            class:active={!!panelStyle.roundness}
+            data-preset="edges"
+            data-value="round"
+            aria-label="Round"
+            title="Round"
+            onclick={() => applyStyle({ roundness: { type: 2 } })}
+          >
+            <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M4 14 Q4 6 10 6 L16 6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
       {#snippet arrowheadIcon(value: string | null, flip: boolean)}
         {#if value === null}
           <ArrowheadNoneIcon {flip} />
@@ -4629,6 +4717,25 @@
             aria-hidden="true"
           ></div>
         {/each}
+        <!-- Rotation handle: top-center of the element's BBOX above it.
+             Same math as getRotationHandlePos — kept as overlay dot so
+             the user can see the grab target. -->
+        {@const cx = el.x + el.width / 2}
+        {@const cy = el.y + el.height / 2}
+        {@const ROT_GAP = 16}
+        {@const rLocalY = el.y - ROT_GAP / zoomV}
+        {@const rdx = cx - cx}
+        {@const rdy = rLocalY - cy}
+        {@const ang = el.angle || 0}
+        {@const rotSceneX = cx + rdx * Math.cos(ang) - rdy * Math.sin(ang)}
+        {@const rotSceneY = cy + rdx * Math.sin(ang) + rdy * Math.cos(ang)}
+        {@const rotVpX = (rotSceneX + sX) * zoomV + oL - (appState.offsetLeft as number)}
+        {@const rotVpY = (rotSceneY + sY) * zoomV + oT - (appState.offsetTop as number)}
+        <div
+          class="sveltedraw-line-handle sveltedraw-rotate-handle"
+          style="left: {rotVpX - 7}px; top: {rotVpY - 7}px;"
+          aria-hidden="true"
+        ></div>
       {/if}
     {/each}
   {/if}
@@ -5109,6 +5216,12 @@
     height: 8px;
     border-color: #a6a0f0;
     opacity: 0.85;
+  }
+  .sveltedraw-rotate-handle {
+    width: 14px;
+    height: 14px;
+    background: #fff;
+    border: 1.5px solid #6965db;
   }
 
   .sveltedraw-utility-bar {

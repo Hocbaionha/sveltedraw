@@ -95,7 +95,9 @@ async function main() {
       JSON.stringify({
         vertexDots: document.querySelectorAll('.sveltedraw-line-handle--vertex').length,
         midDots: document.querySelectorAll('.sveltedraw-line-handle--mid').length,
+        rotateDots: document.querySelectorAll('.sveltedraw-rotate-handle').length,
         activeTool: window.__sveltedrawProbe.appState.activeTool.type,
+        locked: window.__sveltedrawProbe.appState.activeTool.locked,
         selected: Object.keys(window.__sveltedrawProbe.appState.selectedElementIds),
         elCount: window.__sveltedrawProbe.scene.getNonDeletedElements().length,
       }, null, 2)
@@ -103,6 +105,35 @@ async function main() {
     returnByValue: true,
   });
   console.log("DOM state:", dom.result.value);
+
+  // Verify rotate handle actually rotates the arrow.
+  const rot = await send("Runtime.evaluate", {
+    expression: `
+      (async () => {
+        const p = window.__sveltedrawProbe;
+        const arr = p.scene.getNonDeletedElements()[0];
+        const before = arr.angle || 0;
+        const rotateDot = document.querySelector('.sveltedraw-rotate-handle');
+        if (!rotateDot) return { err: 'no rotate dot' };
+        const rect = rotateDot.getBoundingClientRect();
+        const iv = document.querySelectorAll('canvas')[1];
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const mk = (type, x, y) => new PointerEvent(type, { clientX: x, clientY: y, button: 0, pointerId: 2, pointerType: 'mouse', bubbles: true, cancelable: true });
+        iv.dispatchEvent(mk('pointerdown', cx, cy));
+        await new Promise(r => setTimeout(r, 30));
+        // drag 90° clockwise: from top-of-element to right-of-element
+        iv.dispatchEvent(mk('pointermove', cx + 100, cy + 100));
+        await new Promise(r => setTimeout(r, 30));
+        iv.dispatchEvent(mk('pointerup', cx + 100, cy + 100));
+        await new Promise(r => setTimeout(r, 100));
+        const after = (p.scene.getNonDeletedElements()[0].angle) || 0;
+        return { before, after, changed: Math.abs(after - before) > 0.01 };
+      })()
+    `,
+    awaitPromise: true, returnByValue: true,
+  });
+  console.log("rotation test:", JSON.stringify(rot.result.value));
   ws.close();
   cleanup();
 }
