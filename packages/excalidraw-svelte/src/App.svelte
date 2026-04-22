@@ -1767,6 +1767,23 @@
     return false;
   });
 
+  // Every selected line/arrow, used for rendering the handle overlay.
+  // $derived tracks selectedElementIds + sceneReady; inline
+  // filter in the template (`selectedElementIds?.[el.id]`) doesn't
+  // track reliably in Svelte 5 — have to read the proxy field
+  // directly inside a $derived.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const selectedLinearElements = $derived.by<any[]>(() => {
+    void sceneReady;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ids = (appState as any).selectedElementIds ?? {};
+    if (!scene) return [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (scene.getNonDeletedElements() as any[]).filter(
+      (el) => ids[el.id] && (el.type === "line" || el.type === "arrow"),
+    );
+  });
+
   // Text-only: shows text-alignment rows. Same inline-proxy-access
   // pattern as `hasLinearSelected` — Svelte 5 tracking is finicky
   // across function boundaries (see feedback memory).
@@ -4581,18 +4598,14 @@
        between consecutive points. The dots are visual only — the
        actual hit-testing happens in hitResizeHandle(). Picker dot
        on vertex = grab to move; dot on midpoint = grab to bend. -->
-  {#if scene}
-    <!-- `_nonce` forces re-evaluation on every scene mutation. Without
-         it, scene.getNonDeletedElements() isn't tracked by Svelte
-         and the overlay stays stale after mutateElement calls. -->
-    {@const _nonce = sceneReady}
+  {#if selectedLinearElements.length > 0}
     {@const zoomV = (appState.zoom as any).value || 1}
     {@const sX = ((appState as any).scrollX ?? 0)}
     {@const sY = ((appState as any).scrollY ?? 0)}
     {@const oL = (appState.offsetLeft as number) ?? 0}
     {@const oT = (appState.offsetTop as number) ?? 0}
-    {#each scene.getNonDeletedElements() as el (el.id)}
-      {#if (el.type === "line" || el.type === "arrow") && (appState as any).selectedElementIds?.[el.id]}
+    {#each selectedLinearElements as el (el.id)}
+      {#if true}
         {@const pts = el.points ?? []}
         {#each pts as pt, i}
           {@const vpX = (el.x + pt[0] + sX) * zoomV + oL - (appState.offsetLeft as number)}
