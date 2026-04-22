@@ -658,10 +658,16 @@
   // primary hotkeys; letter aliases match upstream where applicable.
   const TOOL_HOTKEYS: Record<string, string> = {
     "1": "selection",
+    v: "selection",
+    V: "selection",
+    s: "selection",
+    S: "selection",
     "2": "rectangle",
     r: "rectangle",
     R: "rectangle",
     "3": "diamond",
+    d: "diamond",
+    D: "diamond",
     "4": "ellipse",
     o: "ellipse",
     O: "ellipse",
