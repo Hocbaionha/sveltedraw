@@ -1,14 +1,8 @@
 /**
  * appStore.svelte.ts
  *
- * Svelte 5 replacement for jotai atoms that live in app scope
- * (previously in excalidraw-app/**).
- *
- * In the React codebase these atoms used the *plain* jotai store
- * (not the isolated jotai-scope), meaning a single instance was shared
- * across the whole page.  Here we replicate that with a module-level
- * singleton created by calling createAppStore() once and storing it via
- * setContext(APP_STORE_KEY, store) at the top of the app tree.
+ * App-scope reactive store (shared across the page — one instance per app root).
+ * Provide via setContext(APP_STORE_KEY, createAppStore()) at the top of the app tree.
  *
  * Atoms covered (source location → field name):
  *   excalidraw-app/app-language/language-state.ts     appLangCodeAtom            → appLangCode
@@ -22,7 +16,7 @@
  */
 
 // ---------------------------------------------------------------------------
-// Types (inlined to avoid deep React/app imports)
+// Types (inlined to avoid deep app imports)
 // ---------------------------------------------------------------------------
 
 /**
@@ -45,7 +39,7 @@ export type ShareDialogState =
   | { isOpen: true; type: ShareDialogType };
 
 // ---------------------------------------------------------------------------
-// Utility: accept a plain value OR an updater function (mirrors jotai API)
+// Utility: accept a plain value OR an updater function
 // ---------------------------------------------------------------------------
 
 type Updater<T> = T | ((prev: T) => T);
@@ -62,14 +56,11 @@ function applyUpdate<T>(prev: T, update: Updater<T>): T {
 
 export function createAppStore() {
   // --- Language -------------------------------------------------------------
-  // The React app initialises this via getPreferredLanguage() which uses
-  // i18next-browser-languagedetector + the supported languages list.
-  // That logic lives in excalidraw-app/app-language/language-detector.ts.
-  //
-  // TODO: Call getPreferredLanguage() (or a Svelte equivalent) here once
-  // i18next-browser-languagedetector is a dependency of excalidraw-svelte.
-  // For now we default to "en"; the root app component should call
-  // setAppLangCode(getPreferredLanguage()) immediately after creating the store.
+  // TODO: call getPreferredLanguage() (i18next-browser-languagedetector +
+  // supported languages list from excalidraw-app/app-language/language-detector.ts)
+  // once that dependency is available here. For now default to "en"; the
+  // root app component should call setAppLangCode(getPreferredLanguage())
+  // immediately after creating the store.
   let appLangCode = $state<string>("en");
 
   // --- Collab ---------------------------------------------------------------

@@ -3,8 +3,7 @@
 
   import type { Snippet } from 'svelte';
 
-  // NOTE: React Paragraph accepted style?: React.CSSProperties (object).
-  // Svelte uses style as a string — callers migrating from React must convert.
+  // NOTE: `style` is a string (not a CSSProperties object).
   let {
     children,
     style = '',

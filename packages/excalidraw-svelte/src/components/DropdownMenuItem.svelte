@@ -1,10 +1,9 @@
 <script lang="ts">
   // Port of packages/excalidraw/components/dropdownMenu/DropdownMenuItem.tsx
-  // Inlines DropdownMenuItemContent (small enough that splitting it adds noise).
-  // formFactor passed as prop (React reads it from context).
-  // The shared DropdownMenuContentPropsContext.onSelect from React is replaced
-  // by an explicit `onParentSelect` prop — DropdownMenuContent forwards it
-  // via prop drilling rather than Svelte context (kept simple for now).
+  // Inlines DropdownMenuItemContent (too small to justify splitting).
+  // `formFactor` passed as a prop. The parent-close hook is an explicit
+  // `onParentSelect` prop forwarded from DropdownMenuContent (prop-drilled
+  // rather than Svelte-context, kept simple for now).
 
   import type { Snippet } from 'svelte';
   import { DropdownMenu as BitsDropdownMenu } from 'bits-ui';

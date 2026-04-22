@@ -1,13 +1,11 @@
 <script lang="ts">
   // Port of packages/excalidraw/components/dropdownMenu/DropdownMenu.tsx
-  // Uses bits-ui DropdownMenu primitive (radix-ui equivalent in React).
+  // Uses the bits-ui DropdownMenu primitive.
   //
-  // The React version implements DropdownMenu.Trigger / .Content as static
-  // properties on the function component. Svelte components don't support that,
-  // so consumers import each subcomponent separately:
+  // Subcomponents are imported individually rather than dot-accessed:
   //   import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, ... }
   //
-  // open is controlled by the parent.
+  // `open` is controlled by the parent.
 
   import type { Snippet } from 'svelte';
   // @ts-ignore upstream package

@@ -1,7 +1,9 @@
 <script lang="ts">
   // Port of packages/excalidraw/components/TextField.tsx
-  // React forwardRef → ref=$bindable(); discriminated union simplified to optional value/defaultValue
-  // Eye icon SVGs inlined from packages/excalidraw/components/icons.tsx (eyeIcon, eyeClosedIcon)
+  // Input element exposed via bindable `ref` prop; value/defaultValue both
+  // optional (discriminated union simplified).
+  // Eye icon SVGs inlined from packages/excalidraw/components/icons.tsx
+  // (eyeIcon, eyeClosedIcon).
 
   import type { Snippet } from 'svelte';
   import clsx from 'clsx';

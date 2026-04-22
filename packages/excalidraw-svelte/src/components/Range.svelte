@@ -1,6 +1,5 @@
 <script lang="ts">
   // Port of packages/excalidraw/components/Range.tsx
-  // React useRef + useEffect → bind:this + $effect (runs after DOM flush, same semantics)
 
   import type { Snippet } from 'svelte';
 

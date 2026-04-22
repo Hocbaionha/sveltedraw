@@ -1,6 +1,5 @@
 <script lang="ts">
   // Port of packages/excalidraw/components/InlineIcon.tsx
-  // React: icon: React.ReactNode → Svelte: icon?: Snippet (rendered with {@render icon?.()})
 
   import type { Snippet } from 'svelte';
 

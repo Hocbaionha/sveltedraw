@@ -1,7 +1,5 @@
 <script lang="ts">
   // Port of packages/excalidraw/components/Ellipsify.tsx
-  // React spread ...rest: React.HTMLAttributes<HTMLSpanElement>
-  // Svelte 5: known props destructured; remaining HTML attrs spread with {...rest}
 
   import type { Snippet } from 'svelte';
   import type { HTMLAttributes } from 'svelte/elements';

@@ -1,9 +1,8 @@
 <script lang="ts">
   // Port of packages/excalidraw/components/Toast.tsx
   // ToolButton swapped for a plain <button> with inlined CloseIcon SVG.
-  // ProgressBar exposed via the sibling ToastProgressBar.svelte (Svelte cannot
-  // attach static props to a component the way Object.assign(Component, {ProgressBar})
-  // works in React).
+  // ProgressBar lives in the sibling ToastProgressBar.svelte and is imported
+  // separately (no dot-accessed static subcomponent).
 
   import type { Snippet } from 'svelte';
 
@@ -33,7 +32,7 @@
   }
 
   $effect(() => {
-    // re-trigger on message/duration change (matches the React useEffect deps)
+    // re-trigger on message/duration change
     void message;
     void duration;
     if (!shouldAutoClose) return;

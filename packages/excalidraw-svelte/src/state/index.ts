@@ -28,19 +28,41 @@ export const APP_STORE_KEY: unique symbol = Symbol("appStore");
 
 /**
  * Svelte context key for EditorInterface (formFactor, desktopUIMode, …).
- * This replaces React's EditorInterfaceContext from components/App.tsx.
- * The value type is EditorInterface from @excalidraw/common.
- *
- * Usage:
- *   // provider (root Excalidraw component)
- *   import { setContext } from "svelte";
- *   import { EDITOR_INTERFACE_KEY } from "$state";
- *   setContext(EDITOR_INTERFACE_KEY, editorInterface);
- *
- *   // consumer
- *   import { getContext } from "svelte";
- *   import { EDITOR_INTERFACE_KEY } from "$state";
- *   import type { EditorInterface } from "@excalidraw/common";
- *   const editorInterface = getContext<EditorInterface>(EDITOR_INTERFACE_KEY);
+ * Value type is EditorInterface from @excalidraw/common.
  */
 export const EDITOR_INTERFACE_KEY: unique symbol = Symbol("editorInterface");
+
+/**
+ * Svelte context key for the per-editor container id, used to namespace
+ * radio-input names and similar IDs scoped to a single Excalidraw instance.
+ * Optional — components fall back to a generated id when not provided.
+ */
+export const EXCAL_ID_KEY: unique symbol = Symbol("excalId");
+
+// Tunnels (port of packages/excalidraw/context/tunnels.ts)
+export {
+  Tunnel,
+  FallbackCounter,
+  TunnelsContext,
+  createTunnelsContext,
+  TUNNELS_KEY,
+} from "./tunnels.svelte.js";
+export type { TunnelEntry } from "./tunnels.svelte.js";
+
+// OverwriteConfirm store (port of OverwriteConfirmState.ts jotai atom)
+export {
+  OverwriteConfirmStore,
+  overwriteConfirmStore,
+} from "./overwriteConfirmState.svelte.js";
+export type {
+  OverwriteConfirmActiveState,
+  OverwriteConfirmInactiveState,
+  OverwriteConfirmStateValue,
+} from "./overwriteConfirmState.svelte.js";
+
+// ColorPicker section store (port of activeColorPickerSectionAtom)
+export {
+  ColorPickerSectionStore,
+  colorPickerSectionStore,
+} from "./colorPickerState.svelte.js";
+export type { ActiveColorPickerSection } from "./colorPickerState.svelte.js";

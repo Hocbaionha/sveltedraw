@@ -1,6 +1,6 @@
 <script lang="ts">
   // Port of packages/excalidraw/components/dropdownMenu/DropdownMenuTrigger.tsx
-  // formFactor passed as prop (React reads from useEditorInterface).
+  // formFactor passed as a prop.
 
   import type { Snippet } from 'svelte';
   import { DropdownMenu as BitsDropdownMenu } from 'bits-ui';

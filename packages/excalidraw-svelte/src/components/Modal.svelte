@@ -1,8 +1,8 @@
 <script lang="ts">
   // Port of packages/excalidraw/components/Modal.tsx
-  // React createPortal → bits-ui Portal. Theme + formFactor are props (React reads
-  // them from context); when the App-context bridge lands (Phase 6) those move to
-  // store-derived values.
+  // Uses bits-ui Portal to render outside the component tree.
+  // `theme` + `formFactor` are plain props (move to store-derived values once
+  // the App-context bridge lands).
 
   import type { Snippet } from 'svelte';
   // @ts-ignore upstream package

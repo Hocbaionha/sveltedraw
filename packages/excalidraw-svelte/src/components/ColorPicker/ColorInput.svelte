@@ -1,54 +1,17 @@
 <script lang="ts">
-  /**
-   * ColorInput.svelte — Svelte 5 port of ColorInput.tsx
-   *
-   * Source: packages/excalidraw/components/ColorPicker/ColorInput.tsx
-   *
-   * Key differences from the React original:
-   * - `useAtom(activeColorPickerSectionAtom)` → getContext(EDITOR_STORE_KEY)
-   * - `useAtom(activeEyeDropperAtom)`         → same store
-   * - `useEditorInterface()`                  → getContext(EDITOR_INTERFACE_KEY)
-   * - forwardRef                              → not needed (no external ref used)
-   * - useState + useEffect(sync with prop)   → $state + $effect
-   * - unmount cleanup effect                  → $effect returning a cleanup fn
-   * - React event handlers (onChange etc.)   → lowercase Svelte events
-   * - className                               → class
-   * - Inline style objects                    → style string or style directive
-   * - eyeDropperIcon (React JSX)             → inlined SVG
-   * - t() from i18n                           → imported directly (same module)
-   *
-   * TODO / known gaps:
-   * - `t()` currently calls the React-side i18n module. Once a Svelte i18n
-   *   module exists, replace the import path.
-   * - `KEYS` and `normalizeInputColor` are imported from `@excalidraw/common`
-   *   which is a plain TS package (no React), so these imports work unchanged.
-   * - `getShortcutKey` comes from `packages/excalidraw/shortcut.ts` which also
-   *   has no React dep and can be used directly.
-   * - The `editorInterface.formFactor !== "phone"` guard hides the eye-dropper
-   *   on phone form factor. In Svelte we get this value from the
-   *   EDITOR_INTERFACE_KEY context (see EDITOR_INTERFACE_KEY in index.ts).
-   *   If that context is not yet wired, the guard defaults to showing the
-   *   eye-dropper (i.e. safe default for desktop).
-   */
+  // Port of packages/excalidraw/components/ColorPicker/ColorInput.tsx
+  //
+  // Contract: controlled input that syncs `innerValue` from the `color` prop
+  // on external change, but keeps transient user input local until it
+  // normalizes to a valid color (which fires `onChange`). The eye-dropper
+  // button is hidden on phone form factor (EDITOR_INTERFACE_KEY context).
 
   import { getContext, untrack } from "svelte";
   // @ts-ignore — resolved by Vite alias; no tsconfig path to avoid upstream cascade
   import { KEYS, normalizeInputColor } from "@excalidraw/common";
 
-  /**
-   * i18n / shortcut imports
-   *
-   * `t()` and `getShortcutKey()` live in packages/excalidraw and have no
-   * React *runtime* dependency (only module-level jotai imports for the
-   * `useI18n` hook, which we don't use here).
-   *
-   * TODO: Once a Svelte-native i18n solution is in place, replace these with
-   * the new module. For now, the internal package paths work in the monorepo
-   * via Vite aliases (`@excalidraw/excalidraw` → `packages/excalidraw`).
-   *
-   * If the import raises errors during the build, use a re-export shim at
-   * packages/excalidraw-svelte/src/i18n.ts that re-exports only `t`.
-   */
+  // TODO: replace these internal-package imports with a Svelte-native i18n /
+  // shortcut module once one exists. Current paths resolve via Vite aliases.
   // @ts-ignore — internal path; use alias when build config is set up
   import { t } from "@excalidraw/excalidraw/i18n";
   // @ts-ignore — internal path
@@ -83,9 +46,7 @@
 
   /**
    * EDITOR_INTERFACE_KEY provides EditorInterface (formFactor, desktopUIMode…).
-   * This is a separate context from the store — it mirrors React's
-   * EditorInterfaceContext from components/App.tsx.
-   * Fall back to a desktop-like default if not yet provided.
+   * Falls back to a desktop-like default when not provided.
    */
   const editorInterface = getContext<EditorInterface | undefined>(
     EDITOR_INTERFACE_KEY,
@@ -213,8 +174,6 @@
       <!--
         Eye-dropper SVG (inlined from packages/excalidraw/components/icons.tsx →
         eyeDropperIcon, which uses tablerIconProps: 24×24, stroke, no fill).
-        The React version renders a JSX element that cannot be imported directly
-        into Svelte — so we inline the SVG paths here.
       -->
       <svg
         aria-hidden="true"

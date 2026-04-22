@@ -1,7 +1,6 @@
 <script lang="ts">
-  // Port of Toast.ProgressBar — Svelte's component model doesn't allow
-  // attaching static subcomponents (Toast.ProgressBar in React), so this is
-  // a sibling component re-exported alongside Toast.
+  // Port of Toast.ProgressBar — sibling component re-exported alongside
+  // Toast (no dot-accessed static subcomponent).
 
   let { progress }: { progress: number } = $props();
 

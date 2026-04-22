@@ -2,3 +2,4 @@
 // Phase 3: leaf UI components added
 
 export * from './components/index.js';
+export * from './icons/index.js';

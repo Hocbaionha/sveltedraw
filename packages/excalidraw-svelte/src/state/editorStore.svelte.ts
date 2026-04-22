@@ -1,11 +1,9 @@
 /**
  * editorStore.svelte.ts
  *
- * Svelte 5 replacement for jotai atoms that live in editor scope
- * (previously spread across packages/excalidraw/**).
- *
- * Each jotai atom becomes a private $state field + a getter/setter pair
- * so that external code can never bypass reactivity by assigning directly.
+ * Editor-scope reactive store (one instance per <Excalidraw> root).
+ * Each field is a private $state with a getter/setter pair so external
+ * code cannot bypass reactivity by assigning directly.
  *
  * Atoms covered (source location → field name):
  *   components/ActiveConfirmDialog.tsx        activeConfirmDialogAtom         → activeConfirmDialog
@@ -31,17 +29,16 @@
  *   components/TTDDialog/useTTDChatStorage    isLoadingChatsAtom              → ttdIsLoadingChats
  *   components/TTDDialog/useTTDChatStorage    chatsLoadedAtom                 → ttdChatsLoaded
  *
- * NOTE: The jotai-scope `EditorJotaiProvider` gave each <Excalidraw> instance
- * an isolated atom scope. Here we replicate that with Svelte context —
- * every time createEditorStore() is called (once per Excalidraw root component)
- * a fresh, isolated store is created and provided via setContext(EDITOR_STORE_KEY, store).
+ * Isolation: every createEditorStore() call produces a fresh store, provided
+ * via setContext(EDITOR_STORE_KEY, store) at the <Excalidraw> root so multiple
+ * editors on one page do not share state.
  */
 
 // @ts-ignore — resolved by Vite alias; no tsconfig path to avoid upstream cascade
 import { randomId } from "@excalidraw/common";
 
 // ---------------------------------------------------------------------------
-// Types re-used from the React codebase (verbatim, no React imports needed)
+// Types
 // ---------------------------------------------------------------------------
 
 /**
@@ -84,7 +81,6 @@ export type OverwriteConfirmState =
   | {
       active: true;
       title: string;
-      /** Raw string only — React.ReactNode is not available in Svelte */
       description: string;
       actionLabel: string;
       color: "danger" | "warning";
@@ -97,7 +93,7 @@ export type OverwriteConfirmState =
 export type SvgCache = Map<LibraryItem["id"], SVGSVGElement>;
 
 // ---------------------------------------------------------------------------
-// TTD types (inlined to avoid deep React-package imports)
+// TTD types (inlined to avoid deep package imports)
 // ---------------------------------------------------------------------------
 
 export type RateLimits = {
@@ -135,7 +131,7 @@ export type SavedChat = {
 export type SavedChats = SavedChat[];
 
 // ---------------------------------------------------------------------------
-// CommandPalette item type (simplified — no React / ActionManager imports)
+// CommandPalette item type (simplified — no ActionManager import)
 // ---------------------------------------------------------------------------
 
 export type CommandPaletteItem = {
@@ -146,12 +142,12 @@ export type CommandPaletteItem = {
   order?: number;
   shortcut?: string | null;
   viewMode?: boolean;
-  /** Typed loosely here to avoid pulling in React/ActionManager */
+  /** Typed loosely here to avoid pulling in ActionManager */
   perform: (...args: unknown[]) => void;
 };
 
 // ---------------------------------------------------------------------------
-// Utility: accept a plain value OR an updater function (mirrors jotai API)
+// Utility: accept a plain value OR an updater function
 // ---------------------------------------------------------------------------
 
 type Updater<T> = T | ((prev: T) => T);

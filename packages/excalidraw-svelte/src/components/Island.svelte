@@ -1,7 +1,7 @@
 <script lang="ts">
   // Port of packages/excalidraw/components/Island.tsx
-  // React used forwardRef → Svelte 5 equivalent: bind:this via $bindable ref prop
-  // SCSS (Island.scss) not imported — styles inlined below
+  // Outer DOM element exposed via a bindable `ref` prop.
+  // SCSS (Island.scss) not imported — styles inlined below.
 
   import type { Snippet } from 'svelte';
   import clsx from 'clsx';

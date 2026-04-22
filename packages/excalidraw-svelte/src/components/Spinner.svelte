@@ -14,7 +14,7 @@
     class?: string;
   } = $props();
 
-  // React used useRef(Date.now()) — equivalent: plain const, runs once at mount
+  // Captured once at mount.
   const mountTime = Date.now();
   const mountDelay = -(mountTime % 1600);
 </script>
