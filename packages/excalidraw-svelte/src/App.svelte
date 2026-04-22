@@ -935,6 +935,77 @@
     bumpSceneRepaint();
   };
 
+  // ── Group / ungroup ────────────────────────────────────────────────
+  // Upstream stores group membership as `element.groupIds: string[]`
+  // where groups nest outward (groupIds[-1] is the outermost). Ctrl+G
+  // adds a fresh groupId to every selected element; Ctrl+Shift+G pops
+  // the outermost group from each selected element.
+  //
+  // Click-to-expand (selecting one element of a group auto-selects
+  // the whole group) is handled separately in the pointerdown flow.
+  const groupSelected = () => {
+    if (!scene) return;
+    const selected = getSelectedElements();
+    if (selected.length < 2) return; // need ≥2 elements to form a group
+    const newGroupId = randomId();
+    for (const el of selected) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const nextGroupIds = [...(el.groupIds as string[]), newGroupId];
+      scene.mutateElement(
+        el,
+        { groupIds: nextGroupIds },
+        { informMutation: false, isDragging: false },
+      );
+    }
+    pushHistory();
+    bumpSceneRepaint();
+  };
+
+  const ungroupSelected = () => {
+    if (!scene) return;
+    const selected = getSelectedElements();
+    if (selected.length === 0) return;
+    let changed = false;
+    for (const el of selected) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ids = (el.groupIds as string[]) ?? [];
+      if (ids.length === 0) continue;
+      // Pop the outermost group (index length-1).
+      const nextGroupIds = ids.slice(0, -1);
+      scene.mutateElement(
+        el,
+        { groupIds: nextGroupIds },
+        { informMutation: false, isDragging: false },
+      );
+      changed = true;
+    }
+    if (changed) {
+      pushHistory();
+      bumpSceneRepaint();
+    }
+  };
+
+  // Expand selection to include every element sharing the outermost
+  // group of `el`. Called from pointerdown's selection branch when the
+  // user clicks a grouped element (but not Alt-held, which keeps
+  // single-selection for targeted operations).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const expandSelectionToGroup = (el: any): string[] => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const groupIds = (el.groupIds as string[]) ?? [];
+    if (groupIds.length === 0) return [el.id];
+    const outerGroup = groupIds[groupIds.length - 1];
+    const siblings: string[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const other of scene!.getNonDeletedElements() as any[]) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((other.groupIds as string[])?.includes(outerGroup)) {
+        siblings.push(other.id);
+      }
+    }
+    return siblings;
+  };
+
   // ── Z-order: bring forward / send backward / to front / to back ─────
   // Upstream's shiftElementsByOne returns the full reordered array;
   // replaceAllElements with skipValidation bypasses fractional-index
@@ -1702,6 +1773,16 @@
 
     // ── Ctrl/Cmd + (Shift) shortcuts ──────────────────────────────────
     if (mod && !event.altKey) {
+      // Group / ungroup: Ctrl+G adds a shared groupId to all selected
+      // elements; Ctrl+Shift+G pops the outermost group from each.
+      // Matches upstream keybindings.
+      if (event.key === "g" || event.key === "G") {
+        if (event.shiftKey) ungroupSelected();
+        else groupSelected();
+        event.preventDefault();
+        return;
+      }
+
       // Z-order: Ctrl+] / Ctrl+[ (one step), Ctrl+Shift+] / Ctrl+Shift+[
       // (to front / to back). Matches upstream keybindings.
       if (event.key === "]") {
@@ -2722,8 +2803,22 @@
         return;
       }
       if (!sel[hit.id]) {
-        // Clicking unselected element replaces selection.
-        selectOnly(hit.id);
+        // Clicking unselected element replaces selection. If the hit
+        // element belongs to a group, expand the selection to include
+        // every member of the outermost group — matches upstream UX.
+        // Alt-click bypasses expansion so Alt-drag can target a single
+        // group member for duplication/move.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const hitGroupIds = ((hit as any).groupIds as string[]) ?? [];
+        if (hitGroupIds.length > 0 && !event.altKey) {
+          const ids = expandSelectionToGroup(hit);
+          const nextSel: Record<string, true> = {};
+          for (const id of ids) nextSel[id] = true;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (appState as any).selectedElementIds = nextSel;
+        } else {
+          selectOnly(hit.id);
+        }
       }
 
       // Alt-held at drag-start → duplicate the selection first, then
@@ -3768,6 +3863,8 @@
       {#if contextMenu.hasSelection}
         <div class="ctx-sep"></div>
         <button type="button" class="ctx-item" onclick={() => { duplicateSelected(); closeContextMenu(); }}>{t("labels.duplicateSelection")}</button>
+        <button type="button" class="ctx-item" onclick={() => { groupSelected(); closeContextMenu(); }}>{t("labels.group")}</button>
+        <button type="button" class="ctx-item" onclick={() => { ungroupSelected(); closeContextMenu(); }}>{t("labels.ungroup")}</button>
         <button type="button" class="ctx-item" onclick={() => { reorderSelected("forward"); closeContextMenu(); }}>{t("labels.bringForward")}</button>
         <button type="button" class="ctx-item" onclick={() => { reorderSelected("front"); closeContextMenu(); }}>{t("labels.bringToFront")}</button>
         <button type="button" class="ctx-item" onclick={() => { reorderSelected("backward"); closeContextMenu(); }}>{t("labels.sendBackward")}</button>

@@ -1297,6 +1297,72 @@ async function main() {
       // Expected: either NO duplicate is created (preferred UX), or if
       // a duplicate IS created, it must be undoable. Pre-fix behavior:
       // duplicate stays in scene but Ctrl+Z doesn't revert it.
+      // ── Group / ungroup + click-to-expand ────────────────────────
+      // Pick two non-overlapping shapes, multi-select via shift, press
+      // Ctrl+G. Both should gain a shared groupId. Click one of them
+      // → the other auto-selects too. Ctrl+Shift+G pops the group.
+      let groupFlow = null;
+      try {
+        const all = p.scene?.getNonDeletedElements?.() ?? [];
+        const rec = all.find(el => el.type === 'rectangle');
+        const dia = all.find(el => el.type === 'diamond');
+        if (!rec || !dia) throw new Error('need rectangle + diamond');
+        const prevRecGroups = rec.groupIds?.length ?? 0;
+
+        // Multi-select via shift-click.
+        p.appState.selectedElementIds = {};
+        await new Promise(r => setTimeout(r, 20));
+        const rc = sceneToVp(rec.x + rec.width / 2, rec.y + rec.height / 2);
+        iv.dispatchEvent(new PointerEvent('pointerdown', { clientX: rc.x, clientY: rc.y, button: 0, pointerId: 1, shiftKey: true, bubbles: true, cancelable: true }));
+        iv.dispatchEvent(new PointerEvent('pointerup', { clientX: rc.x, clientY: rc.y, button: 0, pointerId: 1, shiftKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+        const dc = sceneToVp(dia.x + dia.width / 2, dia.y + dia.height / 2);
+        iv.dispatchEvent(new PointerEvent('pointerdown', { clientX: dc.x, clientY: dc.y, button: 0, pointerId: 1, shiftKey: true, bubbles: true, cancelable: true }));
+        iv.dispatchEvent(new PointerEvent('pointerup', { clientX: dc.x, clientY: dc.y, button: 0, pointerId: 1, shiftKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+        const selBeforeGroup = Object.keys(p.appState.selectedElementIds).length;
+
+        // Ctrl+G → form a group.
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', ctrlKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 40));
+        const recAfter = p.scene.getNonDeletedElements().find(el => el.id === rec.id);
+        const diaAfter = p.scene.getNonDeletedElements().find(el => el.id === dia.id);
+        const sharedGroup = (recAfter.groupIds ?? []).slice(-1)[0];
+        const groupShared = sharedGroup && (diaAfter.groupIds ?? []).includes(sharedGroup);
+
+        // Clear selection, then click ONE element — expansion should
+        // auto-select the other group member.
+        p.appState.selectedElementIds = {};
+        await new Promise(r => setTimeout(r, 20));
+        iv.dispatchEvent(mk('pointerdown', rc.x, rc.y));
+        iv.dispatchEvent(mk('pointerup', rc.x, rc.y));
+        await new Promise(r => setTimeout(r, 30));
+        const selAfterClick = Object.keys(p.appState.selectedElementIds).length;
+        const bothSelected = selAfterClick === 2;
+
+        // Ctrl+Shift+G → ungroup.
+        // Re-select both first (they should already be from click expansion).
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 40));
+        const recAfterUngroup = p.scene.getNonDeletedElements().find(el => el.id === rec.id);
+        const groupGoneAfterUngroup = (recAfterUngroup.groupIds ?? []).length === prevRecGroups;
+
+        // Undo both ops so reload-scene count is stable.
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+
+        groupFlow = {
+          selBeforeGroup,
+          groupShared,
+          bothSelected,
+          groupGoneAfterUngroup,
+        };
+      } catch (err) {
+        groupFlow = { err: String(err) };
+      }
+
       let altClickNoDrag = null;
       try {
         const rec = p.scene?.getNonDeletedElements?.()?.find(el => el.type === 'rectangle');
@@ -1756,7 +1822,7 @@ async function main() {
         fontPicker, styleExt,
         rotatedTextOverlay,
         zOrderForward, zOrderBackward, altDragDup,
-        altClickNoDrag, historyCap,
+        altClickNoDrag, historyCap, groupFlow,
         ctxMenuDup, ctxMenuClose,
         arrowheadPicker, textAlignPicker,
         themeToggle, i18nSwap,
@@ -2460,6 +2526,23 @@ async function main() {
     "alt-click-no-drag-is-undoable",
     probe?.altClickNoDrag?.healthy === true,
     `before=${probe?.altClickNoDrag?.beforeCount} afterClick=${probe?.altClickNoDrag?.afterClickCount} afterUndo=${probe?.altClickNoDrag?.afterUndoCount}`,
+  );
+
+  // Group flow: shift-select → Ctrl+G → click one → both selected → Ctrl+Shift+G.
+  pass(
+    "group-selected-shares-id",
+    probe?.groupFlow?.selBeforeGroup === 2 && probe?.groupFlow?.groupShared === true,
+    `selBefore=${probe?.groupFlow?.selBeforeGroup} groupShared=${probe?.groupFlow?.groupShared}`,
+  );
+  pass(
+    "group-click-expands-selection",
+    probe?.groupFlow?.bothSelected === true,
+    `bothSelected=${probe?.groupFlow?.bothSelected}`,
+  );
+  pass(
+    "ungroup-pops-group-id",
+    probe?.groupFlow?.groupGoneAfterUngroup === true,
+    `groupGone=${probe?.groupFlow?.groupGoneAfterUngroup}`,
   );
 
   // History cap: 600 mutations must not grow history unboundedly.
