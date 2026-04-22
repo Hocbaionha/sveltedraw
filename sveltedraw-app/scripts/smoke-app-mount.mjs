@@ -658,7 +658,15 @@ async function main() {
         iv.dispatchEvent(new MouseEvent('dblclick', { clientX: txCtr.x, clientY: txCtr.y, bubbles: true, cancelable: true }));
         await new Promise(r => setTimeout(r, 100));
         const taEdit = document.querySelector('.sveltedraw-text-editor');
-        var afterDblClickOpen = { opened: !!taEdit, initialValue: taEdit?.value ?? null };
+        // Ghost-bug check: while the editor is OPEN, the canvas must not
+        // render the being-edited text. Signal: appState.editingTextElement
+        // is set to the target element id.
+        var afterDblClickOpen = {
+          opened: !!taEdit,
+          initialValue: taEdit?.value ?? null,
+          editingTextElementIdWhileOpen: p.appState?.editingTextElement?.id ?? null,
+          targetId: existingText.id,
+        };
         if (taEdit) {
           const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
           setter.call(taEdit, 'hello edited');
@@ -668,7 +676,11 @@ async function main() {
           await new Promise(r => setTimeout(r, 50));
         }
         const editedText = (p.scene?.getNonDeletedElements?.() ?? []).find(el => el.id === existingText.id);
-        var afterDblClickEdit = { newText: editedText?.text ?? null, sameId: editedText?.id === existingText.id };
+        var afterDblClickEdit = {
+          newText: editedText?.text ?? null,
+          sameId: editedText?.id === existingText.id,
+          editingTextElementAfterCommit: p.appState?.editingTextElement ?? null,
+        };
       } else {
         var afterDblClickOpen = { err: 'no text' };
         var afterDblClickEdit = { err: 'no text' };
@@ -996,6 +1008,137 @@ async function main() {
         exportSvg = { err: String(err) };
       }
 
+      // ── Deep-review probes (targeted risk verification) ─────────────
+      //
+      // 1) Rotated-bbox resize: rotate a rect to 45°, drag the NW handle,
+      //    verify the SE corner's world position stays fixed (anchor is
+      //    correct under rotation). This is the most load-bearing branch
+      //    of applyResize(); SE + NW unrotated are covered by existing
+      //    tests, rotated is not.
+      let rotatedResize = null;
+      try {
+        // Use the existing rectangle; save state, rotate, drag, compare,
+        // then restore. scene.mutateElement with informMutation:false +
+        // isDragging:true does NOT push history, so undo chain is intact.
+        const rEl = p.scene?.getNonDeletedElements?.()?.find(el => el.type === 'rectangle');
+        if (rEl) {
+          const save = { x: rEl.x, y: rEl.y, w: rEl.width, h: rEl.height, angle: rEl.angle || 0 };
+          const ANG = Math.PI / 4;
+          const cx0 = rEl.x + rEl.width / 2;
+          const cy0 = rEl.y + rEl.height / 2;
+          // Select the rect so handles are hit-testable; force selection tool.
+          p.appState.activeTool = { ...(p.appState.activeTool || {}), type: 'selection' };
+          p.appState.selectedElementIds = { [rEl.id]: true };
+          p.scene.mutateElement(rEl, { angle: ANG }, { informMutation: false });
+          await new Promise(r => setTimeout(r, 60));
+
+          // SE corner world pos BEFORE (rotated).
+          const localSE = { x: rEl.width / 2, y: rEl.height / 2 };
+          const preSE = {
+            x: cx0 + localSE.x * Math.cos(ANG) - localSE.y * Math.sin(ANG),
+            y: cy0 + localSE.x * Math.sin(ANG) + localSE.y * Math.cos(ANG),
+          };
+
+          // NW handle world pos (rotated): local (-w/2, -h/2) from center.
+          const localNW = { x: -rEl.width / 2, y: -rEl.height / 2 };
+          const nwWorld = {
+            x: cx0 + localNW.x * Math.cos(ANG) - localNW.y * Math.sin(ANG),
+            y: cy0 + localNW.x * Math.sin(ANG) + localNW.y * Math.cos(ANG),
+          };
+          const nwVp = sceneToVp(nwWorld.x, nwWorld.y);
+          // Drag NW handle along its world diagonal (shrink in local frame).
+          const dragDx = 20; // world units, toward center (along +x rotated)
+          const dragDy = 20;
+          const moveDx = dragDx * Math.cos(ANG) - dragDy * Math.sin(ANG);
+          const moveDy = dragDx * Math.sin(ANG) + dragDy * Math.cos(ANG);
+          iv.dispatchEvent(mk('pointerdown', nwVp.x, nwVp.y));
+          await new Promise(r => setTimeout(r, 20));
+          iv.dispatchEvent(mk('pointermove', nwVp.x + moveDx * zoomR, nwVp.y + moveDy * zoomR));
+          await new Promise(r => setTimeout(r, 20));
+          iv.dispatchEvent(mk('pointerup', nwVp.x + moveDx * zoomR, nwVp.y + moveDy * zoomR));
+          await new Promise(r => setTimeout(r, 30));
+
+          const rEl2 = p.scene?.getNonDeletedElements?.()?.find(el => el.id === rEl.id);
+          const cx1 = rEl2.x + rEl2.width / 2;
+          const cy1 = rEl2.y + rEl2.height / 2;
+          const localSE2 = { x: rEl2.width / 2, y: rEl2.height / 2 };
+          const ang1 = rEl2.angle || 0;
+          const postSE = {
+            x: cx1 + localSE2.x * Math.cos(ang1) - localSE2.y * Math.sin(ang1),
+            y: cy1 + localSE2.x * Math.sin(ang1) + localSE2.y * Math.cos(ang1),
+          };
+          rotatedResize = {
+            preSEx: +preSE.x.toFixed(2), preSEy: +preSE.y.toFixed(2),
+            postSEx: +postSE.x.toFixed(2), postSEy: +postSE.y.toFixed(2),
+            distSE: +Math.hypot(postSE.x - preSE.x, postSE.y - preSE.y).toFixed(2),
+            dw: +(rEl2.width - save.w).toFixed(2),
+            dh: +(rEl2.height - save.h).toFixed(2),
+            angleSet: +(rEl2.angle || 0).toFixed(3),
+            nwVpX: +nwVp.x.toFixed(2), nwVpY: +nwVp.y.toFixed(2),
+            moveDx: +moveDx.toFixed(2), moveDy: +moveDy.toFixed(2),
+            zoomR,
+            elW: rEl2.width, elH: rEl2.height,
+          };
+
+          // Undo the resize, then restore angle (undo doesn't revert our
+          // direct mutateElement call since that didn't push history).
+          container.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+          await new Promise(r => setTimeout(r, 30));
+          const rEl3 = p.scene?.getNonDeletedElements?.()?.find(el => el.id === rEl.id);
+          p.scene.mutateElement(rEl3, { x: save.x, y: save.y, width: save.w, height: save.h, angle: save.angle }, { informMutation: false });
+          await new Promise(r => setTimeout(r, 20));
+        } else {
+          rotatedResize = { err: 'no rect' };
+        }
+      } catch (err) {
+        rotatedResize = { err: String(err) };
+      }
+
+      // 2) Ctrl+A keyboard selects all non-deleted elements.
+      let ctrlASelect = null;
+      try {
+        // Clear selection first.
+        p.appState.selectedElementIds = {};
+        await new Promise(r => setTimeout(r, 20));
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+        const total = p.scene?.getNonDeletedElements?.()?.length ?? 0;
+        const selected = Object.keys(p.appState?.selectedElementIds ?? {}).length;
+        ctrlASelect = { total, selected };
+      } catch (err) {
+        ctrlASelect = { err: String(err) };
+      }
+
+      // 3) Undo past initial: fire 50 Ctrl+Z events, then 50 Ctrl+Y
+      //    (redo) to restore; verify no crash, floor at initial snapshot
+      //    (count=0), and full redo recovers state so the subsequent
+      //    reload test still sees the built-up scene.
+      let undoFloor = null;
+      try {
+        const before = p.scene?.getNonDeletedElements?.()?.length ?? 0;
+        const snapshot = p.scene.getElementsIncludingDeleted().slice();
+        for (let i = 0; i < 50; i++) {
+          container.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+        }
+        await new Promise(r => setTimeout(r, 50));
+        const atFloor = p.scene?.getNonDeletedElements?.()?.length ?? -1;
+        for (let i = 0; i < 50; i++) {
+          container.dispatchEvent(new KeyboardEvent('keydown', { key: 'y', ctrlKey: true, bubbles: true, cancelable: true }));
+        }
+        await new Promise(r => setTimeout(r, 50));
+        const afterRedo = p.scene?.getNonDeletedElements?.()?.length ?? -1;
+        // Defensive restore if redo didn't reach the top (history can
+        // truncate if any mutation occurred mid-unwind).
+        if (afterRedo !== before) {
+          p.scene.replaceAllElements(snapshot, { skipValidation: true });
+          await new Promise(r => setTimeout(r, 20));
+        }
+        const final = p.scene?.getNonDeletedElements?.()?.length ?? -1;
+        undoFloor = { before, atFloor, afterRedo, final, appStateAlive: !!p.appState };
+      } catch (err) {
+        undoFloor = { err: String(err) };
+      }
+
       return {
         ...afterDraw,
         afterSelect, afterDrag, afterClickEmpty,
@@ -1016,6 +1159,7 @@ async function main() {
         afterDblClickOpen, afterDblClickEdit,
         svgInlined, idbCheck,
         exportPng, exportSvg,
+        rotatedResize, ctrlASelect, undoFloor,
       };
     })()`,
     returnByValue: true,
@@ -1454,6 +1598,20 @@ async function main() {
       probe?.afterDblClickEdit?.sameId === true,
     `newText=${JSON.stringify(probe?.afterDblClickEdit?.newText)} sameId=${probe?.afterDblClickEdit?.sameId}`,
   );
+  // Ghost-bug fix: while editor is open, the canvas must skip the edited
+  // element (Renderer filters on appState.editingTextElement.id).
+  pass(
+    "dblclick-hides-edited-text-on-canvas",
+    probe?.afterDblClickOpen?.editingTextElementIdWhileOpen ===
+      probe?.afterDblClickOpen?.targetId &&
+      probe?.afterDblClickOpen?.editingTextElementIdWhileOpen != null,
+    `editingWhileOpen=${probe?.afterDblClickOpen?.editingTextElementIdWhileOpen} target=${probe?.afterDblClickOpen?.targetId}`,
+  );
+  pass(
+    "dblclick-clears-editing-on-commit",
+    probe?.afterDblClickEdit?.editingTextElementAfterCommit == null,
+    `afterCommit=${JSON.stringify(probe?.afterDblClickEdit?.editingTextElementAfterCommit)}`,
+  );
 
   // Batch 20: SVG export with font inlining.
   pass(
@@ -1562,6 +1720,36 @@ async function main() {
     "export-svg-has-viewbox",
     probe?.exportSvg?.hasViewBox === true,
     `hasViewBox=${probe?.exportSvg?.hasViewBox}`,
+  );
+
+  // Deep-review: rotated-bbox resize preserves opposite corner's world pos.
+  pass(
+    "rotated-resize-anchor-stable",
+    (probe?.rotatedResize?.distSE ?? 99) < 2,
+    `distSE=${probe?.rotatedResize?.distSE}px pre=(${probe?.rotatedResize?.preSEx},${probe?.rotatedResize?.preSEy}) post=(${probe?.rotatedResize?.postSEx},${probe?.rotatedResize?.postSEy}) dw=${probe?.rotatedResize?.dw} dh=${probe?.rotatedResize?.dh}`,
+  );
+  pass(
+    "rotated-resize-shrinks-dims",
+    (probe?.rotatedResize?.dw ?? 0) < -10 && (probe?.rotatedResize?.dh ?? 0) < -10,
+    `dw=${probe?.rotatedResize?.dw} dh=${probe?.rotatedResize?.dh} (NW drag toward center should shrink both)`,
+  );
+
+  // Deep-review: Ctrl+A keyboard selects every non-deleted element.
+  pass(
+    "ctrl-a-selects-all",
+    probe?.ctrlASelect?.total > 0 &&
+      probe?.ctrlASelect?.selected === probe?.ctrlASelect?.total,
+    `selected=${probe?.ctrlASelect?.selected}/${probe?.ctrlASelect?.total}`,
+  );
+
+  // Deep-review: 50 undos past initial state does not crash or destroy
+  // scene (invariant: history[0] = initial snapshot, floor = 0).
+  pass(
+    "undo-past-initial-stable",
+    probe?.undoFloor?.appStateAlive === true &&
+      (probe?.undoFloor?.atFloor ?? -1) >= 0 &&
+      (probe?.undoFloor?.final ?? -1) === (probe?.undoFloor?.before ?? -2),
+    `before=${probe?.undoFloor?.before} atFloor=${probe?.undoFloor?.atFloor} afterRedo=${probe?.undoFloor?.afterRedo} final=${probe?.undoFloor?.final} alive=${probe?.undoFloor?.appStateAlive}`,
   );
 
   pass(

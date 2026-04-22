@@ -2001,6 +2001,16 @@
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     // Used when editing an existing text element; null for new text.
     editingElementId: string | null;
+    // Visual props copied from the element being edited (null → defaults
+    // for new-text entry). Lets the textarea overlay match the canvas
+    // rendering so there's no visual jump between edit and committed
+    // text.
+    fontSize: number;
+    fontFamily: number;
+    strokeColor: string;
+    angle: number;
+    width: number | null;
+    height: number | null;
   } | null = $state(null);
   let textEditorEl: HTMLTextAreaElement | null = $state(null);
 
@@ -2010,6 +2020,9 @@
     const text = (textEditorEl?.value ?? "").replace(/\s+$/, "");
     // Close the editor first so blur handler doesn't re-enter.
     textEditor = null;
+    // Clear editing-text flag so canvas resumes rendering the element.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).editingTextElement = null;
 
     if (!text) {
       // Empty text: if we were editing an existing text element, delete
@@ -2072,17 +2085,45 @@
   const openTextEditor = (sceneX: number, sceneY: number, opts: {
     initialValue?: string;
     editingElementId?: string | null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    element?: any;
   } = {}) => {
+    const el = opts.element;
     textEditor = {
       sceneX,
       sceneY,
       initialValue: opts.initialValue ?? "",
       editingElementId: opts.editingElementId ?? null,
+      fontSize: el?.fontSize ?? DEFAULT_FONT_SIZE,
+      fontFamily: el?.fontFamily ?? DEFAULT_FONT_FAMILY,
+      strokeColor:
+        el?.strokeColor ??
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ((appState as any).currentItemStrokeColor || "#000"),
+      angle: el?.angle || 0,
+      width: el?.width ?? null,
+      height: el?.height ?? null,
     };
+    // Hide the canvas-rendered element while editing so it doesn't
+    // ghost under the textarea overlay. Upstream's Renderer skips any
+    // element whose id matches appState.editingTextElement.id.
+    if (el) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (appState as any).editingTextElement = el;
+      bumpSceneRepaint();
+    }
     // Focus after Svelte commits the DOM — tick via rAF.
     requestAnimationFrame(() => {
-      textEditorEl?.focus();
-      textEditorEl?.select();
+      const ta = textEditorEl;
+      if (!ta) return;
+      ta.focus();
+      ta.select();
+      // Auto-grow to fit initialValue so the first paint doesn't show a
+      // tiny box clipping multi-line existing text.
+      ta.style.height = "auto";
+      ta.style.height = ta.scrollHeight + "px";
+      ta.style.width = "auto";
+      ta.style.width = ta.scrollWidth + "px";
     });
   };
 
@@ -2631,14 +2672,12 @@
     if (hit && hit.type === "text") {
       // Commit any open editor first.
       if (textEditor) commitTextEditor();
-      // Remove the element from scene while editing so it doesn't render
-      // under the textarea. Batch 21 simple path: keep the element in
-      // scene, textarea overlays. User will see two copies briefly; fine.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const el = hit as any;
       openTextEditor(el.x, el.y, {
         initialValue: el.text ?? "",
         editingElementId: el.id,
+        element: el,
       });
       event.preventDefault();
       return;
@@ -2835,9 +2874,15 @@
     <!-- Position inside the container (which is position:relative at
          the viewport offset). Scene→container coords: (sceneX + scrollX)
          * zoom, ignoring viewport offset since the container already
-         lives there. -->
+         lives there. For rotated text, we rotate around the element's
+         center; transform-origin is set to the center offset in px. -->
     {@const vpX = (textEditor.sceneX + ((appState.scrollX as any) ?? 0)) * zoomV}
     {@const vpY = (textEditor.sceneY + ((appState.scrollY as any) ?? 0)) * zoomV}
+    {@const teW = textEditor.width ?? 0}
+    {@const teH = textEditor.height ?? 0}
+    {@const rotOrigin = teW && teH
+      ? `${(teW * zoomV) / 2}px ${(teH * zoomV) / 2}px`
+      : `0 0`}
     <textarea
       bind:this={textEditorEl}
       value={textEditor.initialValue}
@@ -2845,18 +2890,21 @@
       style="position: absolute;
              left: {vpX}px;
              top: {vpY}px;
-             min-width: 40px;
-             min-height: {DEFAULT_FONT_SIZE * 1.2 * zoomV}px;
-             font: {DEFAULT_FONT_SIZE * zoomV}px {getFontFamilyString({ fontFamily: DEFAULT_FONT_FAMILY })};
+             min-width: {teW ? teW * zoomV : 40}px;
+             min-height: {(teH || textEditor.fontSize * 1.2) * zoomV}px;
+             font: {textEditor.fontSize * zoomV}px {getFontFamilyString({ fontFamily: textEditor.fontFamily })};
+             line-height: 1.2;
              background: transparent;
              border: 1px dashed #6965db;
              outline: none;
              resize: none;
-             padding: 2px;
+             padding: 0;
              margin: 0;
              overflow: hidden;
              white-space: pre;
-             color: {(appState as any).currentItemStrokeColor || '#000'};
+             color: {textEditor.strokeColor};
+             transform: rotate({textEditor.angle}rad);
+             transform-origin: {rotOrigin};
              z-index: 20;"
       onblur={commitTextEditor}
       onkeydown={(event) => {
