@@ -2095,9 +2095,14 @@ async function main() {
   // Batch 4 interaction assertions.
   const probe = global.__probeResult;
   pass(
+    // After drawing a rectangle, the tool auto-switches back to
+    // selection (mirrors upstream Excalidraw UX so the user can
+    // immediately click the element they just drew). Assertion
+    // name kept for backwards compat; we verify the rectangle WAS
+    // drawn via the element-count check below.
     "keydown-r-switches-tool",
-    probe?.activeToolType === "rectangle",
-    `activeTool=${probe?.activeToolType}`,
+    probe?.activeToolType === "selection",
+    `activeTool=${probe?.activeToolType} (expected selection after auto-switch)`,
   );
   pass(
     "draw-creates-element",

@@ -3713,7 +3713,21 @@
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (appState as any).newElement = null;
       dragStart = null;
-      if (committed) pushHistory();
+      if (committed) {
+        // Auto-switch to selection + auto-select the just-drawn
+        // element. Matches upstream Excalidraw UX: after every draw
+        // the tool returns to selection so the user can immediately
+        // click other elements. Without this, clicking on the
+        // freshly-drawn shape would start a new draw of the same
+        // type. (We skip this for freedraw because users typically
+        // want to keep sketching.)
+        if (cur.type !== "freedraw") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (appState as any).selectedElementIds = { [cur.id]: true };
+          setActiveTool("selection");
+        }
+        pushHistory();
+      }
       bumpSceneRepaint();
     }
 
