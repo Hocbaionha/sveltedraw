@@ -37,7 +37,7 @@
   let dropdownOpen = $state(false);
 </script>
 
-<div class="showcase">
+<div class="showcase excalidraw">
   <h1>Sveltedraw Component Showcase</h1>
   <p>Svelte 5 port of Excalidraw UI components</p>
 

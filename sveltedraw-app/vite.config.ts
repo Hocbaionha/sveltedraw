@@ -11,6 +11,10 @@ export default defineConfig({
     open: true,
   },
   resolve: {
+    // bits-ui's package.json `exports` only declares `svelte` + `types`
+    // conditions (no `default`/`import`). Older vite resolvers fail to pick a
+    // condition without this hint.
+    conditions: ['svelte', 'browser', 'module', 'import', 'default'],
     alias: [
       { find: /^@excalidraw\/excalidraw$/, replacement: resolve('../packages/excalidraw/index.tsx') },
       { find: /^@excalidraw\/excalidraw\/(.*)/, replacement: resolve('../packages/excalidraw/$1') },
@@ -21,6 +25,7 @@ export default defineConfig({
       { find: /^@excalidraw\/math$/, replacement: resolve('../packages/math/src/index.ts') },
       { find: /^@excalidraw\/math\/(.*)/, replacement: resolve('../packages/math/src/$1') },
       { find: /^@excalidraw\/utils$/, replacement: resolve('../packages/utils/src/index.ts') },
+      { find: /^@excalidraw\/utils\/(.*)/, replacement: resolve('../packages/utils/src/$1') },
       { find: /^@sveltedraw\/excalidraw$/, replacement: resolve('../packages/excalidraw-svelte/src/index.ts') },
     ],
   },

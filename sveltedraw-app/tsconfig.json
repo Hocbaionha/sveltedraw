@@ -12,6 +12,9 @@
     "strict": true,
     "skipLibCheck": true,
     "verbatimModuleSyntax": true,
+    "paths": {
+      "@sveltedraw/excalidraw": ["../packages/excalidraw-svelte/src/index.ts"]
+    }
   },
   "include": ["src/**/*", "../packages/excalidraw-svelte/src/**/*"]
 }

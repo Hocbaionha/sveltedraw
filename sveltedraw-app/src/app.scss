@@ -1,3 +1,13 @@
+// Global stylesheet for sveltedraw-app.
+//
+// Imports upstream Excalidraw SCSS so the ported Svelte components inherit
+// the same look. Excalidraw's own components import their .scss sidecars in
+// React (`import "./X.scss"`); the Svelte ports do not, so we aggregate all
+// of them here once.
+//
+// All Excalidraw rules are nested under `.excalidraw` — wrap any region that
+// uses ported components in a `<div class="excalidraw">` so the rules apply.
+
 *,
 *::before,
 *::after {
@@ -6,5 +16,81 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
+
+// ─── Upstream Excalidraw global styles + theme variables ─────────────────
+@use "../../packages/excalidraw/css/app";
+@use "../../packages/excalidraw/css/styles";
+
+// ─── Per-component SCSS sidecars (alphabetical) ─────────────────────────
+@use "../../packages/excalidraw/components/Actions";
+@use "../../packages/excalidraw/components/Avatar";
+@use "../../packages/excalidraw/components/Button";
+@use "../../packages/excalidraw/components/ButtonIcon";
+@use "../../packages/excalidraw/components/Card";
+@use "../../packages/excalidraw/components/CheckboxItem";
+@use "../../packages/excalidraw/components/ColorPicker/ColorPicker";
+@use "../../packages/excalidraw/components/CommandPalette/CommandPalette";
+@use "../../packages/excalidraw/components/ConfirmDialog";
+@use "../../packages/excalidraw/components/ContextMenu";
+@use "../../packages/excalidraw/components/ConvertElementTypePopup";
+@use "../../packages/excalidraw/components/Dialog";
+@use "../../packages/excalidraw/components/DialogActionButton";
+@use "../../packages/excalidraw/components/dropdownMenu/DropdownMenu";
+@use "../../packages/excalidraw/components/ElementCanvasButtons";
+@use "../../packages/excalidraw/components/ElementLinkDialog";
+@use "../../packages/excalidraw/components/ExcalidrawLogo";
+@use "../../packages/excalidraw/components/ExportDialog";
+@use "../../packages/excalidraw/components/EyeDropper";
+@use "../../packages/excalidraw/components/FilledButton";
+@use "../../packages/excalidraw/components/FixedSideContainer";
+@use "../../packages/excalidraw/components/FollowMode/FollowMode";
+@use "../../packages/excalidraw/components/FontPicker/FontPicker";
+@use "../../packages/excalidraw/components/footer/FooterCenter";
+@use "../../packages/excalidraw/components/HelpDialog";
+@use "../../packages/excalidraw/components/HintViewer";
+@use "../../packages/excalidraw/components/hyperlink/Hyperlink";
+@use "../../packages/excalidraw/components/IconPicker";
+@use "../../packages/excalidraw/components/ImageExportDialog";
+@use "../../packages/excalidraw/components/Island";
+@use "../../packages/excalidraw/components/LayerUI";
+@use "../../packages/excalidraw/components/LibraryMenu";
+@use "../../packages/excalidraw/components/LibraryMenuItems";
+@use "../../packages/excalidraw/components/LibraryUnit";
+@use "../../packages/excalidraw/components/live-collaboration/LiveCollaborationTrigger";
+@use "../../packages/excalidraw/components/main-menu/DefaultItems";
+@use "../../packages/excalidraw/components/MobileToolBar";
+@use "../../packages/excalidraw/components/Modal";
+@use "../../packages/excalidraw/components/OverwriteConfirm/OverwriteConfirm";
+@use "../../packages/excalidraw/components/PasteChartDialog";
+@use "../../packages/excalidraw/components/Popover";
+@use "../../packages/excalidraw/components/ProjectName";
+@use "../../packages/excalidraw/components/PublishLibrary";
+@use "../../packages/excalidraw/components/QuickSearch";
+@use "../../packages/excalidraw/components/RadioGroup";
+@use "../../packages/excalidraw/components/Range";
+@use "../../packages/excalidraw/components/ScrollableList";
+@use "../../packages/excalidraw/components/SearchMenu";
+@use "../../packages/excalidraw/components/ShareableLinkDialog";
+@use "../../packages/excalidraw/components/Sidebar/Sidebar";
+@use "../../packages/excalidraw/components/Sidebar/SidebarTrigger";
+@use "../../packages/excalidraw/components/Spinner";
+@use "../../packages/excalidraw/components/Stack";
+@use "../../packages/excalidraw/components/Stats/DragInput";
+@use "../../packages/excalidraw/components/Stats/Stats";
+@use "../../packages/excalidraw/components/SVGLayer";
+@use "../../packages/excalidraw/components/Switch";
+@use "../../packages/excalidraw/components/TextField";
+@use "../../packages/excalidraw/components/TextInput";
+@use "../../packages/excalidraw/components/Toast";
+@use "../../packages/excalidraw/components/ToolIcon";
+@use "../../packages/excalidraw/components/Toolbar";
+@use "../../packages/excalidraw/components/ToolPopover";
+@use "../../packages/excalidraw/components/Tooltip";
+@use "../../packages/excalidraw/components/TTDDialog/Chat/Chat";
+@use "../../packages/excalidraw/components/TTDDialog/MermaidToExcalidraw";
+@use "../../packages/excalidraw/components/TTDDialog/TTDDialog";
+@use "../../packages/excalidraw/components/UnlockPopup";
+@use "../../packages/excalidraw/components/UserList";
+@use "../../packages/excalidraw/components/welcome-screen/WelcomeScreen";
