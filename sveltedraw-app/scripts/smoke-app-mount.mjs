@@ -1037,7 +1037,7 @@ async function main() {
       let themeToggle = null;
       try {
         const before = p.appState?.theme ?? 'light';
-        const btn = document.querySelector('.sveltedraw-utility-bar button');
+        const btn = document.querySelector('.sveltedraw-utility-bar button[aria-label="Toggle dark mode"]');
         const beforeClass = document.querySelector('.excalidraw')?.classList?.contains('theme--dark') ?? false;
         if (btn) btn.click();
         await new Promise(r => setTimeout(r, 40));
@@ -1666,6 +1666,84 @@ async function main() {
         polylineEscape = { err: String(err) };
       }
 
+      // ── Shape library: save selection, open panel, insert, delete
+      let libraryFlow = null;
+      try {
+        // Wipe any existing library items.
+        window.localStorage.removeItem('sveltedraw:library:v1');
+        // Force reload of library state by calling the probe directly
+        // (we don't expose it, but library state init happened on mount;
+        // mutating localStorage post-mount doesn't refresh libraryItems
+        // until next load). Workaround: do full flow via UI.
+        const rec = p.scene?.getNonDeletedElements?.()?.find(el => el.type === 'rectangle');
+        if (!rec) throw new Error('no rect');
+        p.appState.selectedElementIds = { [rec.id]: true };
+        await new Promise(r => setTimeout(r, 20));
+        // Stub window.prompt to auto-confirm "my-rect".
+        const origPrompt = window.prompt;
+        window.prompt = () => 'my-rect';
+        // Right-click → click "Library" in context menu.
+        const ctr = sceneToVp(rec.x + rec.width / 2, rec.y + rec.height / 2);
+        iv.dispatchEvent(new MouseEvent('contextmenu', { clientX: ctr.x, clientY: ctr.y, button: 2, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 50));
+        const menu = document.querySelector('.sveltedraw-ctx-menu');
+        const libSaveBtn = menu && Array.from(menu.querySelectorAll('.ctx-item')).find(b => /library/i.test(b.textContent));
+        if (libSaveBtn) libSaveBtn.click();
+        window.prompt = origPrompt;
+        await new Promise(r => setTimeout(r, 50));
+
+        // Open panel via utility-bar button (find by aria-label).
+        const libBtn = document.querySelector('.sveltedraw-utility-bar button[aria-label*="ibrary"]');
+        if (libBtn) libBtn.click();
+        await new Promise(r => setTimeout(r, 50));
+        const panel = document.querySelector('.sveltedraw-library-panel');
+        const itemCount = panel ? panel.querySelectorAll('.lib-item').length : 0;
+        const itemName = panel ? panel.querySelector('.lib-item-name')?.textContent?.trim() : null;
+
+        // Insert — scene count should go from N to N+1. Call through
+        // the probe helper to sidestep Svelte 5 event-delegation
+        // quirks with synthetic MouseEvents.
+        const beforeInsert = p.scene?.getNonDeletedElements?.()?.length ?? 0;
+        const insertBtn = panel?.querySelector('.lib-item-insert');
+        const hasInsertBtn = !!insertBtn;
+        const items = p.getLibraryItems?.() ?? [];
+        const hasProbeHelper = typeof p.insertLibraryItem === 'function';
+        const itemsCount = items.length;
+        if (items.length > 0 && typeof p.insertLibraryItem === 'function') {
+          try {
+            p.insertLibraryItem(items[0]);
+          } catch (e) {
+            // eslint-disable-next-line
+            var insertErr = String(e);
+          }
+        }
+        await new Promise(r => setTimeout(r, 50));
+        const afterInsert = p.scene?.getNonDeletedElements?.()?.length ?? 0;
+
+        // Delete the item.
+        const delBtn = panel?.querySelector('.lib-item-del');
+        if (delBtn) delBtn.click();
+        await new Promise(r => setTimeout(r, 30));
+        const afterDeleteCount = document.querySelectorAll('.sveltedraw-library-panel .lib-item').length;
+
+        // Close panel.
+        if (libBtn) libBtn.click();
+        await new Promise(r => setTimeout(r, 20));
+
+        // Undo the insert so reload-scene count is unchanged.
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+
+        libraryFlow = {
+          savedOne: itemCount === 1,
+          itemName,
+          insertAdded: afterInsert === beforeInsert + 1,
+          deletedOk: afterDeleteCount === 0,
+        };
+      } catch (err) {
+        libraryFlow = { err: String(err) };
+      }
+
       // ── Pinch-zoom gesture (kept LAST — touch events leak state
       // into subsequent tests since the first finger flows through
       // the normal pointerdown pipeline before pinch engages).
@@ -1869,7 +1947,7 @@ async function main() {
         fontPicker, styleExt,
         rotatedTextOverlay,
         zOrderForward, zOrderBackward, altDragDup,
-        altClickNoDrag, historyCap, groupFlow, pinchZoom,
+        altClickNoDrag, historyCap, groupFlow, pinchZoom, libraryFlow,
         ctxMenuDup, ctxMenuClose,
         arrowheadPicker, textAlignPicker,
         themeToggle, i18nSwap,
@@ -2573,6 +2651,23 @@ async function main() {
     "alt-click-no-drag-is-undoable",
     probe?.altClickNoDrag?.healthy === true,
     `before=${probe?.altClickNoDrag?.beforeCount} afterClick=${probe?.altClickNoDrag?.afterClickCount} afterUndo=${probe?.altClickNoDrag?.afterUndoCount}`,
+  );
+
+  // Shape library: save, insert, delete.
+  pass(
+    "library-save-adds-item",
+    probe?.libraryFlow?.savedOne === true && probe?.libraryFlow?.itemName === "my-rect",
+    `savedOne=${probe?.libraryFlow?.savedOne} name=${probe?.libraryFlow?.itemName}`,
+  );
+  pass(
+    "library-insert-adds-element",
+    probe?.libraryFlow?.insertAdded === true,
+    `insertAdded=${probe?.libraryFlow?.insertAdded}`,
+  );
+  pass(
+    "library-delete-removes-item",
+    probe?.libraryFlow?.deletedOk === true,
+    `deletedOk=${probe?.libraryFlow?.deletedOk}`,
   );
 
   // Pinch-zoom halves zoom when fingers close from 200px to 100px.

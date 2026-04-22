@@ -507,6 +507,7 @@
     // Attempt to hydrate from localStorage BEFORE seeding history so the
     // initial history floor captures the restored state, not "empty".
     tryLoad();
+    loadLibrary();
     sceneReady++; // triggers the first static paint
 
     // Seed history with the CURRENT state (empty or restored).
@@ -533,6 +534,12 @@
         scene,
         exportAsPng,
         exportAsSvg,
+        // Library test helpers — call these directly to avoid
+        // Svelte 5 event-delegation quirks in synthetic events.
+        saveSelectionToLibrary: () => saveSelectionToLibrary(),
+        insertLibraryItem: (item: LibraryItem) => insertLibraryItem(item),
+        deleteLibraryItem: (id: string) => deleteLibraryItem(id),
+        getLibraryItems: () => libraryItems,
       };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__sveltedrawHistoryLen = () => history.length;
@@ -1004,6 +1011,142 @@
       }
     }
     return siblings;
+  };
+
+  // ── Shape library ──────────────────────────────────────────────────
+  // localStorage-backed collection of reusable element groups.
+  // Each item = { id, name, created, elements: deep-cloned snapshot }.
+  // Save: current selection → named item.
+  // Insert: click item → append duplicated elements at viewport center.
+  //
+  // Upstream has a much richer Library class (jotai-backed, file import
+  // /export, IndexedDB-persisted). We skip those; localStorage is
+  // sufficient for a PoC (each item ~few KB, typical library <50 items).
+  const LIBRARY_KEY = "sveltedraw:library:v1";
+
+  type LibraryItem = {
+    id: string;
+    name: string;
+    created: number;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    elements: any[];
+  };
+
+  let libraryItems = $state<LibraryItem[]>([]);
+  let libraryPanelOpen = $state(false);
+
+  const loadLibrary = () => {
+    try {
+      const raw = localStorage.getItem(LIBRARY_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as LibraryItem[];
+      if (Array.isArray(parsed)) libraryItems = parsed;
+    } catch {
+      /* corrupted — start fresh */
+    }
+  };
+  const persistLibrary = () => {
+    try {
+      localStorage.setItem(LIBRARY_KEY, JSON.stringify(libraryItems));
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn("sveltedraw: library persist failed", err);
+    }
+  };
+
+  const saveSelectionToLibrary = () => {
+    const selected = getSelectedElements();
+    if (selected.length === 0) return;
+    const name =
+      window.prompt(
+        t("labels.group") + " name",
+        `${t("labels.group")} ${libraryItems.length + 1}`,
+      ) ?? null;
+    if (name === null) return; // user cancelled
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cloned = selected.map((el: any) => deepCopyElement(el));
+    const item: LibraryItem = {
+      id: randomId(),
+      name: name.trim() || `Item ${libraryItems.length + 1}`,
+      created: Date.now(),
+      elements: cloned,
+    };
+    libraryItems = [...libraryItems, item];
+    persistLibrary();
+  };
+
+  // Insert a library item at the viewport center. Each element gets
+  // a fresh randomId so repeat inserts don't collide with the originals
+  // still in the scene (or with themselves).
+  const insertLibraryItem = (item: LibraryItem) => {
+    if (!scene) return;
+    // Compute bbox of saved elements so we can translate the copy to
+    // the viewport center.
+    let minX = Infinity, minY = Infinity;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const el of item.elements as any[]) {
+      if (el.x < minX) minX = el.x;
+      if (el.y < minY) minY = el.y;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const zoomV = (appState.zoom as any).value || 1;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const scrollX = (appState as any).scrollX ?? 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const scrollY = (appState as any).scrollY ?? 0;
+    const targetSceneX = appState.width / 2 / zoomV - scrollX;
+    const targetSceneY = appState.height / 2 / zoomV - scrollY;
+    const tx = targetSceneX - minX;
+    const ty = targetSceneY - minY;
+
+    // Build a local id-remap so group references stay consistent
+    // within this inserted copy (if the saved item had grouped
+    // elements, they remain grouped in the insert — with a fresh
+    // group id scoped to this paste).
+    const idRemap = new Map<string, string>();
+    const groupRemap = new Map<string, string>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const el of item.elements as any[]) {
+      idRemap.set(el.id, randomId());
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const gid of (el.groupIds as string[]) ?? []) {
+        if (!groupRemap.has(gid)) groupRemap.set(gid, randomId());
+      }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fresh = item.elements.map((el: any) => ({
+      ...deepCopyElement(el),
+      id: idRemap.get(el.id)!,
+      x: el.x + tx,
+      y: el.y + ty,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      groupIds: ((el.groupIds as string[]) ?? []).map((g) =>
+        groupRemap.get(g) ?? g,
+      ),
+      // Re-index so fractionalIndices generate fresh on replaceAllElements.
+      index: null,
+      // Bump version so the renderer treats them as new.
+      version: 1,
+      versionNonce: Math.floor(Math.random() * 2 ** 31),
+      updated: Date.now(),
+    }));
+
+    const existing = scene.getElementsIncludingDeleted();
+    scene.replaceAllElements([...existing, ...fresh], {
+      skipValidation: true,
+    });
+    const nextSel: Record<string, true> = {};
+    for (const el of fresh) nextSel[el.id] = true;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).selectedElementIds = nextSel;
+    pushHistory();
+    bumpSceneRepaint();
+  };
+
+  const deleteLibraryItem = (id: string) => {
+    libraryItems = libraryItems.filter((it) => it.id !== id);
+    persistLibrary();
   };
 
   // ── Z-order: bring forward / send backward / to front / to back ─────
@@ -3528,6 +3671,16 @@
     <button
       type="button"
       class="sveltedraw-util-btn"
+      class:active={libraryPanelOpen}
+      aria-label={t("toolBar.library")}
+      title={t("toolBar.library")}
+      onclick={() => (libraryPanelOpen = !libraryPanelOpen)}
+    >
+      📚
+    </button>
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
       aria-label="Toggle dark mode"
       title="Toggle dark mode"
       onclick={toggleTheme}
@@ -3545,6 +3698,51 @@
       {/each}
     </select>
   </div>
+
+  <!-- Library panel — floats bottom-left. Each item is a button that
+       inserts the saved elements at viewport center. The × closes
+       the panel; the ×-per-item deletes that specific item. -->
+  {#if libraryPanelOpen}
+    <div class="sveltedraw-library-panel" role="region" aria-label={t("toolBar.library")}>
+      <div class="lib-header">
+        <strong>{t("toolBar.library")}</strong>
+        <button
+          type="button"
+          class="lib-close"
+          aria-label="Close library"
+          onclick={() => (libraryPanelOpen = false)}
+        >×</button>
+      </div>
+      {#if libraryItems.length === 0}
+        <div class="lib-empty">
+          {t("library.hint_emptyLibrary", undefined, "Select elements, right-click → Save to library.")}
+        </div>
+      {:else}
+        <div class="lib-items">
+          {#each libraryItems as item (item.id)}
+            <div class="lib-item">
+              <button
+                type="button"
+                class="lib-item-insert"
+                title={`Insert ${item.name}`}
+                onclick={() => insertLibraryItem(item)}
+              >
+                <span class="lib-item-name">{item.name}</span>
+                <span class="lib-item-count">{item.elements.length}</span>
+              </button>
+              <button
+                type="button"
+                class="lib-item-del"
+                aria-label={`Delete ${item.name}`}
+                title="Remove from library"
+                onclick={() => deleteLibraryItem(item.id)}
+              >×</button>
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  {/if}
 
   <!-- Style panel. Shown whenever the editor is mounted; changes apply
        to the current selection OR to currentItem* defaults if none. -->
@@ -3979,6 +4177,7 @@
         <button type="button" class="ctx-item" onclick={() => { duplicateSelected(); closeContextMenu(); }}>{t("labels.duplicateSelection")}</button>
         <button type="button" class="ctx-item" onclick={() => { groupSelected(); closeContextMenu(); }}>{t("labels.group")}</button>
         <button type="button" class="ctx-item" onclick={() => { ungroupSelected(); closeContextMenu(); }}>{t("labels.ungroup")}</button>
+        <button type="button" class="ctx-item" onclick={() => { saveSelectionToLibrary(); closeContextMenu(); }}>{t("toolBar.library")}</button>
         <button type="button" class="ctx-item" onclick={() => { reorderSelected("forward"); closeContextMenu(); }}>{t("labels.bringForward")}</button>
         <button type="button" class="ctx-item" onclick={() => { reorderSelected("front"); closeContextMenu(); }}>{t("labels.bringToFront")}</button>
         <button type="button" class="ctx-item" onclick={() => { reorderSelected("backward"); closeContextMenu(); }}>{t("labels.sendBackward")}</button>
@@ -4157,6 +4356,110 @@
   }
   .sveltedraw-utility-bar .sveltedraw-lang-select {
     min-width: 120px;
+  }
+  .sveltedraw-utility-bar .sveltedraw-util-btn.active {
+    background: #eeedfa;
+    border-color: #6965db;
+  }
+
+  .sveltedraw-library-panel {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    width: 260px;
+    max-height: 60vh;
+    background: #fff;
+    border: 1px solid #d1d4da;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    display: flex;
+    flex-direction: column;
+    z-index: 40;
+    font-size: 13px;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-library-panel {
+    background: #232329;
+    border-color: #363636;
+    color: #e5e7ea;
+  }
+  .sveltedraw-library-panel .lib-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid #e5e7ea;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-library-panel .lib-header {
+    border-bottom-color: #363636;
+  }
+  .sveltedraw-library-panel .lib-close {
+    background: transparent;
+    border: none;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    color: inherit;
+    padding: 0 4px;
+  }
+  .sveltedraw-library-panel .lib-empty {
+    padding: 16px 12px;
+    color: #6b7280;
+    font-size: 12px;
+  }
+  .sveltedraw-library-panel .lib-items {
+    overflow-y: auto;
+    padding: 4px;
+  }
+  .sveltedraw-library-panel .lib-item {
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+    margin-bottom: 2px;
+  }
+  .sveltedraw-library-panel .lib-item-insert {
+    flex: 1;
+    text-align: left;
+    padding: 6px 10px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    color: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .sveltedraw-library-panel .lib-item-insert:hover {
+    background: #f1f3f5;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-library-panel .lib-item-insert:hover {
+    background: #2e2e36;
+  }
+  .sveltedraw-library-panel .lib-item-name {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sveltedraw-library-panel .lib-item-count {
+    color: #9ca3af;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    margin-left: 8px;
+  }
+  .sveltedraw-library-panel .lib-item-del {
+    width: 26px;
+    background: transparent;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+  }
+  .sveltedraw-library-panel .lib-item-del:hover {
+    color: #e03131;
+    background: #fff5f5;
+    border-radius: 4px;
   }
 
   .sveltedraw-ctx-menu .ctx-sep {
