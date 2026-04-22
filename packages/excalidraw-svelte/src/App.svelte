@@ -1,0 +1,808 @@
+<script lang="ts" module>
+  // Phase 6 batches 1 + 2 + 3 — App.svelte shell.
+  //
+  // Batch 1: state contexts (EDITOR_STORE_KEY / APP_STORE_KEY /
+  //   EDITOR_INTERFACE_KEY / TUNNELS_KEY / EXCAL_ID_KEY), canvas refs,
+  //   LayerUI mount. No renderer.
+  // Batch 2: Scene + Renderer + roughjs construction; static-scene render
+  //   wiring (empty Scene paints background + grid); ResizeObserver on the
+  //   container; fullscreen-change listener.
+  // Batch 3: Interactive-scene AnimationController loop; NewElementCanvas
+  //   render wiring; minimal AppClassProperties façade for the interactive
+  //   renderer (grep'd 4 touched fields; others unused).
+  //
+  // What is still intentionally NOT here:
+  //  - Event wiring (pointerdown/move/up, keydown/keyup, wheel, touch,
+  //    clipboard, drag-and-drop) → batch 4.
+  //  - Scene-mutation nonce wiring (Renderer repaints via appState deps only
+  //    so far; batch 4 adds a sceneNonce $state bumped on every mutation).
+  //  - syncActionResult / actionManager / history integration → batch 5.
+  //  - ExcalidrawImperativeAPI (`onExcalidrawAPI` callback) → batch 6.
+  //  - textWysiwyg.ts port → batch 7.
+
+  // @ts-ignore — upstream, resolved via Vite alias; tsconfig path mapping
+  // only exists in the excalidraw-svelte package, not sveltedraw-app.
+  import type { EditorInterface } from "@excalidraw/common";
+  import type { LayerUIAppStateLike } from "./components/LayerUI.svelte";
+
+  /**
+   * Minimal AppState shape needed by LayerUI + canvas wrappers.
+   * Upstream `AppState` has ~80 fields; the runtime value comes from
+   * `getDefaultAppState()` (full shape) so passing it to upstream helpers
+   * remains structurally sound.
+   */
+  export type ShellAppState = LayerUIAppStateLike & {
+    width: number;
+    height: number;
+    activeTool: { type: string };
+    [key: string]: unknown;
+  };
+</script>
+
+<script lang="ts">
+  import { setContext, untrack, onMount } from "svelte";
+  // @ts-ignore — upstream, resolved via Vite alias
+  import { getDefaultAppState } from "@excalidraw/excalidraw/appState";
+  // @ts-ignore — upstream
+  import { Scene } from "@excalidraw/element";
+  // @ts-ignore — upstream
+  import { Renderer } from "@excalidraw/excalidraw/scene/Renderer";
+  // @ts-ignore — upstream
+  import { renderStaticScene } from "@excalidraw/excalidraw/renderer/staticScene";
+  // @ts-ignore — upstream
+  import { renderNewElementScene } from "@excalidraw/excalidraw/renderer/renderNewElementScene";
+  // @ts-ignore — upstream
+  import { renderInteractiveScene } from "@excalidraw/excalidraw/renderer/interactiveScene";
+  // @ts-ignore — upstream
+  import { AnimationController } from "@excalidraw/excalidraw/renderer/animation";
+  // Inline to avoid pulling @excalidraw/excalidraw/components/canvases/InteractiveCanvas.tsx
+  // (which imports from "react"). Upstream value confirmed identical.
+  const INTERACTIVE_SCENE_ANIMATION_KEY = "animateInteractiveScene";
+  // @ts-ignore — upstream
+  import rough from "roughjs/bin/rough";
+  // @ts-ignore — upstream, resolved via Vite alias
+  // prettier-ignore
+  import { getFormFactor, createUserAgentDescriptor, MQ_RIGHT_SIDEBAR_MIN_WIDTH, supportsResizeObserver, POINTER_EVENTS, randomId, viewportCoordsToSceneCoords, DEFAULT_ELEMENT_PROPS, DEFAULT_FONT_FAMILY } from "@excalidraw/common";
+  // @ts-ignore — upstream
+  import { newElement } from "@excalidraw/element";
+
+  import {
+    EDITOR_STORE_KEY,
+    APP_STORE_KEY,
+    EDITOR_INTERFACE_KEY,
+    EXCAL_ID_KEY,
+    createEditorStore,
+    createAppStore,
+    createTunnelsContext,
+    TUNNELS_KEY,
+  } from "./state/index.js";
+
+  import LayerUI from "./components/LayerUI.svelte";
+  import StaticCanvas from "./components/canvases/StaticCanvas.svelte";
+  import InteractiveCanvas from "./components/canvases/InteractiveCanvas.svelte";
+  import NewElementCanvas from "./components/canvases/NewElementCanvas.svelte";
+
+  let {
+    viewModeEnabled = false,
+    zenModeEnabled = false,
+    gridModeEnabled = false,
+    objectsSnapModeEnabled = false,
+    theme,
+    name,
+  }: {
+    viewModeEnabled?: boolean;
+    zenModeEnabled?: boolean;
+    gridModeEnabled?: boolean;
+    objectsSnapModeEnabled?: boolean;
+    theme?: "light" | "dark";
+    name?: string;
+  } = $props();
+
+  // ── AppState ───────────────────────────────────────────────────────────
+  const initial = untrack(() => ({
+    ...getDefaultAppState(),
+    theme: theme ?? "light",
+    exportWithDarkMode: (theme ?? "light") === "dark",
+    isLoading: false,
+    viewModeEnabled,
+    zenModeEnabled,
+    objectsSnapModeEnabled,
+    gridModeEnabled,
+    name: name ?? "Untitled",
+    width: typeof window !== "undefined" ? window.innerWidth : 800,
+    height: typeof window !== "undefined" ? window.innerHeight : 600,
+    offsetTop: 0,
+    offsetLeft: 0,
+  }));
+
+  const appState = $state<ShellAppState>(initial as ShellAppState);
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const patchAppState = (patch: Partial<ShellAppState>) => {
+    for (const [k, v] of Object.entries(patch)) {
+      (appState as Record<string, unknown>)[k] = v;
+    }
+  };
+
+  // ── Editor interface ─────────────────────────────────────────────────
+  const uaDesc = createUserAgentDescriptor(
+    typeof navigator !== "undefined" ? navigator.userAgent : "",
+  );
+  type MutableEditorInterface = {
+    -readonly [K in keyof EditorInterface]: EditorInterface[K];
+  };
+  const makeEditorInterface = (
+    w: number,
+    h: number,
+  ): MutableEditorInterface => ({
+    formFactor: getFormFactor(w, h),
+    desktopUIMode: "full",
+    userAgent: uaDesc,
+    isTouchScreen: typeof window !== "undefined" && "ontouchstart" in window,
+    canFitSidebar: w > MQ_RIGHT_SIDEBAR_MIN_WIDTH,
+    isLandscape: w > h,
+  });
+
+  const editorInterface = $state<MutableEditorInterface>(
+    makeEditorInterface(appState.width, appState.height),
+  );
+  $effect(() => {
+    const next = makeEditorInterface(appState.width, appState.height);
+    editorInterface.formFactor = next.formFactor;
+    editorInterface.canFitSidebar = next.canFitSidebar;
+    editorInterface.isLandscape = next.isLandscape;
+  });
+
+  // ── Stores + contexts ──────────────────────────────────────────────────
+  const editorStore = createEditorStore();
+  const appStore = createAppStore();
+  const tunnels = createTunnelsContext();
+
+  setContext(EDITOR_STORE_KEY, editorStore);
+  setContext(APP_STORE_KEY, appStore);
+  setContext(EDITOR_INTERFACE_KEY, editorInterface as EditorInterface);
+  setContext(TUNNELS_KEY, tunnels);
+  // Use upstream `randomId` (nanoid in prod, deterministic in test) for parity
+  // with the React side — `App.tsx` does `this.id = nanoid()`.
+  setContext(EXCAL_ID_KEY, randomId());
+
+  // ── Canvas refs ────────────────────────────────────────────────────────
+  const staticCanvas =
+    typeof document !== "undefined"
+      ? document.createElement("canvas")
+      : (null as unknown as HTMLCanvasElement);
+
+  let interactiveCanvasEl: HTMLCanvasElement | null = null;
+  // Set by the InteractiveCanvas wrapper once the <canvas> mounts. We start
+  // the AnimationController here (not on mount above) because the canvas
+  // element is created inside the wrapper — its ref only exists post-mount.
+  const handleInteractiveCanvasRef = (el: HTMLCanvasElement | null) => {
+    interactiveCanvasEl = el;
+    if (el) startInteractiveAnimation();
+  };
+
+  // ── Container ref ─────────────────────────────────────────────────────
+  let containerEl: HTMLDivElement | null = $state(null);
+
+  // ── Scene + Renderer + RoughCanvas ───────────────────────────────────
+  // Constructed on mount (need DOM access for rough.canvas()). Kept in
+  // non-reactive locals because the renderer reads them by reference.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let scene: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let renderer: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let rc: any = null;
+
+  // Bumped after construction so the static-render $effect can trigger its
+  // first paint once the Scene/Renderer are ready.
+  let sceneReady = $state(0);
+
+  // Static render callback — assembles StaticSceneRenderConfig per frame and
+  // calls renderStaticScene. An empty Scene renders background + grid only.
+  //
+  // IMPORTANT (batch 4 gotcha): `Renderer.getRenderableElements` is wrapped
+  // with upstream `memoize` (`Renderer.ts:26`). Memoize keys on argument
+  // IDENTITY. Mutating nested state (`appState.zoom.value = 2`) keeps the
+  // same object ref → memoize hit → canvas won't repaint. Use replace-style
+  // mutations for any object-valued AppState field touched by this function
+  // (`zoom`, `gridSize`, `gridStep` etc.) — e.g. `appState.zoom = { ...appState.zoom, value: 2 }`.
+  const staticRender = () => {
+    if (!renderer || !scene || !rc) return;
+
+    // `newElementId` is used by the Renderer to bust its memoized cache on
+    // first render of a freshly-created element. In batch 2 we have no
+    // `newElement` yet (no pointer wiring), so always `undefined`.
+    const { elementsMap, visibleElements } = renderer.getRenderableElements({
+      zoom: appState.zoom,
+      offsetLeft: appState.offsetLeft,
+      offsetTop: appState.offsetTop,
+      scrollX: appState.scrollX,
+      scrollY: appState.scrollY,
+      height: appState.height,
+      width: appState.width,
+      editingTextElement: appState.editingTextElement,
+      newElementId: undefined,
+      sceneNonce: scene.getSceneNonce(),
+    });
+
+    // Upstream `StaticSceneRenderConfig` pins exact AppState shape; our
+    // `ShellAppState` is structurally a superset but TypeScript can't verify
+    // the 20+ individual fields match without dragging the full AppState
+    // type in (which pulls React types). Runtime value is sound since the
+    // initial state came from `getDefaultAppState()`.
+    renderStaticScene(
+      {
+        canvas: staticCanvas,
+        rc,
+        elementsMap,
+        allElementsMap: scene.getNonDeletedElementsMap(),
+        visibleElements,
+        scale,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        appState: appState as any,
+        renderConfig: {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          canvasBackgroundColor: appState.viewBackgroundColor as any,
+          imageCache: new Map(),
+          renderGrid: !!appState.gridModeEnabled,
+          isExporting: false,
+          embedsValidationStatus: new Map(),
+          elementsPendingErasure: new Set(),
+          pendingFlowchartNodes: null,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          theme: appState.theme as any,
+        },
+      },
+      /* throttle */ false,
+    );
+  };
+
+  // Device pixel ratio for canvas backing store. React App.tsx recomputes DPR
+  // inside `onResize` (window.resize fires on DPR change, e.g. moving the
+  // window to a different-DPI monitor). We mirror that by holding DPR in a
+  // $state and refreshing it from `measure()`.
+  let dpr = $state(
+    typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1,
+  );
+  const scale = $derived(dpr);
+
+  // Shared StaticCanvasRenderConfig builder — the static renderer and the
+  // new-element renderer both want the same `renderConfig` shape (the
+  // NewElementSceneRenderConfig literally reuses StaticCanvasRenderConfig).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const makeStaticRenderConfig = (): any => ({
+    canvasBackgroundColor: appState.viewBackgroundColor,
+    imageCache: new Map(),
+    renderGrid: !!appState.gridModeEnabled,
+    isExporting: false,
+    embedsValidationStatus: new Map(),
+    elementsPendingErasure: new Set(),
+    pendingFlowchartNodes: null,
+    theme: appState.theme,
+  });
+
+  // NewElementCanvas render callback. Args from the wrapper give us the
+  // internal <canvas> element + scale. We supply scene + elementsMap +
+  // allElementsMap + newElement + rc. NewElementSceneRenderConfig does NOT
+  // require `app: AppClassProperties` (unlike interactive scene), so this
+  // wires cleanly without a façade.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const newElementRender = (args: any) => {
+    if (!renderer || !scene || !rc) return;
+    const { elementsMap } = renderer.getRenderableElements({
+      zoom: appState.zoom,
+      offsetLeft: appState.offsetLeft,
+      offsetTop: appState.offsetTop,
+      scrollX: appState.scrollX,
+      scrollY: appState.scrollY,
+      height: appState.height,
+      width: appState.width,
+      editingTextElement: appState.editingTextElement,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      newElementId: (appState.newElement as any)?.id,
+      sceneNonce: scene.getSceneNonce(),
+    });
+    renderNewElementScene(
+      {
+        canvas: args.canvas,
+        scale: args.scale,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        newElement: appState.newElement as any,
+        elementsMap,
+        allElementsMap: scene.getNonDeletedElementsMap(),
+        rc,
+        renderConfig: makeStaticRenderConfig(),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        appState: appState as any,
+      },
+      /* throttle */ false,
+    );
+  };
+
+  // Minimal AppClassProperties façade consumed by renderInteractiveScene.
+  // Grep of interactiveScene.ts shows only 4 `app.*` touches:
+  //   app.state.bindMode, app.bindModeHandler, app.lastPointerMoveCoords{.x,.y}
+  // Those each default to a no-op-safe value for batch 3 (no event wiring
+  // yet). Batch 4 will replace this with a real App.svelte-backed view once
+  // pointer/keyboard wiring lands.
+  const appFacade = {
+    get state() {
+      return appState;
+    },
+    bindModeHandler: null,
+    lastPointerMoveCoords: null,
+    lastViewportPosition: { x: 0, y: 0 },
+  };
+
+  // Interactive scene AnimationController loop. Starts once the canvas ref
+  // is delivered by the InteractiveCanvas wrapper. The callback runs on
+  // each RAF tick, reads CURRENT appState + scene (closed-over), and feeds
+  // renderInteractiveScene.
+  function startInteractiveAnimation() {
+    if (AnimationController.running(INTERACTIVE_SCENE_ANIMATION_KEY)) return;
+    AnimationController.start(
+      INTERACTIVE_SCENE_ANIMATION_KEY,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ({ deltaTime, state }: any) => {
+        // Test-only liveness signal: smoke scripts read this to verify the
+        // animation loop actually ticks (vs "registered but not running").
+        // DEV-only — stripped from production builds.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((import.meta as any).env?.DEV) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (window as any).__sveltedrawInteractiveTicks =
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ((window as any).__sveltedrawInteractiveTicks ?? 0) + 1;
+        }
+
+        if (!renderer || !scene || !interactiveCanvasEl) {
+          // Keep animation alive until scene is ready; returning a truthy
+          // state re-enqueues this key for the next tick.
+          return state ?? { bindingHighlight: undefined };
+        }
+        const { elementsMap, visibleElements } =
+          renderer.getRenderableElements({
+            zoom: appState.zoom,
+            offsetLeft: appState.offsetLeft,
+            offsetTop: appState.offsetTop,
+            scrollX: appState.scrollX,
+            scrollY: appState.scrollY,
+            height: appState.height,
+            width: appState.width,
+            editingTextElement: appState.editingTextElement,
+            newElementId: undefined,
+            sceneNonce: scene.getSceneNonce(),
+          });
+
+        const selectedElements: unknown[] = []; // batch 4 populates from appState.selectedElementIds
+
+        const result = renderInteractiveScene({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          app: appFacade as any,
+          canvas: interactiveCanvasEl,
+          elementsMap,
+          visibleElements,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          selectedElements: selectedElements as any,
+          allElementsMap: scene.getNonDeletedElementsMap(),
+          scale,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          appState: appState as any,
+          renderConfig: {
+            remotePointerViewportCoords: new Map(),
+            remotePointerButton: new Map(),
+            remoteSelectedElementIds: new Map(),
+            remotePointerUsernames: new Map(),
+            remotePointerUserStates: new Map(),
+            selectionColor: "#6965db",
+            lastViewportPosition: { x: 0, y: 0 },
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          editorInterface: editorInterface as any,
+          callback: () => {
+            // batch 5 wires renderInteractiveSceneCallback for scrollbars
+            // + scrolledOutside state updates.
+          },
+          animationState: state,
+          deltaTime,
+        });
+
+        // Keep the loop alive regardless of whether any animation state is
+        // active (returning `undefined` stops the key). For batch 3 we run
+        // every tick to keep parity with React; batch 4+ can short-circuit
+        // when no selection/hover changes are pending.
+        return result.animationState ?? { bindingHighlight: undefined };
+      },
+    );
+  }
+
+  // Parent-owned static-render driver. We pass a no-op `render` prop to the
+  // StaticCanvas wrapper and run renderStaticScene here as a top-level
+  // $effect instead. Rationale: the wrapper's internal $effect tracks only
+  // {canvas, scale, appState, renderConfig} by design (it's generic), but
+  // we need to react to Scene mutations too (via `scene.getSceneNonce()`)
+  // plus `sceneReady` flipping on mount. Doing it here gives us a single
+  // source of truth for "when to paint."
+  $effect(() => {
+    // reactive deps (read explicitly so Svelte tracks them all)
+    void sceneReady;
+    void scale;
+    void appState.width;
+    void appState.height;
+    void appState.zoom;
+    void appState.scrollX;
+    void appState.scrollY;
+    void appState.offsetLeft;
+    void appState.offsetTop;
+    void appState.theme;
+    void appState.viewBackgroundColor;
+    void appState.gridModeEnabled;
+    staticRender();
+  });
+
+  // NewElementCanvas repaint: the wrapper's internal $effect tracks only
+  // its direct props (canvas/scale/appState/renderConfig). We force it to
+  // re-fire on newElement changes by including `newElement` identity in
+  // the `appState` prop literal we pass — Svelte batches the $state reads
+  // into the derived shape, so a fresh object-identity on newElement busts
+  // the wrapper's memo via the appState prop's reference changing.
+  //
+  // No explicit $effect needed here; the reactive chain is:
+  //   user drag → appState.newElement = {...} (fresh identity)
+  //     → template re-runs (reads newElement)
+  //     → NewElementCanvas gets fresh appState prop literal
+  //     → its $effect fires
+  //     → calls our `newElementRender` which reads appState.newElement.
+
+  // ── onMount: construct Scene + Renderer + RoughCanvas ────────────────
+  onMount(() => {
+    scene = new Scene();
+    renderer = new Renderer(scene);
+    rc = rough.canvas(staticCanvas);
+    sceneReady++; // triggers the first static paint
+
+    // Test-only probe: smoke scripts read `window.__sveltedrawProbe` to
+    // inspect live scene + appState. DEV-only.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((import.meta as any).env?.DEV) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__sveltedrawProbe = { appState, scene };
+    }
+
+    // ── ResizeObserver on container (replaces window-resize from batch 1) ─
+    // Window resize is kept as a fallback for browsers without RO support
+    // (none in practice; `supportsResizeObserver` is true everywhere modern).
+    const measure = () => {
+      if (!containerEl) return;
+      const rect = containerEl.getBoundingClientRect();
+      appState.width = rect.width || window.innerWidth;
+      appState.height = rect.height || window.innerHeight;
+      appState.offsetLeft = rect.left;
+      appState.offsetTop = rect.top;
+      // DPR can change without a resize (rare — e.g. OS-level zoom toggle);
+      // we still read it here because window.resize does fire on DPI changes
+      // when the window moves between monitors.
+      dpr = window.devicePixelRatio || 1;
+    };
+
+    // Fullscreen change — React App.tsx clears activeEmbeddable when
+    // fullscreen exits while an embeddable was active. Parity port.
+    const onFullscreenChange = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const active = (appState as any).activeEmbeddable;
+      if (!document.fullscreenElement && active?.state === "active") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (appState as any).activeEmbeddable = null;
+      }
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+
+    // Keydown listener on the container (it's focusable — tabindex=0 set
+    // on the container div, matching React's AppRenderHelpers.tsx). Using
+    // addEventListener on the element (not window) so multiple editors on
+    // one page don't eat each other's keyboard input.
+    containerEl?.addEventListener("keydown", onContainerKeyDown);
+    // Auto-focus the container on mount so hotkeys work without requiring
+    // the user to click first. Matches upstream UX.
+    containerEl?.focus({ preventScroll: true });
+
+    let ro: ResizeObserver | null = null;
+    if (supportsResizeObserver && containerEl) {
+      ro = new ResizeObserver(() => measure());
+      ro.observe(containerEl);
+    }
+    window.addEventListener("resize", measure);
+    measure();
+
+    return () => {
+      if (ro) ro.disconnect();
+      window.removeEventListener("resize", measure);
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+      containerEl?.removeEventListener("keydown", onContainerKeyDown);
+      AnimationController.cancel(INTERACTIVE_SCENE_ANIMATION_KEY);
+      renderer?.destroy?.();
+    };
+  });
+
+  // ── Batch 4: interaction handlers (Svelte-native port) ───────────────
+  //
+  // Rationale: upstream `engine/` modules (keyboardOps/pointerEventOps/…) are
+  // React-coupled (flushSync, jotai atoms from .tsx files, actions system).
+  // Reusing them requires a parallel shadow-monorepo of shims. We port each
+  // tool's lifecycle fresh as Svelte-idiomatic code instead — bounded cost
+  // per tool, no React baggage in the Svelte bundle.
+  //
+  // Batch 4 scope: ONE tool (rectangle), end-to-end. Keydown → tool switch,
+  // pointerdown → create newElement, pointermove → extend, pointerup → commit.
+  // Subsequent batches copy-paste for other shapes and add selection/drag.
+
+  // Map keyboard keys to tool types. Subset of upstream `findShapeByKey`
+  // (packages/excalidraw/components/shapes.tsx) — covers just the shapes
+  // wired in this batch; future batches append entries.
+  const TOOL_HOTKEYS: Record<string, string> = {
+    "1": "selection",
+    "2": "rectangle",
+    r: "rectangle",
+    R: "rectangle",
+  };
+
+  const setActiveTool = (type: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).activeTool = {
+      type,
+      customType: null,
+      locked: false,
+      fromSelection: false,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      lastActiveTool: (appState as any).activeTool ?? null,
+    };
+  };
+
+  const onContainerKeyDown = (event: KeyboardEvent) => {
+    // Ignore while typing in inputs / textareas / contenteditable.
+    const target = event.target as HTMLElement | null;
+    if (
+      target &&
+      (target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable)
+    ) {
+      return;
+    }
+
+    // Escape → clear in-progress element + back to selection.
+    if (event.key === "Escape") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (appState as any).newElement = null;
+      setActiveTool("selection");
+      return;
+    }
+
+    const nextTool = TOOL_HOTKEYS[event.key];
+    if (nextTool) {
+      setActiveTool(nextTool);
+      event.preventDefault();
+    }
+  };
+
+  // Scene-nonce bump — forces the static-render $effect to repaint even
+  // when no appState field changed (e.g. after scene.replaceAllElements).
+  // The $effect tracks sceneReady; we reuse it as a generic "something
+  // scene-level happened" ticker.
+  const bumpSceneRepaint = () => {
+    sceneReady++;
+  };
+
+  // Build the AppState slice needed by `viewportCoordsToSceneCoords`.
+  // Separate function to keep the conversion site compact.
+  const toSceneCoords = (clientX: number, clientY: number) => {
+    return viewportCoordsToSceneCoords(
+      { clientX, clientY },
+      {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        zoom: appState.zoom as any,
+        offsetLeft: appState.offsetLeft as number,
+        offsetTop: appState.offsetTop as number,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        scrollX: appState.scrollX as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        scrollY: appState.scrollY as any,
+      },
+    );
+  };
+
+  // Drag start point (scene coords) for the in-progress element.
+  let dragStart: { x: number; y: number } | null = null;
+
+  const onInteractivePointerDown = (event: PointerEvent) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tool = (appState.activeTool as any)?.type;
+    if (tool !== "rectangle") return;
+
+    const { x, y } = toSceneCoords(event.clientX, event.clientY);
+    dragStart = { x, y };
+
+    const el = newElement({
+      type: "rectangle",
+      x,
+      y,
+      width: 1,
+      height: 1,
+      strokeColor: DEFAULT_ELEMENT_PROPS.strokeColor,
+      backgroundColor: DEFAULT_ELEMENT_PROPS.backgroundColor,
+      fillStyle: DEFAULT_ELEMENT_PROPS.fillStyle,
+      strokeWidth: DEFAULT_ELEMENT_PROPS.strokeWidth,
+      strokeStyle: DEFAULT_ELEMENT_PROPS.strokeStyle,
+      roughness: DEFAULT_ELEMENT_PROPS.roughness,
+      opacity: DEFAULT_ELEMENT_PROPS.opacity,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).newElement = el;
+
+    // Pointer capture so we still get move/up after the cursor leaves the canvas.
+    (event.currentTarget as HTMLElement | null)?.setPointerCapture?.(event.pointerId);
+  };
+
+  const onInteractivePointerMove = (event: PointerEvent) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cur = (appState as any).newElement;
+    if (!cur || !dragStart) return;
+
+    const { x, y } = toSceneCoords(event.clientX, event.clientY);
+    const width = x - dragStart.x;
+    const height = y - dragStart.y;
+
+    // CRITICAL (memoize gotcha from review pass): the Renderer memoizes on
+    // object IDENTITY of its inputs. Mutating `cur.width = …` would leave
+    // the same object ref and the canvas wouldn't repaint. Spread-copy to
+    // produce a fresh object.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).newElement = {
+      ...cur,
+      // If the drag went negative, flip x/y so width/height stay positive.
+      x: width < 0 ? dragStart.x + width : dragStart.x,
+      y: height < 0 ? dragStart.y + height : dragStart.y,
+      width: Math.abs(width) || 1,
+      height: Math.abs(height) || 1,
+      // Version bump so element-map memoization (keyed on version) busts.
+      version: (cur.version ?? 1) + 1,
+    };
+  };
+
+  const onInteractivePointerUp = (event: PointerEvent) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cur = (appState as any).newElement;
+    if (!cur) return;
+
+    // Commit to scene only if the element has meaningful dimensions; drop
+    // zero-size accidental clicks.
+    if (cur.width > 1 && cur.height > 1 && scene) {
+      const existing = scene.getElementsIncludingDeleted();
+      // `skipValidation: true` — the fractional-index validator throws for
+      // freshly-minted elements whose index isn't yet synced. `syncInvalidIndices`
+      // (inside replaceAllElements) repairs them; we just bypass the throw-y
+      // validator. Upstream App.tsx does the same via `CaptureUpdateAction`.
+      scene.replaceAllElements([...existing, cur], { skipValidation: true });
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).newElement = null;
+    dragStart = null;
+    bumpSceneRepaint();
+
+    (event.currentTarget as HTMLElement | null)?.releasePointerCapture?.(
+      event.pointerId,
+    );
+  };
+
+  // No-op passthroughs for events we don't handle yet.
+  const noop = () => {};
+  const noopRender = () => {};
+
+  const onScrollBackToContent = () => {
+    /* batch 5: dispatch actionFinalize / scrollToContent */
+  };
+  const onToastClose = () => {
+    appState.toast = null;
+  };
+
+  // Container class composition — parity with React AppRenderHelpers.tsx:674.
+  // `excalidraw--view-mode` also flips true for the element-link dialog per
+  // upstream logic (dialog makes the canvas non-editable).
+  const containerClass = $derived(
+    [
+      "excalidraw",
+      "excalidraw-container",
+      "notranslate",
+      appState.viewModeEnabled ||
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (appState.openDialog as any)?.name === "elementLinkSelector"
+        ? "excalidraw--view-mode"
+        : "",
+      editorInterface.formFactor === "phone" ? "excalidraw--mobile" : "",
+    ]
+      .filter(Boolean)
+      .join(" "),
+  );
+
+  // `--ui-pointerEvents` mirrors React: disabled while dragging so UI chrome
+  // doesn't eat pointer events mid-gesture. Batch 3 keeps it always enabled
+  // since there's no pointer wiring yet.
+  const uiPointerEvents = $derived(POINTER_EVENTS.enabled);
+</script>
+
+<!-- Container is focusable by design — global keyboard listeners live here.
+     Same pattern as upstream React's `AppRenderHelpers.tsx:688` (`tabIndex=0`). -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div
+  class={containerClass}
+  bind:this={containerEl}
+  translate="no"
+  tabindex="0"
+  data-prevent-outside-click
+  style="--ui-pointerEvents: {uiPointerEvents}; --right-sidebar-width: 302px;"
+>
+  <LayerUI
+    appState={appState as unknown as LayerUIAppStateLike}
+    {onScrollBackToContent}
+    {onToastClose}
+  />
+
+  <div class="excalidraw-textEditorContainer"></div>
+  <div class="excalidraw-contextMenuContainer"></div>
+  <div class="excalidraw-eye-dropper-container"></div>
+
+  <StaticCanvas
+    canvas={staticCanvas}
+    {scale}
+    appState={{ width: appState.width, height: appState.height }}
+    renderConfig={undefined}
+    render={noopRender}
+  />
+
+  <InteractiveCanvas
+    appState={{
+      width: appState.width,
+      height: appState.height,
+      viewModeEnabled: appState.viewModeEnabled,
+      activeTool: appState.activeTool,
+    }}
+    {scale}
+    handleCanvasRef={handleInteractiveCanvasRef}
+    oncontextmenu={noop}
+    onclick={noop}
+    onpointermove={onInteractivePointerMove}
+    onpointerup={onInteractivePointerUp}
+    onpointercancel={onInteractivePointerUp}
+    ontouchmove={noop}
+    onpointerdown={onInteractivePointerDown}
+    ondblclick={noop}
+  />
+
+  <NewElementCanvas
+    {scale}
+    appState={{
+      width: appState.width,
+      height: appState.height,
+      // Expose newElement identity to the wrapper's effect tracking; the
+      // wrapper's $effect reads `appState` (object identity), so including
+      // newElement here busts its memo when newElement changes. The field
+      // is unused downstream — only the identity change matters.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      _newElement: (appState as any).newElement,
+    }}
+    renderConfig={undefined}
+    render={newElementRender}
+  />
+</div>
+
+<style>
+  .excalidraw-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+</style>
