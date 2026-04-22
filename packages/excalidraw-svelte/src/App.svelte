@@ -2382,9 +2382,10 @@
     }
     // Second pass — midpoints between consecutive vertices. These
     // are the "bend" handles: dragging creates a new intermediate
-    // point at that position. Smaller tolerance so midpoints don't
-    // compete with resize handles / adjacent anchored points.
-    const midTol = 6 / zoomV;
+    // point at that position. Tolerance matches vertices; the
+    // earlier 6px was too stingy on short segments so users kept
+    // missing.
+    const midTol = 10 / zoomV;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const el of scene.getNonDeletedElements() as any[]) {
       if (!selectedIds[el.id]) continue;
@@ -4552,6 +4553,10 @@
        actual hit-testing happens in hitResizeHandle(). Picker dot
        on vertex = grab to move; dot on midpoint = grab to bend. -->
   {#if scene}
+    <!-- `_nonce` forces re-evaluation on every scene mutation. Without
+         it, scene.getNonDeletedElements() isn't tracked by Svelte
+         and the overlay stays stale after mutateElement calls. -->
+    {@const _nonce = sceneReady}
     {@const zoomV = (appState.zoom as any).value || 1}
     {@const sX = ((appState as any).scrollX ?? 0)}
     {@const sY = ((appState as any).scrollY ?? 0)}
@@ -4578,7 +4583,7 @@
           {@const myVp = (el.y + (ay + by) / 2 + sY) * zoomV + oT - (appState.offsetTop as number)}
           <div
             class="sveltedraw-line-handle sveltedraw-line-handle--mid"
-            style="left: {mxVp - 3}px; top: {myVp - 3}px;"
+            style="left: {mxVp - 4}px; top: {myVp - 4}px;"
             aria-hidden="true"
           ></div>
         {/each}
@@ -5058,8 +5063,8 @@
     height: 10px;
   }
   .sveltedraw-line-handle--mid {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
     border-color: #a6a0f0;
     opacity: 0.85;
   }
