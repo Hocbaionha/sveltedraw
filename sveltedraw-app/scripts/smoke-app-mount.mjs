@@ -448,6 +448,85 @@ async function main() {
         count: p.scene?.getNonDeletedElements?.()?.length ?? 0,
       };
 
+      // ── Batch 14: resize ──────────────────────────────────────────
+      // Select the first rectangle (back from the undo-clear), grab its SE
+      // handle, drag it +60,+40. Verify width/height changed by ~60/40,
+      // x/y unchanged (SE handle only moves the opposite corner).
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: '1', bubbles: true, cancelable: true }));  // selection
+      await new Promise(r => setTimeout(r, 20));
+
+      const rectEl = p.scene?.getNonDeletedElements?.()?.find(el => el.type === 'rectangle');
+      if (!rectEl) return { ...afterDraw, afterUndoClear, resizeErr: 'no rectangle' };
+
+      const zoomR = p.appState?.zoom?.value ?? 1;
+      const offLeft = p.appState?.offsetLeft ?? 0;
+      const offTop = p.appState?.offsetTop ?? 0;
+      const scrX = p.appState?.scrollX ?? 0;
+      const scrY = p.appState?.scrollY ?? 0;
+      const sceneToVp = (sx, sy) => ({
+        x: (sx + scrX) * zoomR + offLeft,
+        y: (sy + scrY) * zoomR + offTop,
+      });
+
+      // Click center to select
+      const centerVp = sceneToVp(rectEl.x + rectEl.width / 2, rectEl.y + rectEl.height / 2);
+      iv.dispatchEvent(mk('pointerdown', centerVp.x, centerVp.y));
+      iv.dispatchEvent(mk('pointerup', centerVp.x, centerVp.y));
+      await new Promise(r => setTimeout(r, 30));
+
+      const origW = rectEl.width;
+      const origH = rectEl.height;
+      const origRectX = rectEl.x;
+      const origRectY = rectEl.y;
+
+      // SE handle in scene coords = (x + w, y + h).
+      const seVp = sceneToVp(rectEl.x + rectEl.width, rectEl.y + rectEl.height);
+      iv.dispatchEvent(mk('pointerdown', seVp.x, seVp.y));
+      await new Promise(r => setTimeout(r, 20));
+      iv.dispatchEvent(mk('pointermove', seVp.x + 60 * zoomR, seVp.y + 40 * zoomR));
+      await new Promise(r => setTimeout(r, 20));
+      iv.dispatchEvent(mk('pointerup', seVp.x + 60 * zoomR, seVp.y + 40 * zoomR));
+      await new Promise(r => setTimeout(r, 30));
+
+      const rectAfter = p.scene?.getNonDeletedElements?.()?.find(el => el.id === rectEl.id);
+      const afterResizeSE = {
+        dw: (rectAfter?.width ?? 0) - origW,
+        dh: (rectAfter?.height ?? 0) - origH,
+        dx: (rectAfter?.x ?? 0) - origRectX,
+        dy: (rectAfter?.y ?? 0) - origRectY,
+      };
+
+      // Drag NW handle -20, -10 → x/y shrink, width/height GROW (since
+      // NW moves the top-left corner outward).
+      const nwVp = sceneToVp(rectAfter.x, rectAfter.y);
+      const origW2 = rectAfter.width;
+      const origH2 = rectAfter.height;
+      const origX2 = rectAfter.x;
+      const origY2 = rectAfter.y;
+      iv.dispatchEvent(mk('pointerdown', nwVp.x, nwVp.y));
+      await new Promise(r => setTimeout(r, 20));
+      iv.dispatchEvent(mk('pointermove', nwVp.x - 20 * zoomR, nwVp.y - 10 * zoomR));
+      await new Promise(r => setTimeout(r, 20));
+      iv.dispatchEvent(mk('pointerup', nwVp.x - 20 * zoomR, nwVp.y - 10 * zoomR));
+      await new Promise(r => setTimeout(r, 30));
+
+      const rectAfterNW = p.scene?.getNonDeletedElements?.()?.find(el => el.id === rectEl.id);
+      const afterResizeNW = {
+        dx: (rectAfterNW?.x ?? 0) - origX2,
+        dy: (rectAfterNW?.y ?? 0) - origY2,
+        dw: (rectAfterNW?.width ?? 0) - origW2,
+        dh: (rectAfterNW?.height ?? 0) - origH2,
+      };
+
+      // Undo the NW resize → back to post-SE dims.
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 30));
+      const rectAfterUndoResize = p.scene?.getNonDeletedElements?.()?.find(el => el.id === rectEl.id);
+      const afterUndoResize = {
+        w: rectAfterUndoResize?.width ?? 0,
+        h: rectAfterUndoResize?.height ?? 0,
+      };
+
       return {
         ...afterDraw,
         afterSelect, afterDrag, afterClickEmpty,
@@ -456,6 +535,7 @@ async function main() {
         afterUndoDelete, afterRedoDelete, afterCtrlY,
         zoomBefore, afterZoomIn, afterZoomReset, afterPan, afterKeyZoomIn, afterMiddlePan,
         afterShapes, afterSaveCheck, afterClearCanvas, afterUndoClear,
+        afterResizeSE, afterResizeNW, afterUndoResize,
       };
     })()`,
     returnByValue: true,
@@ -755,6 +835,40 @@ async function main() {
     probe?.afterUndoClear?.count === 6,
     `count=${probe?.afterUndoClear?.count} (expected 6)`,
   );
+
+  // Batch 14: resize handles.
+  pass(
+    "se-handle-resizes-width",
+    Math.abs((probe?.afterResizeSE?.dw ?? 0) - 60) < 5,
+    `dw=${probe?.afterResizeSE?.dw} (expected ~60)`,
+  );
+  pass(
+    "se-handle-resizes-height",
+    Math.abs((probe?.afterResizeSE?.dh ?? 0) - 40) < 5,
+    `dh=${probe?.afterResizeSE?.dh} (expected ~40)`,
+  );
+  pass(
+    "se-handle-keeps-origin",
+    Math.abs(probe?.afterResizeSE?.dx ?? 99) < 2 && Math.abs(probe?.afterResizeSE?.dy ?? 99) < 2,
+    `dx=${probe?.afterResizeSE?.dx} dy=${probe?.afterResizeSE?.dy} (both ~0)`,
+  );
+  pass(
+    "nw-handle-moves-origin",
+    Math.abs((probe?.afterResizeNW?.dx ?? 0) + 20) < 5 &&
+      Math.abs((probe?.afterResizeNW?.dy ?? 0) + 10) < 5,
+    `dx=${probe?.afterResizeNW?.dx} (~-20) dy=${probe?.afterResizeNW?.dy} (~-10)`,
+  );
+  pass(
+    "nw-handle-grows-size",
+    (probe?.afterResizeNW?.dw ?? 0) > 15 && (probe?.afterResizeNW?.dh ?? 0) > 5,
+    `dw=${probe?.afterResizeNW?.dw} dh=${probe?.afterResizeNW?.dh}`,
+  );
+  pass(
+    "resize-is-undoable",
+    (probe?.afterUndoResize?.w ?? 0) > 150 && (probe?.afterUndoResize?.w ?? 0) < 280,
+    `w=${probe?.afterUndoResize?.w} h=${probe?.afterUndoResize?.h} (post-SE pre-NW bounds)`,
+  );
+
   pass(
     "reload-restores-scene",
     afterReload?.count === 6,

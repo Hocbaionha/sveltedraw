@@ -1190,6 +1190,125 @@
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let dragOrigins: Array<{ id: string; x: number; y: number; el: any }> = [];
 
+  // ── Resize state ──────────────────────────────────────────────────
+  // When pointerdown lands on a transform handle of a selected element,
+  // we record the handle direction + the element's bbox at that moment.
+  // Subsequent pointermoves compute fresh bbox from cursor delta.
+  type HandleDir = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
+  let resizeGesture:
+    | {
+        dir: HandleDir;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        el: any;
+        origX: number;
+        origY: number;
+        origW: number;
+        origH: number;
+      }
+    | null = null;
+
+  // Hit-test a click against the 8 resize handles of any currently-selected
+  // element. Returns {dir, el} if a handle is hit, null otherwise.
+  // Tolerance scales inversely with zoom so handles stay clickable at small
+  // zoom levels (their visual size is ~8px).
+  const hitResizeHandle = (
+    sceneX: number,
+    sceneY: number,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ): { dir: HandleDir; el: any } | null => {
+    if (!scene) return null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const selectedIds = (appState as any).selectedElementIds ?? {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const zoomV = (appState.zoom as any).value || 1;
+    const tol = 8 / zoomV; // scene-coord tolerance for handle squares
+
+    // Only handle non-linear, non-freedraw elements for batch 14.
+    // Linear (line/arrow) and freedraw need their own per-point editors
+    // which is a separate batch.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const el of scene.getNonDeletedElements() as any[]) {
+      if (!selectedIds[el.id]) continue;
+      if (el.type === "line" || el.type === "arrow" || el.type === "freedraw")
+        continue;
+
+      const { x, y, width: w, height: h } = el;
+      const cx = x + w / 2;
+      const cy = y + h / 2;
+
+      // Corner handles first (priority — they're visually on top of edges).
+      const corners: Array<[HandleDir, number, number]> = [
+        ["nw", x, y],
+        ["ne", x + w, y],
+        ["se", x + w, y + h],
+        ["sw", x, y + h],
+      ];
+      for (const [dir, hx, hy] of corners) {
+        if (Math.abs(sceneX - hx) <= tol && Math.abs(sceneY - hy) <= tol) {
+          return { dir, el };
+        }
+      }
+      // Edge handles (mid-points).
+      const edges: Array<[HandleDir, number, number]> = [
+        ["n", cx, y],
+        ["e", x + w, cy],
+        ["s", cx, y + h],
+        ["w", x, cy],
+      ];
+      for (const [dir, hx, hy] of edges) {
+        if (Math.abs(sceneX - hx) <= tol && Math.abs(sceneY - hy) <= tol) {
+          return { dir, el };
+        }
+      }
+    }
+    return null;
+  };
+
+  // Apply resize given handle direction + scene-coord delta. Minimum
+  // 1px on either dim to avoid zero-area elements.
+  const applyResize = (sceneX: number, sceneY: number) => {
+    if (!resizeGesture || !scene) return;
+    const { dir, el, origX, origY, origW, origH } = resizeGesture;
+    const dx = sceneX - (origX + (dir.includes("e") ? origW : dir.includes("w") ? 0 : origW / 2));
+    const dy = sceneY - (origY + (dir.includes("s") ? origH : dir.includes("n") ? 0 : origH / 2));
+
+    // Start from original bbox, then adjust the edges the handle controls.
+    let nx = origX;
+    let ny = origY;
+    let nw = origW;
+    let nh = origH;
+
+    if (dir.includes("e")) nw = origW + dx;
+    if (dir.includes("w")) {
+      nx = origX + dx;
+      nw = origW - dx;
+    }
+    if (dir.includes("s")) nh = origH + dy;
+    if (dir.includes("n")) {
+      ny = origY + dy;
+      nh = origH - dy;
+    }
+
+    // Min size + flip-prevention. If the user drags past the opposite
+    // edge (nw <= 0), pin the bbox to a 1-px minimum on that side. Real
+    // editors flip the element; we keep PoC scope tight.
+    if (nw < 1) {
+      if (dir.includes("w")) nx = origX + origW - 1;
+      nw = 1;
+    }
+    if (nh < 1) {
+      if (dir.includes("n")) ny = origY + origH - 1;
+      nh = 1;
+    }
+
+    scene.mutateElement(
+      el,
+      { x: nx, y: ny, width: nw, height: nh },
+      { informMutation: false, isDragging: true },
+    );
+    bumpSceneRepaint();
+  };
+
   // Hit-test helper: returns topmost (last-drawn) element at scene coords,
   // or null if empty. Iterates scene elements in reverse document order so
   // the highest-z element wins. Threshold allows a small slop (~10px in
@@ -1251,8 +1370,28 @@
     const tool = (appState.activeTool as any)?.type;
     const { x, y } = toSceneCoords(event.clientX, event.clientY);
 
-    // ── Selection tool: hit-test, update selection, maybe start drag ──
+    // ── Selection tool: check resize handles first, then hit-test ─────
     if (tool === "selection") {
+      // Resize handle hit-test takes precedence over element hit-test
+      // because handles are rendered on TOP of elements. Without this
+      // check, clicking a handle near the corner of an element would
+      // just start a drag on the element.
+      const handleHit = hitResizeHandle(x, y);
+      if (handleHit) {
+        resizeGesture = {
+          dir: handleHit.dir,
+          el: handleHit.el,
+          origX: handleHit.el.x,
+          origY: handleHit.el.y,
+          origW: handleHit.el.width,
+          origH: handleHit.el.height,
+        };
+        dragStart = { x, y }; // used only as "drag active" sentinel
+        tryCapture(event.currentTarget as HTMLElement | null, event.pointerId);
+        event.preventDefault();
+        return;
+      }
+
       const hit = hitTestAt(x, y);
       if (!hit) {
         clearSelection();
@@ -1351,6 +1490,13 @@
     }
     if (!dragStart) return;
 
+    // Resize gesture takes precedence over drag/draw.
+    if (resizeGesture) {
+      const { x, y } = toSceneCoords(event.clientX, event.clientY);
+      applyResize(x, y);
+      return;
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cur = (appState as any).newElement;
 
@@ -1438,6 +1584,21 @@
   const onInteractivePointerUp = (event: PointerEvent) => {
     if (isPanning) {
       endPan();
+      tryRelease(event.currentTarget as HTMLElement | null, event.pointerId);
+      return;
+    }
+
+    // Finalize resize gesture.
+    if (resizeGesture) {
+      const changed =
+        resizeGesture.el.x !== resizeGesture.origX ||
+        resizeGesture.el.y !== resizeGesture.origY ||
+        resizeGesture.el.width !== resizeGesture.origW ||
+        resizeGesture.el.height !== resizeGesture.origH;
+      resizeGesture = null;
+      dragStart = null;
+      if (changed) pushHistory();
+      bumpSceneRepaint();
       tryRelease(event.currentTarget as HTMLElement | null, event.pointerId);
       return;
     }
