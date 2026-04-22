@@ -66,6 +66,8 @@
   // @ts-ignore — upstream
   import { newElement, newLinearElement, newArrowElement, newFreeDrawElement, hitElementItself, duplicateElements, deepCopyElement } from "@excalidraw/element";
   // @ts-ignore — upstream, resolved via Vite alias
+  import { exportToBlob, exportToSvg } from "@excalidraw/utils/export";
+  // @ts-ignore — upstream, resolved via Vite alias
   // prettier-ignore
   import { DEFAULT_COLLISION_THRESHOLD, ELEMENT_TRANSLATE_AMOUNT, ELEMENT_SHIFT_TRANSLATE_AMOUNT, ZOOM_STEP } from "@excalidraw/common";
   // @ts-ignore — upstream
@@ -490,11 +492,18 @@
     pushHistory();
 
     // Test-only probe: smoke scripts read `window.__sveltedrawProbe` to
-    // inspect live scene + appState. DEV-only.
+    // inspect live scene + appState + call export helpers directly
+    // (avoids having to intercept blob downloads in headless Chrome).
+    // DEV-only.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if ((import.meta as any).env?.DEV) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).__sveltedrawProbe = { appState, scene };
+      (window as any).__sveltedrawProbe = {
+        appState,
+        scene,
+        exportAsPng,
+        exportAsSvg,
+      };
     }
 
     // ── ResizeObserver on container (replaces window-resize from batch 1) ─
@@ -865,6 +874,83 @@
     bumpSceneRepaint();
   };
 
+  // ── Export ───────────────────────────────────────────────────────────
+  //
+  // Thin wrappers over upstream `@excalidraw/utils/export`. Those helpers
+  // call `restoreAppState` + `restoreElements` defensively, so we can pass
+  // our $state proxy cast to any — they migrate/normalize what they need.
+  //
+  // Download via anchor.click() with a blob URL. Revoke the URL after a
+  // tick so Chrome finishes the download before GC.
+
+  const triggerDownload = (blobOrUrl: Blob | string, filename: string) => {
+    const url =
+      typeof blobOrUrl === "string" ? blobOrUrl : URL.createObjectURL(blobOrUrl);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    if (typeof blobOrUrl !== "string") {
+      // Revoke after the browser has consumed the URL. setTimeout is the
+      // simplest portable tick for this.
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+  };
+
+  const buildExportOpts = () => {
+    if (!scene) return null;
+    return {
+      elements: scene.getNonDeletedElements(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      appState: appState as any,
+      files: {},
+    };
+  };
+
+  const exportAsPng = async (): Promise<Blob | null> => {
+    const opts = buildExportOpts();
+    if (!opts) return null;
+    const blob = await exportToBlob({
+      ...opts,
+      mimeType: "image/png",
+    });
+    return blob;
+  };
+
+  const downloadPng = async () => {
+    const blob = await exportAsPng();
+    if (!blob) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const name = (appState as any).name || "sveltedraw";
+    triggerDownload(blob, `${name}.png`);
+  };
+
+  const exportAsSvg = async (): Promise<SVGSVGElement | null> => {
+    const opts = buildExportOpts();
+    if (!opts) return null;
+    const svg = await exportToSvg(opts);
+    return svg;
+  };
+
+  const downloadSvg = async () => {
+    const svg = await exportAsSvg();
+    if (!svg) return;
+    const serializer = new XMLSerializer();
+    const source = serializer.serializeToString(svg);
+    // Prefix with XML + DOCTYPE so the SVG opens standalone in browsers
+    // and graphics apps that are strict about preambles.
+    const prelude =
+      '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n';
+    const blob = new Blob([prelude + source], { type: "image/svg+xml" });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const name = (appState as any).name || "sveltedraw";
+    triggerDownload(blob, `${name}.svg`);
+  };
+
   const clearCanvas = () => {
     if (!scene) return;
     scene.replaceAllElements([], { skipValidation: true });
@@ -1045,6 +1131,20 @@
         (event.key === "Delete" || event.key === "Backspace")
       ) {
         clearCanvas();
+        event.preventDefault();
+        return;
+      }
+
+      // Export shortcuts.
+      //   Ctrl/Cmd + S       → download PNG
+      //   Ctrl/Cmd + Shift+S → download SVG
+      // Both block the browser's "Save Page" prompt.
+      if (event.key === "s" || event.key === "S") {
+        if (event.shiftKey) {
+          downloadSvg();
+        } else {
+          downloadPng();
+        }
         event.preventDefault();
         return;
       }

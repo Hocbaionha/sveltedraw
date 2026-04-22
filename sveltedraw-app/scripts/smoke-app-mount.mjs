@@ -605,6 +605,32 @@ async function main() {
         selectedCount: Object.keys(p.appState?.selectedElementIds ?? {}).length,
       };
 
+      // ── Batch 12: export PNG + SVG ───────────────────────────────
+      // Call probe helpers directly; avoids dealing with blob downloads
+      // in headless. Asserts each returns a non-trivial output.
+      let exportPng = null;
+      let exportSvg = null;
+      try {
+        const pngBlob = await p.exportAsPng();
+        exportPng = {
+          isBlob: pngBlob instanceof Blob,
+          size: pngBlob?.size ?? 0,
+          type: pngBlob?.type ?? '',
+        };
+      } catch (err) {
+        exportPng = { err: String(err) };
+      }
+      try {
+        const svgEl = await p.exportAsSvg();
+        exportSvg = {
+          tag: svgEl?.tagName ?? '',
+          childCount: svgEl?.querySelectorAll?.('*')?.length ?? 0,
+          hasViewBox: !!svgEl?.getAttribute?.('viewBox'),
+        };
+      } catch (err) {
+        exportSvg = { err: String(err) };
+      }
+
       return {
         ...afterDraw,
         afterSelect, afterDrag, afterClickEmpty,
@@ -616,6 +642,7 @@ async function main() {
         afterResizeSE, afterResizeNW, afterUndoResize,
         afterShiftClick1, afterShiftClick2, afterShiftClickToggleOff,
         afterMarquee, afterShiftMarquee,
+        exportPng, exportSvg,
       };
     })()`,
     returnByValue: true,
@@ -974,6 +1001,33 @@ async function main() {
     "shift-marquee-is-additive",
     (probe?.afterShiftMarquee?.selectedCount ?? 0) > probe?.afterMarquee?.selectedCount,
     `before=${probe?.afterMarquee?.selectedCount} after=${probe?.afterShiftMarquee?.selectedCount}`,
+  );
+
+  // Batch 12: export.
+  pass(
+    "export-png-returns-blob",
+    probe?.exportPng?.isBlob === true && (probe?.exportPng?.size ?? 0) > 500,
+    `size=${probe?.exportPng?.size} type=${probe?.exportPng?.type} err=${probe?.exportPng?.err ?? ""}`,
+  );
+  pass(
+    "export-png-has-image-mime",
+    probe?.exportPng?.type === "image/png",
+    `type=${probe?.exportPng?.type}`,
+  );
+  pass(
+    "export-svg-returns-svg-el",
+    (probe?.exportSvg?.tag ?? "").toLowerCase() === "svg",
+    `tag=${probe?.exportSvg?.tag} err=${probe?.exportSvg?.err ?? ""}`,
+  );
+  pass(
+    "export-svg-has-children",
+    (probe?.exportSvg?.childCount ?? 0) >= 6,
+    `childCount=${probe?.exportSvg?.childCount} (expected ≥6 for 6-shape scene)`,
+  );
+  pass(
+    "export-svg-has-viewbox",
+    probe?.exportSvg?.hasViewBox === true,
+    `hasViewBox=${probe?.exportSvg?.hasViewBox}`,
   );
 
   pass(
