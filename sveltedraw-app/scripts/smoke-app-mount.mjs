@@ -1033,6 +1033,50 @@ async function main() {
         exportSvg = { err: String(err) };
       }
 
+      // ── Text alignment picker (text-only rows) ──
+      let textAlignPicker = null;
+      try {
+        const txt = p.scene?.getNonDeletedElements?.()?.find(el => el.type === 'text');
+        if (!txt) throw new Error('no text');
+        p.appState.selectedElementIds = { [txt.id]: true };
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        await new Promise(r => setTimeout(r, 60));
+        const textAlignRow = !!document.querySelector('.sveltedraw-style-panel [data-preset="textAlign"]');
+        const verticalRow = !!document.querySelector('.sveltedraw-style-panel [data-preset="verticalAlign"]');
+
+        const centerBtn = document.querySelector('.sveltedraw-style-panel [data-preset="textAlign"][data-value="center"]');
+        if (centerBtn) centerBtn.click();
+        await new Promise(r => setTimeout(r, 30));
+        const afterCenter = p.scene?.getNonDeletedElements?.()?.find(el => el.id === txt.id);
+
+        const middleBtn = document.querySelector('.sveltedraw-style-panel [data-preset="verticalAlign"][data-value="middle"]');
+        if (middleBtn) middleBtn.click();
+        await new Promise(r => setTimeout(r, 30));
+        const afterMiddle = p.scene?.getNonDeletedElements?.()?.find(el => el.id === txt.id);
+
+        // Select a rectangle — rows should disappear.
+        const rec = p.scene?.getNonDeletedElements?.()?.find(el => el.type === 'rectangle');
+        if (rec) p.appState.selectedElementIds = { [rec.id]: true };
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        await new Promise(r => setTimeout(r, 40));
+        const rowHiddenForRect = !document.querySelector('.sveltedraw-style-panel [data-preset="textAlign"]');
+
+        textAlignPicker = {
+          textAlignRow,
+          verticalRow,
+          newTextAlign: afterCenter?.textAlign ?? null,
+          newVerticalAlign: afterMiddle?.verticalAlign ?? null,
+          rowHiddenForRect,
+        };
+        // Undo x2 so reload-scene is unchanged.
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+      } catch (err) {
+        textAlignPicker = { err: String(err) };
+      }
+
       // ── Arrowhead picker: shown only when linear selected ──
       // Select an arrow element (known to exist from batch 7), verify the
       // arrowhead rows render. Click the "triangle" end-arrow preset,
@@ -1578,7 +1622,7 @@ async function main() {
         rotatedTextOverlay,
         zOrderForward, zOrderBackward, altDragDup,
         ctxMenuDup, ctxMenuClose,
-        arrowheadPicker,
+        arrowheadPicker, textAlignPicker,
       };
     })()`,
     returnByValue: true,
@@ -2177,6 +2221,29 @@ async function main() {
       (probe?.undoFloor?.atFloor ?? -1) >= 0 &&
       (probe?.undoFloor?.final ?? -1) === (probe?.undoFloor?.before ?? -2),
     `before=${probe?.undoFloor?.before} atFloor=${probe?.undoFloor?.atFloor} afterRedo=${probe?.undoFloor?.afterRedo} final=${probe?.undoFloor?.final} alive=${probe?.undoFloor?.appStateAlive}`,
+  );
+
+  // Text alignment (text-only).
+  pass(
+    "text-align-rows-visible-for-text",
+    probe?.textAlignPicker?.textAlignRow === true &&
+      probe?.textAlignPicker?.verticalRow === true,
+    `textAlignRow=${probe?.textAlignPicker?.textAlignRow} verticalRow=${probe?.textAlignPicker?.verticalRow}`,
+  );
+  pass(
+    "text-align-center-applies",
+    probe?.textAlignPicker?.newTextAlign === "center",
+    `newTextAlign=${probe?.textAlignPicker?.newTextAlign}`,
+  );
+  pass(
+    "text-vertical-align-middle-applies",
+    probe?.textAlignPicker?.newVerticalAlign === "middle",
+    `newVerticalAlign=${probe?.textAlignPicker?.newVerticalAlign}`,
+  );
+  pass(
+    "text-align-rows-hide-for-non-text",
+    probe?.textAlignPicker?.rowHiddenForRect === true,
+    `hidden=${probe?.textAlignPicker?.rowHiddenForRect}`,
   );
 
   // Arrowhead picker (linear-only).

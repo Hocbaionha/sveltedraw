@@ -94,6 +94,9 @@
   import type { FontDescriptor } from "./components/font-picker/types.js";
   import Icon from "./icons/Icon.svelte";
   import StrokeStyleSolidIcon from "./icons/dynamic/StrokeStyleSolidIcon.svelte";
+  import TextAlignTopIcon from "./icons/dynamic/TextAlignTopIcon.svelte";
+  import TextAlignMiddleIcon from "./icons/dynamic/TextAlignMiddleIcon.svelte";
+  import TextAlignBottomIcon from "./icons/dynamic/TextAlignBottomIcon.svelte";
   import ArrowheadNoneIcon from "./icons/dynamic/ArrowheadNoneIcon.svelte";
   import ArrowheadArrowIcon from "./icons/dynamic/ArrowheadArrowIcon.svelte";
   import ArrowheadTriangleIcon from "./icons/dynamic/ArrowheadTriangleIcon.svelte";
@@ -1329,6 +1332,16 @@
     { name: "circle", value: "circle" as const },
     { name: "bar", value: "bar" as const },
   ];
+  const TEXT_ALIGN_PRESETS = [
+    { name: "left", value: "left" as const, icon: "TextAlignLeftIcon" },
+    { name: "center", value: "center" as const, icon: "TextAlignCenterIcon" },
+    { name: "right", value: "right" as const, icon: "TextAlignRightIcon" },
+  ];
+  const VERTICAL_ALIGN_PRESETS = [
+    { name: "top", value: "top" as const },
+    { name: "middle", value: "middle" as const },
+    { name: "bottom", value: "bottom" as const },
+  ];
 
   // Open-state for the two picker popovers (controlled). Only one open at
   // a time; opening the other auto-closes the first.
@@ -1367,6 +1380,10 @@
         startArrowhead: (el as any).startArrowhead ?? null,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         endArrowhead: (el as any).endArrowhead ?? null,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        textAlign: (el as any).textAlign,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        verticalAlign: (el as any).verticalAlign,
       };
     }
     return {
@@ -1388,6 +1405,10 @@
       startArrowhead: (appState as any).currentItemStartArrowhead ?? null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       endArrowhead: (appState as any).currentItemEndArrowhead ?? "arrow",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      textAlign: (appState as any).currentItemTextAlign,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      verticalAlign: (appState as any).currentItemVerticalAlign,
     };
   });
 
@@ -1406,6 +1427,22 @@
       if (ids[el.id] && (el.type === "line" || el.type === "arrow")) {
         return true;
       }
+    }
+    return false;
+  });
+
+  // Text-only: shows text-alignment rows. Same inline-proxy-access
+  // pattern as `hasLinearSelected` — Svelte 5 tracking is finicky
+  // across function boundaries (see feedback memory).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const hasTextSelected = $derived.by<boolean>(() => {
+    void sceneReady;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ids = (appState as any).selectedElementIds ?? {};
+    if (!scene) return false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const el of scene.getNonDeletedElements() as any[]) {
+      if (ids[el.id] && el.type === "text") return true;
     }
     return false;
   });
@@ -3398,6 +3435,54 @@
               onclick={() => applyStyle({ endArrowhead: a.value })}
             >
               {@render arrowheadIcon(a.value, false)}
+            </button>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
+    {#if hasTextSelected}
+      {#snippet verticalAlignIcon(value: string)}
+        {#if value === "top"}
+          <TextAlignTopIcon />
+        {:else if value === "middle"}
+          <TextAlignMiddleIcon />
+        {:else if value === "bottom"}
+          <TextAlignBottomIcon />
+        {/if}
+      {/snippet}
+      <div class="sp-row">
+        <div class="sp-label">Text align</div>
+        <div class="sp-swatches">
+          {#each TEXT_ALIGN_PRESETS as t}
+            <button
+              type="button"
+              class="sp-icon-btn"
+              class:active={panelStyle.textAlign === t.value}
+              data-preset="textAlign"
+              data-value={t.value}
+              aria-label={`Text align ${t.name}`}
+              onclick={() => applyStyle({ textAlign: t.value })}
+            >
+              <Icon name={t.icon} />
+            </button>
+          {/each}
+        </div>
+      </div>
+      <div class="sp-row">
+        <div class="sp-label">Vertical</div>
+        <div class="sp-swatches">
+          {#each VERTICAL_ALIGN_PRESETS as v}
+            <button
+              type="button"
+              class="sp-icon-btn"
+              class:active={panelStyle.verticalAlign === v.value}
+              data-preset="verticalAlign"
+              data-value={v.value}
+              aria-label={`Vertical align ${v.name}`}
+              onclick={() => applyStyle({ verticalAlign: v.value })}
+            >
+              {@render verticalAlignIcon(v.value)}
             </button>
           {/each}
         </div>
