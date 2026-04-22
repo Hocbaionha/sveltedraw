@@ -1033,6 +1033,81 @@ async function main() {
         exportSvg = { err: String(err) };
       }
 
+      // ── Style extensions: strokeStyle / fillStyle / roughness ──
+      // Select a rectangle, click dashed stroke style (data-value=dashed),
+      // then solid fill style, then artist roughness. Verify each update.
+      let styleExt = null;
+      try {
+        const rectForExt = p.scene?.getNonDeletedElements?.()?.find(el => el.type === 'rectangle');
+        if (!rectForExt) throw new Error('no rect');
+        const extCtr = sceneToVp(rectForExt.x + rectForExt.width / 2, rectForExt.y + rectForExt.height / 2);
+        iv.dispatchEvent(mk('pointerdown', extCtr.x, extCtr.y));
+        iv.dispatchEvent(mk('pointerup', extCtr.x, extCtr.y));
+        await new Promise(r => setTimeout(r, 30));
+
+        const dashedBtn = document.querySelector('.sveltedraw-style-panel [data-preset="strokeStyle"][data-value="dashed"]');
+        if (dashedBtn) dashedBtn.click();
+        await new Promise(r => setTimeout(r, 30));
+        const afterDashed = p.scene?.getNonDeletedElements?.()?.find(el => el.id === rectForExt.id);
+
+        const solidFillBtn = document.querySelector('.sveltedraw-style-panel [data-preset="fillStyle"][data-value="solid"]');
+        if (solidFillBtn) solidFillBtn.click();
+        await new Promise(r => setTimeout(r, 30));
+        const afterFill = p.scene?.getNonDeletedElements?.()?.find(el => el.id === rectForExt.id);
+
+        const roughBtn = document.querySelector('.sveltedraw-style-panel [data-preset="roughness"][data-value="1"]');
+        if (roughBtn) roughBtn.click();
+        await new Promise(r => setTimeout(r, 30));
+        const afterRough = p.scene?.getNonDeletedElements?.()?.find(el => el.id === rectForExt.id);
+
+        styleExt = {
+          foundDashedBtn: !!dashedBtn,
+          foundSolidFillBtn: !!solidFillBtn,
+          foundRoughBtn: !!roughBtn,
+          newStrokeStyle: afterDashed?.strokeStyle ?? null,
+          newFillStyle: afterFill?.fillStyle ?? null,
+          newRoughness: afterRough?.roughness ?? null,
+        };
+      } catch (err) {
+        styleExt = { err: String(err) };
+      }
+
+      // ── Font picker: changes fontFamily on selected text element ──
+      // Pick up an existing text element, open the font picker via its
+      // trigger, pick the "Normal" (Helvetica=2) default quick-pick,
+      // verify the element's fontFamily updated + the popover closed.
+      let fontPicker = null;
+      try {
+        const txt = (p.scene?.getNonDeletedElements?.() ?? []).find(el => el.type === 'text');
+        if (!txt) throw new Error('no text to test FontPicker');
+        const origFont = txt.fontFamily;
+        p.appState.selectedElementIds = { [txt.id]: true };
+        await new Promise(r => setTimeout(r, 30));
+        // The 3-way default buttons live in a RadioSelection BEFORE the
+        // popover opens. Click the 2nd (Normal = Helvetica = 2).
+        const panel = document.querySelector('.sp-font-picker');
+        const radios = panel?.querySelectorAll('.buttonList button, [role="radio"], button');
+        // Find the one with label text "Normal" or data-testid match.
+        const normalBtn = panel?.querySelector('[data-testid="font-family-normal"]');
+        let clicked = null;
+        if (normalBtn) {
+          normalBtn.click();
+          clicked = 'normal';
+          await new Promise(r => setTimeout(r, 30));
+        }
+        const after = (p.scene?.getNonDeletedElements?.() ?? []).find(el => el.id === txt.id);
+        fontPicker = {
+          foundPanel: !!panel,
+          foundNormalBtn: !!normalBtn,
+          radiosCount: radios?.length ?? 0,
+          origFont,
+          newFont: after?.fontFamily ?? null,
+          clicked,
+        };
+      } catch (err) {
+        fontPicker = { err: String(err) };
+      }
+
       // ── Multi-point line (polyline) probe ────────────────────────
       // Switch to line tool, click-release at 3 points (no drag), then
       // press Enter. Verify the committed element has 3 user-anchored
@@ -1246,6 +1321,7 @@ async function main() {
         exportPng, exportSvg,
         rotatedResize, ctrlASelect, undoFloor,
         polylineLine, polylineEscape,
+        fontPicker, styleExt,
       };
     })()`,
     returnByValue: true,
@@ -1844,6 +1920,35 @@ async function main() {
       (probe?.undoFloor?.atFloor ?? -1) >= 0 &&
       (probe?.undoFloor?.final ?? -1) === (probe?.undoFloor?.before ?? -2),
     `before=${probe?.undoFloor?.before} atFloor=${probe?.undoFloor?.atFloor} afterRedo=${probe?.undoFloor?.afterRedo} final=${probe?.undoFloor?.final} alive=${probe?.undoFloor?.appStateAlive}`,
+  );
+
+  // Style extensions: strokeStyle / fillStyle / roughness rows apply.
+  pass(
+    "style-stroke-style-applies",
+    probe?.styleExt?.foundDashedBtn === true &&
+      probe?.styleExt?.newStrokeStyle === "dashed",
+    `found=${probe?.styleExt?.foundDashedBtn} newStrokeStyle=${probe?.styleExt?.newStrokeStyle}`,
+  );
+  pass(
+    "style-fill-style-applies",
+    probe?.styleExt?.foundSolidFillBtn === true &&
+      probe?.styleExt?.newFillStyle === "solid",
+    `found=${probe?.styleExt?.foundSolidFillBtn} newFillStyle=${probe?.styleExt?.newFillStyle}`,
+  );
+  pass(
+    "style-roughness-applies",
+    probe?.styleExt?.foundRoughBtn === true &&
+      probe?.styleExt?.newRoughness === 1,
+    `found=${probe?.styleExt?.foundRoughBtn} newRoughness=${probe?.styleExt?.newRoughness}`,
+  );
+
+  // Font picker: quick-pick "Normal" changes text fontFamily.
+  pass(
+    "font-picker-applies-to-text",
+    probe?.fontPicker?.foundPanel === true &&
+      probe?.fontPicker?.foundNormalBtn === true &&
+      probe?.fontPicker?.newFont === 2,
+    `foundPanel=${probe?.fontPicker?.foundPanel} foundNormalBtn=${probe?.fontPicker?.foundNormalBtn} orig=${probe?.fontPicker?.origFont} new=${probe?.fontPicker?.newFont}`,
   );
 
   // Polyline probes (multi-point line/arrow).

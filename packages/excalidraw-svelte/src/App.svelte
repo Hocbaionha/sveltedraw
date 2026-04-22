@@ -62,7 +62,7 @@
   import rough from "roughjs/bin/rough";
   // @ts-ignore — upstream, resolved via Vite alias
   // prettier-ignore
-  import { getFormFactor, createUserAgentDescriptor, MQ_RIGHT_SIDEBAR_MIN_WIDTH, supportsResizeObserver, POINTER_EVENTS, randomId, viewportCoordsToSceneCoords, DEFAULT_ELEMENT_PROPS, DEFAULT_FONT_FAMILY } from "@excalidraw/common";
+  import { getFormFactor, createUserAgentDescriptor, MQ_RIGHT_SIDEBAR_MIN_WIDTH, supportsResizeObserver, POINTER_EVENTS, randomId, viewportCoordsToSceneCoords, DEFAULT_ELEMENT_PROPS, DEFAULT_FONT_FAMILY, FONT_FAMILY } from "@excalidraw/common";
   // @ts-ignore — upstream
   import { newElement, newLinearElement, newArrowElement, newFreeDrawElement, newTextElement, newImageElement, hitElementItself, duplicateElements, deepCopyElement } from "@excalidraw/element";
   // @ts-ignore — upstream
@@ -71,7 +71,7 @@
   import { exportToBlob, exportToSvg } from "@excalidraw/utils/export";
   // @ts-ignore — upstream, resolved via Vite alias
   // prettier-ignore
-  import { DEFAULT_COLLISION_THRESHOLD, ELEMENT_TRANSLATE_AMOUNT, ELEMENT_SHIFT_TRANSLATE_AMOUNT, ZOOM_STEP, STROKE_WIDTH, COLOR_PALETTE } from "@excalidraw/common";
+  import { DEFAULT_COLLISION_THRESHOLD, ELEMENT_TRANSLATE_AMOUNT, ELEMENT_SHIFT_TRANSLATE_AMOUNT, ZOOM_STEP, STROKE_WIDTH, COLOR_PALETTE, ROUGHNESS } from "@excalidraw/common";
   // @ts-ignore — upstream
   import { getStateForZoom } from "@excalidraw/excalidraw/scene/zoom";
   // @ts-ignore — upstream
@@ -90,6 +90,10 @@
     TUNNELS_KEY,
   } from "./state/index.js";
   import ColorPicker from "./components/color-picker/ColorPicker.svelte";
+  import FontPicker from "./components/font-picker/FontPicker.svelte";
+  import type { FontDescriptor } from "./components/font-picker/types.js";
+  import Icon from "./icons/Icon.svelte";
+  import StrokeStyleSolidIcon from "./icons/dynamic/StrokeStyleSolidIcon.svelte";
 
   import LayerUI from "./components/LayerUI.svelte";
   import StaticCanvas from "./components/canvases/StaticCanvas.svelte";
@@ -1270,6 +1274,21 @@
     { name: "bold", value: STROKE_WIDTH.bold },
     { name: "extrabold", value: STROKE_WIDTH.extraBold },
   ];
+  const STROKE_STYLES = [
+    { name: "solid", value: "solid" as const, icon: "StrokeStyleSolidIcon" },
+    { name: "dashed", value: "dashed" as const, icon: "StrokeStyleDashedIcon" },
+    { name: "dotted", value: "dotted" as const, icon: "StrokeStyleDottedIcon" },
+  ];
+  const FILL_STYLES = [
+    { name: "hachure", value: "hachure" as const, icon: "FillHachureIcon" },
+    { name: "cross-hatch", value: "cross-hatch" as const, icon: "FillCrossHatchIcon" },
+    { name: "solid", value: "solid" as const, icon: "FillSolidIcon" },
+  ];
+  const ROUGHNESS_PRESETS = [
+    { name: "architect", value: ROUGHNESS.architect, icon: "SloppinessArchitectIcon" },
+    { name: "artist", value: ROUGHNESS.artist, icon: "SloppinessArtistIcon" },
+    { name: "cartoonist", value: ROUGHNESS.cartoonist, icon: "SloppinessCartoonistIcon" },
+  ];
   const OPACITY_PRESETS = [25, 50, 75, 100];
 
   // Open-state for the two picker popovers (controlled). Only one open at
@@ -1299,6 +1318,12 @@
         backgroundColor: el.backgroundColor,
         strokeWidth: el.strokeWidth,
         opacity: el.opacity,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        strokeStyle: (el as any).strokeStyle,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        fillStyle: (el as any).fillStyle,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        roughness: (el as any).roughness,
       };
     }
     return {
@@ -1310,7 +1335,70 @@
       strokeWidth: (appState as any).currentItemStrokeWidth,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       opacity: (appState as any).currentItemOpacity,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      strokeStyle: (appState as any).currentItemStrokeStyle,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      fillStyle: (appState as any).currentItemFillStyle,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      roughness: (appState as any).currentItemRoughness,
     };
+  });
+
+  // ── Font picker state ────────────────────────────────────────────
+  // The picker shows a 3-way quick-pick (Hand-drawn / Normal / Code) at
+  // the top and a full searchable list in a popover. All selection writes
+  // go through `applyStyle({ fontFamily })` so they flow through the
+  // existing "apply-to-selection-or-currentItem*" path.
+  let fontPickerOpen = $state(false);
+  let fontPickerHover = $state<number | null>(null);
+
+  // Font family currently shown in the picker — last selected text
+  // element's fontFamily OR currentItemFontFamily.
+  const panelFontFamily = $derived.by<number>(() => {
+    const selected = getSelectedElements();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const textEls = selected.filter((el: any) => el.type === "text");
+    if (textEls.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (textEls[textEls.length - 1] as any).fontFamily ?? DEFAULT_FONT_FAMILY;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (appState as any).currentItemFontFamily ?? DEFAULT_FONT_FAMILY;
+  });
+
+  // Build FontDescriptor arrays. Text labels are font family names (the
+  // list items render them in their own font). Icons are attached in
+  // the template (Svelte Snippets are template constructs).
+  const fontFamilyLabels: Record<number, string> = {
+    [FONT_FAMILY.Virgil]: "Virgil",
+    [FONT_FAMILY.Helvetica]: "Helvetica",
+    [FONT_FAMILY.Cascadia]: "Cascadia",
+    [FONT_FAMILY.Excalifont]: "Excalifont",
+    [FONT_FAMILY.Nunito]: "Nunito",
+    [FONT_FAMILY["Lilita One"]]: "Lilita One",
+    [FONT_FAMILY["Comic Shanns"]]: "Comic Shanns",
+    [FONT_FAMILY["Liberation Sans"]]: "Liberation Sans",
+    [FONT_FAMILY.Assistant]: "Assistant",
+  };
+  const defaultFontValues = [
+    FONT_FAMILY.Excalifont,
+    FONT_FAMILY.Helvetica,
+    FONT_FAMILY.Cascadia,
+  ];
+
+  // Scene fonts = {font-family values used by ≥1 text element} minus the
+  // 3 default quick-picks. Available fonts = everything else.
+  const sceneFontFamilies = $derived.by<Set<number>>(() => {
+    void sceneReady;
+    const out = new Set<number>();
+    if (!scene) return out;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const el of scene.getNonDeletedElements() as any[]) {
+      if (el.type === "text" && typeof el.fontFamily === "number") {
+        out.add(el.fontFamily);
+      }
+    }
+    return out;
   });
 
   const clearCanvas = () => {
@@ -2979,6 +3067,67 @@
     </div>
 
     <div class="sp-row">
+      <div class="sp-label">Stroke style</div>
+      <div class="sp-swatches">
+        {#each STROKE_STYLES as s}
+          <button
+            type="button"
+            class="sp-icon-btn"
+            class:active={panelStyle.strokeStyle === s.value}
+            data-preset="strokeStyle"
+            data-value={s.value}
+            aria-label={`Stroke style ${s.name}`}
+            onclick={() => applyStyle({ strokeStyle: s.value })}
+          >
+            {#if s.value === "solid"}
+              <StrokeStyleSolidIcon />
+            {:else}
+              <Icon name={s.icon} />
+            {/if}
+          </button>
+        {/each}
+      </div>
+    </div>
+
+    <div class="sp-row">
+      <div class="sp-label">Fill style</div>
+      <div class="sp-swatches">
+        {#each FILL_STYLES as f}
+          <button
+            type="button"
+            class="sp-icon-btn"
+            class:active={panelStyle.fillStyle === f.value}
+            data-preset="fillStyle"
+            data-value={f.value}
+            aria-label={`Fill style ${f.name}`}
+            onclick={() => applyStyle({ fillStyle: f.value })}
+          >
+            <Icon name={f.icon} />
+          </button>
+        {/each}
+      </div>
+    </div>
+
+    <div class="sp-row">
+      <div class="sp-label">Sloppiness</div>
+      <div class="sp-swatches">
+        {#each ROUGHNESS_PRESETS as r}
+          <button
+            type="button"
+            class="sp-icon-btn"
+            class:active={panelStyle.roughness === r.value}
+            data-preset="roughness"
+            data-value={r.value}
+            aria-label={`Roughness ${r.name}`}
+            onclick={() => applyStyle({ roughness: r.value })}
+          >
+            <Icon name={r.icon} />
+          </button>
+        {/each}
+      </div>
+    </div>
+
+    <div class="sp-row">
       <div class="sp-label">Opacity</div>
       <div class="sp-swatches">
         {#each OPACITY_PRESETS as o}
@@ -2992,6 +3141,39 @@
             onclick={() => applyStyle({ opacity: o })}
           >{o}</button>
         {/each}
+      </div>
+    </div>
+
+    <div class="sp-row">
+      <div class="sp-label">Font</div>
+      <div class="sp-picker sp-font-picker">
+        {#snippet handDrawnIcon()}<Icon name="FreedrawIcon" />{/snippet}
+        {#snippet normalIcon()}<Icon name="FontFamilyNormalIcon" />{/snippet}
+        {#snippet codeIcon()}<Icon name="FontFamilyCodeIcon" />{/snippet}
+        <FontPicker
+          isOpened={fontPickerOpen}
+          selectedFontFamily={panelFontFamily}
+          hoveredFontFamily={fontPickerHover}
+          defaultFonts={[
+            { value: FONT_FAMILY.Excalifont, icon: handDrawnIcon, text: "Hand-drawn", testId: "font-family-hand-drawn" },
+            { value: FONT_FAMILY.Helvetica, icon: normalIcon, text: "Normal", testId: "font-family-normal" },
+            { value: FONT_FAMILY.Cascadia, icon: codeIcon, text: "Code", testId: "font-family-code" },
+          ]}
+          sceneFonts={Object.entries(fontFamilyLabels)
+            .filter(([v]) => sceneFontFamilies.has(Number(v)) && !defaultFontValues.includes(Number(v)))
+            .map(([v, text]) => ({ value: Number(v), icon: normalIcon, text }))}
+          availableFonts={Object.entries(fontFamilyLabels)
+            .filter(([v]) => !sceneFontFamilies.has(Number(v)) && !defaultFontValues.includes(Number(v)))
+            .map(([v, text]) => ({ value: Number(v), icon: normalIcon, text }))}
+          onSelect={(v) => {
+            applyStyle({ fontFamily: v });
+            fontPickerOpen = false;
+          }}
+          onHover={(v) => (fontPickerHover = v)}
+          onLeave={() => (fontPickerHover = null)}
+          onPopupChange={(open) => (fontPickerOpen = open)}
+          container={containerEl}
+        />
       </div>
     </div>
   </div>
@@ -3193,5 +3375,26 @@
   .sveltedraw-style-panel .sp-opacity.active {
     border-color: #6965db;
     background: #eeedfa;
+  }
+  .sveltedraw-style-panel .sp-icon-btn {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: #fff;
+    border: 1px solid #d1d4da;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #1e1e1e;
+  }
+  .sveltedraw-style-panel .sp-icon-btn.active {
+    border-color: #6965db;
+    background: #eeedfa;
+  }
+  :global(.sveltedraw-style-panel .sp-icon-btn svg) {
+    width: 16px;
+    height: 16px;
   }
 </style>
