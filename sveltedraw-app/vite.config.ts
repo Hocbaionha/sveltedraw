@@ -94,7 +94,9 @@ export default defineConfig({
     // condition without this hint.
     conditions: ['svelte', 'browser', 'module', 'import', 'default'],
     alias: [
-      { find: /^@excalidraw\/excalidraw$/, replacement: resolve('../packages/excalidraw/index.tsx') },
+      // Bare `@excalidraw/excalidraw` is no longer exported (index.tsx
+      // was the React entry, deleted in Phase 9). Only subpath imports
+      // like `/scene/Renderer` work.
       { find: /^@excalidraw\/excalidraw\/(.*)/, replacement: resolve('../packages/excalidraw/$1') },
       { find: /^@excalidraw\/common$/, replacement: resolve('../packages/common/src/index.ts') },
       { find: /^@excalidraw\/common\/(.*)/, replacement: resolve('../packages/common/src/$1') },
@@ -109,5 +111,83 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
+    // Chunk size budget: the warning limit at default 500 KB was
+    // designed for typical SPAs. Excalidraw has a ~900 KB main
+    // bundle even after splitting because of the canvas rendering
+    // stack (roughjs + perfect-freehand + element ops). Raising to
+    // 800 KB suppresses the noise on chunks that are already as
+    // small as they can be.
+    chunkSizeWarningLimit: 800,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Upstream-generated font subset worker — already its own
+          // chunk via Excalidraw's fonts pipeline, keep as-is.
+          if (id.includes('subset-shared') || id.includes('subset-worker')) {
+            return undefined;
+          }
+
+          if (id.includes('node_modules')) {
+            // Canvas rendering libs — paired with the scene engine.
+            if (
+              id.includes('roughjs') ||
+              id.includes('perfect-freehand') ||
+              id.includes('points-on-curve') ||
+              id.includes('canvas-roundrect-polyfill') ||
+              id.includes('path-data-parser')
+            ) {
+              return 'canvas-libs';
+            }
+            // UI primitives
+            if (id.includes('bits-ui') || id.includes('@melt-ui')) {
+              return 'bits-ui';
+            }
+            // Mermaid + codemirror: future TTDDialog, lazy-loadable.
+            if (id.includes('@excalidraw/mermaid-to-excalidraw')) {
+              return 'mermaid';
+            }
+            if (id.includes('@codemirror') || id.includes('@lezer')) {
+              return 'codemirror';
+            }
+            // Small standalone libs
+            if (
+              id.includes('nanoid') ||
+              id.includes('pako') ||
+              id.includes('fractional-indexing') ||
+              id.includes('browser-fs-access') ||
+              id.includes('clsx') ||
+              id.includes('fuzzy')
+            ) {
+              return 'vendor-small';
+            }
+            // Image libs (large)
+            if (id.includes('image-blob-reduce') || id.includes('pica')) {
+              return 'image-libs';
+            }
+            // Everything else in node_modules: generic vendor.
+            return 'vendor';
+          }
+
+          // Split the Excalidraw engine (scene + renderer + data +
+          // fonts) into its own chunk so the Svelte app code can be
+          // updated without busting the engine cache.
+          if (
+            id.includes('/packages/excalidraw/scene/') ||
+            id.includes('/packages/excalidraw/renderer/') ||
+            id.includes('/packages/excalidraw/data/') ||
+            id.includes('/packages/excalidraw/fonts/') ||
+            id.includes('/packages/excalidraw/clipboard.ts') ||
+            id.includes('/packages/excalidraw/appState.ts') ||
+            id.includes('/packages/excalidraw/types.ts') ||
+            id.includes('/packages/element/') ||
+            id.includes('/packages/common/') ||
+            id.includes('/packages/math/') ||
+            id.includes('/packages/utils/')
+          ) {
+            return 'excalidraw-engine';
+          }
+        },
+      },
+    },
   },
 });
