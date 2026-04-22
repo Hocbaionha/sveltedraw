@@ -106,7 +106,11 @@
   import ArrowheadNoneIcon from "./icons/dynamic/ArrowheadNoneIcon.svelte";
   import ArrowheadArrowIcon from "./icons/dynamic/ArrowheadArrowIcon.svelte";
   import ArrowheadTriangleIcon from "./icons/dynamic/ArrowheadTriangleIcon.svelte";
+  import ArrowheadTriangleOutlineIcon from "./icons/dynamic/ArrowheadTriangleOutlineIcon.svelte";
+  import ArrowheadDiamondIcon from "./icons/dynamic/ArrowheadDiamondIcon.svelte";
+  import ArrowheadDiamondOutlineIcon from "./icons/dynamic/ArrowheadDiamondOutlineIcon.svelte";
   import ArrowheadCircleIcon from "./icons/dynamic/ArrowheadCircleIcon.svelte";
+  import ArrowheadCircleOutlineIcon from "./icons/dynamic/ArrowheadCircleOutlineIcon.svelte";
   import ArrowheadBarIcon from "./icons/dynamic/ArrowheadBarIcon.svelte";
 
   import LayerUI from "./components/LayerUI.svelte";
@@ -1837,6 +1841,59 @@
     return false;
   });
 
+  // True iff selection is ENTIRELY text elements — used to hide rows
+  // that don't apply to text (Background fill, Stroke width, etc.).
+  const allSelectedAreText = $derived.by<boolean>(() => {
+    void sceneReady;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ids = (appState as any).selectedElementIds ?? {};
+    const keys = Object.keys(ids);
+    if (keys.length === 0) return false;
+    if (!scene) return false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const el of scene.getNonDeletedElements() as any[]) {
+      if (ids[el.id] && el.type !== "text") return false;
+    }
+    return true;
+  });
+
+  // True iff selection is ENTIRELY linear — hide Fill / Fill style /
+  // Background for those. Linear has stroke + arrowheads only.
+  const allSelectedAreLinear = $derived.by<boolean>(() => {
+    void sceneReady;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ids = (appState as any).selectedElementIds ?? {};
+    const keys = Object.keys(ids);
+    if (keys.length === 0) return false;
+    if (!scene) return false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const el of scene.getNonDeletedElements() as any[]) {
+      if (ids[el.id] && el.type !== "line" && el.type !== "arrow") return false;
+    }
+    return true;
+  });
+
+  // Toggle lock on every selected element. Locked elements can't be
+  // clicked / dragged / resized; they're essentially inert until
+  // unlocked. Matches upstream's element.locked boolean field.
+  const toggleLockSelected = () => {
+    if (!scene) return;
+    const selected = getSelectedElements();
+    if (selected.length === 0) return;
+    // If any are locked → unlock all. Else lock all.
+    const anyLocked = selected.some((el) => el.locked);
+    const nextLocked = !anyLocked;
+    for (const el of selected) {
+      scene.mutateElement(
+        el,
+        { locked: nextLocked },
+        { informMutation: false, isDragging: false },
+      );
+    }
+    pushHistory();
+    bumpSceneRepaint();
+  };
+
   // ── Font picker state ────────────────────────────────────────────
   // The picker shows a 3-way quick-pick (Hand-drawn / Normal / Code) at
   // the top and a full searchable list in a popover. All selection writes
@@ -2107,6 +2164,13 @@
       }
       if (event.key === "[") {
         reorderSelected(event.shiftKey ? "back" : "backward");
+        event.preventDefault();
+        return;
+      }
+
+      // Lock / unlock selected: Ctrl+Shift+L.
+      if (event.shiftKey && (event.key === "l" || event.key === "L")) {
+        toggleLockSelected();
         event.preventDefault();
         return;
       }
@@ -4225,107 +4289,115 @@
       </div>
     </div>
 
-    <div class="sp-row">
-      <div class="sp-label">{t("labels.background")}</div>
-      <div class="sp-picker">
-        <ColorPicker
-          type="elementBackground"
-          color={panelStyle.backgroundColor}
-          label="Background"
-          elements={pickerElements}
-          updateData={() => {}}
-          open={bgPickerOpen}
-          onToggle={() => {
-            bgPickerOpen = !bgPickerOpen;
-            if (bgPickerOpen) strokePickerOpen = false;
-          }}
-          onClose={() => (bgPickerOpen = false)}
-          onChange={(c) => applyStyle({ backgroundColor: c })}
-          onEyeDropperToggle={() => {}}
-          container={containerEl}
-        />
+    {#if !allSelectedAreText && !allSelectedAreLinear}
+      <div class="sp-row">
+        <div class="sp-label">{t("labels.background")}</div>
+        <div class="sp-picker">
+          <ColorPicker
+            type="elementBackground"
+            color={panelStyle.backgroundColor}
+            label="Background"
+            elements={pickerElements}
+            updateData={() => {}}
+            open={bgPickerOpen}
+            onToggle={() => {
+              bgPickerOpen = !bgPickerOpen;
+              if (bgPickerOpen) strokePickerOpen = false;
+            }}
+            onClose={() => (bgPickerOpen = false)}
+            onChange={(c) => applyStyle({ backgroundColor: c })}
+            onEyeDropperToggle={() => {}}
+            container={containerEl}
+          />
+        </div>
       </div>
-    </div>
+    {/if}
 
-    <div class="sp-row">
-      <div class="sp-label">{t("labels.strokeWidth")}</div>
-      <div class="sp-swatches">
-        {#each STROKE_WIDTHS as w}
-          <button
-            type="button"
-            class="sp-width"
-            class:active={panelStyle.strokeWidth === w.value}
-            data-preset="width"
-            data-value={w.value}
-            aria-label={`Stroke width ${w.name}`}
-            onclick={() => applyStyle({ strokeWidth: w.value })}
-          >
-            <span style="display: inline-block; width: 18px; height: {w.value}px; background: #1e1e1e; border-radius: 1px;"></span>
-          </button>
-        {/each}
+    {#if !allSelectedAreText}
+      <div class="sp-row">
+        <div class="sp-label">{t("labels.strokeWidth")}</div>
+        <div class="sp-swatches">
+          {#each STROKE_WIDTHS as w}
+            <button
+              type="button"
+              class="sp-width"
+              class:active={panelStyle.strokeWidth === w.value}
+              data-preset="width"
+              data-value={w.value}
+              aria-label={`Stroke width ${w.name}`}
+              onclick={() => applyStyle({ strokeWidth: w.value })}
+            >
+              <span style="display: inline-block; width: 18px; height: {w.value}px; background: #1e1e1e; border-radius: 1px;"></span>
+            </button>
+          {/each}
+        </div>
       </div>
-    </div>
 
-    <div class="sp-row">
-      <div class="sp-label">{t("labels.strokeStyle")}</div>
-      <div class="sp-swatches">
-        {#each STROKE_STYLES as s}
-          <button
-            type="button"
-            class="sp-icon-btn"
-            class:active={panelStyle.strokeStyle === s.value}
-            data-preset="strokeStyle"
-            data-value={s.value}
-            aria-label={`Stroke style ${s.name}`}
-            onclick={() => applyStyle({ strokeStyle: s.value })}
-          >
-            {#if s.value === "solid"}
-              <StrokeStyleSolidIcon />
-            {:else}
-              <Icon name={s.icon} />
-            {/if}
-          </button>
-        {/each}
+      <div class="sp-row">
+        <div class="sp-label">{t("labels.strokeStyle")}</div>
+        <div class="sp-swatches">
+          {#each STROKE_STYLES as s}
+            <button
+              type="button"
+              class="sp-icon-btn"
+              class:active={panelStyle.strokeStyle === s.value}
+              data-preset="strokeStyle"
+              data-value={s.value}
+              aria-label={`Stroke style ${s.name}`}
+              onclick={() => applyStyle({ strokeStyle: s.value })}
+            >
+              {#if s.value === "solid"}
+                <StrokeStyleSolidIcon />
+              {:else}
+                <Icon name={s.icon} />
+              {/if}
+            </button>
+          {/each}
+        </div>
       </div>
-    </div>
+    {/if}
 
-    <div class="sp-row">
-      <div class="sp-label">{t("labels.fill")}</div>
-      <div class="sp-swatches">
-        {#each FILL_STYLES as f}
-          <button
-            type="button"
-            class="sp-icon-btn"
-            class:active={panelStyle.fillStyle === f.value}
-            data-preset="fillStyle"
-            data-value={f.value}
-            aria-label={`Fill style ${f.name}`}
-            onclick={() => applyStyle({ fillStyle: f.value })}
-          >
-            <Icon name={f.icon} />
-          </button>
-        {/each}
+    {#if !allSelectedAreText && !allSelectedAreLinear}
+      <div class="sp-row">
+        <div class="sp-label">{t("labels.fill")}</div>
+        <div class="sp-swatches">
+          {#each FILL_STYLES as f}
+            <button
+              type="button"
+              class="sp-icon-btn"
+              class:active={panelStyle.fillStyle === f.value}
+              data-preset="fillStyle"
+              data-value={f.value}
+              aria-label={`Fill style ${f.name}`}
+              onclick={() => applyStyle({ fillStyle: f.value })}
+            >
+              <Icon name={f.icon} />
+            </button>
+          {/each}
+        </div>
       </div>
-    </div>
+    {/if}
 
-    <div class="sp-row">
-      <div class="sp-label">{t("labels.sloppiness")}</div>
-      <div class="sp-swatches">
-        {#each ROUGHNESS_PRESETS as r}
-          <button
-            type="button"
-            class="sp-icon-btn"
-            class:active={panelStyle.roughness === r.value}
-            data-preset="roughness"
-            data-value={r.value}
-            aria-label={`Roughness ${r.name}`}
-            onclick={() => applyStyle({ roughness: r.value })}
-          >
-            <Icon name={r.icon} />
-          </button>
-        {/each}
+    {#if !allSelectedAreText}
+      <div class="sp-row">
+        <div class="sp-label">{t("labels.sloppiness")}</div>
+        <div class="sp-swatches">
+          {#each ROUGHNESS_PRESETS as r}
+            <button
+              type="button"
+              class="sp-icon-btn"
+              class:active={panelStyle.roughness === r.value}
+              data-preset="roughness"
+              data-value={r.value}
+              aria-label={`Roughness ${r.name}`}
+              onclick={() => applyStyle({ roughness: r.value })}
+            >
+              <Icon name={r.icon} />
+            </button>
+          {/each}
+        </div>
       </div>
-    </div>
+    {/if}
 
     {#if hasLinearSelected}
       <!-- Edge style: sharp corners vs smooth curves. Applies the
@@ -4373,8 +4445,16 @@
           <ArrowheadArrowIcon {flip} />
         {:else if value === "triangle"}
           <ArrowheadTriangleIcon {flip} />
+        {:else if value === "triangle_outline"}
+          <ArrowheadTriangleOutlineIcon {flip} />
+        {:else if value === "diamond"}
+          <ArrowheadDiamondIcon {flip} />
+        {:else if value === "diamond_outline"}
+          <ArrowheadDiamondOutlineIcon {flip} />
         {:else if value === "circle"}
           <ArrowheadCircleIcon {flip} />
+        {:else if value === "circle_outline"}
+          <ArrowheadCircleOutlineIcon {flip} />
         {:else if value === "bar"}
           <ArrowheadBarIcon {flip} />
         {/if}
@@ -4536,6 +4616,25 @@
             onPopupChange={(open) => (fontPickerOpen = open)}
             container={containerEl}
           />
+        </div>
+      </div>
+    {/if}
+
+    <!-- Lock/unlock selection. Locked elements ignore pointer events,
+         can't be resized/rotated/dragged. Upstream hotkey: Ctrl+Shift+L. -->
+    {#if Object.keys((appState as any).selectedElementIds ?? {}).length > 0}
+      <div class="sp-row">
+        <div class="sp-label">Actions</div>
+        <div class="sp-swatches">
+          <button
+            type="button"
+            class="sp-icon-btn"
+            aria-label="Toggle lock"
+            title="Lock/unlock (Ctrl+Shift+L)"
+            onclick={toggleLockSelected}
+          >
+            {getSelectedElements().some((el) => el.locked) ? "🔒" : "🔓"}
+          </button>
         </div>
       </div>
     {/if}
