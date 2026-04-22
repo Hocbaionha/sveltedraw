@@ -28,6 +28,12 @@
 
 <BitsPopover.Trigger>
   {#snippet child({ props })}
+    <!-- BitsPopover.Trigger already handles the open-toggle via the
+         spread `props` (click handler on this wrapper). ButtonIcon
+         previously ALSO wired onclick={onToggle} which caused a
+         double-toggle — click → button sets open=true → click bubbles
+         → bits-ui sees open=true and closes it. Net no-op. Fix: swallow
+         the inner button's click at capture so only bits-ui toggles. -->
     <div {...props} data-openpopup="fontFamily" class="properties-trigger">
       {#snippet textIcon()}
         <Icon name="TextIcon" />
@@ -39,7 +45,11 @@
         class="properties-trigger"
         testId="font-family-show-fonts"
         active={isOpened}
-        onclick={onToggle}
+        onclick={(e: MouseEvent) => {
+          // Let the click bubble to the BitsPopover.Trigger wrapper;
+          // don't call onToggle directly or we get a double-toggle.
+          void e;
+        }}
         style={`border: none; ${compactStyle}`}
       />
     </div>
