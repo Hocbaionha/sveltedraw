@@ -497,6 +497,11 @@
     // loaded session WITHOUT an undo floor.
     pushHistory();
 
+    // Rehydrate image binaries from IndexedDB after the scene has been
+    // loaded. Fire-and-forget (bumpSceneRepaint inside triggers repaints
+    // as each image loads).
+    rehydrateImagesFromIdb();
+
     // Test-only probe: smoke scripts read `window.__sveltedrawProbe` to
     // inspect live scene + appState + call export helpers directly
     // (avoids having to intercept blob downloads in headless Chrome).
@@ -950,13 +955,12 @@
   const exportAsSvg = async (): Promise<SVGSVGElement | null> => {
     const opts = buildExportOpts();
     if (!opts) return null;
-    // `skipInliningFonts: true` — upstream's font-inlining fetches woff2
-    // files from an esm.sh URL that doesn't resolve in this Vite dev
-    // setup (and may not resolve even in production without CDN config).
-    // Text renders with system-font fallback, which is visually off but
-    // opens correctly everywhere. Swap in inlining when we ship with a
-    // reliable font CDN.
-    const svg = await exportToSvg({ ...opts, skipInliningFonts: true });
+    // Font inlining enabled — with `EXCALIDRAW_ASSET_PATH = location.origin`
+    // (set in main.ts), Excalifont woff2 loads from the Vite dev server
+    // and the Patrick Hand fallback is bundled in /public/fonts/. Exported
+    // SVG embeds the font bytes as base64 so VN text renders correctly
+    // when the file is opened in external viewers.
+    const svg = await exportToSvg(opts);
     return svg;
   };
 
@@ -974,6 +978,94 @@
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const name = (appState as any).name || "sveltedraw";
     triggerDownload(blob, `${name}.svg`);
+  };
+
+  // ── IndexedDB for image binaries ─────────────────────────────────────
+  //
+  // localStorage has a ~5-10MB quota and stores strings — fine for the
+  // scene JSON but punitive for image dataURLs. IndexedDB has a much
+  // larger quota (often 50%+ of free disk) and handles blobs natively.
+  //
+  // Schema: one object store "files", keyed by FileId, value = {
+  //   id, mimeType, dataURL, created
+  // }. We lazy-open the DB on first use, cache the connection.
+  //
+  // Pipeline:
+  // - insertImageFromBlob → ALSO writes to IndexedDB.
+  // - On mount, after scene is loaded from localStorage, walk through
+  //   image elements + for each missing fileId, fetch from IndexedDB
+  //   and repopulate imageCacheMap + binaryFiles.
+  const IDB_NAME = "sveltedraw";
+  const IDB_STORE = "files";
+  const IDB_VERSION = 1;
+
+  const openIdb = (): Promise<IDBDatabase> =>
+    new Promise((resolve, reject) => {
+      if (typeof indexedDB === "undefined") {
+        reject(new Error("IndexedDB unavailable"));
+        return;
+      }
+      const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(IDB_STORE)) {
+          db.createObjectStore(IDB_STORE, { keyPath: "id" });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const idbPut = async (record: any) => {
+    try {
+      const db = await openIdb();
+      return new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, "readwrite");
+        tx.objectStore(IDB_STORE).put(record);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (err) {
+      console.warn("sveltedraw: idb put failed", err);
+    }
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const idbGet = async (id: string): Promise<any | null> => {
+    try {
+      const db = await openIdb();
+      return new Promise((resolve) => {
+        const tx = db.transaction(IDB_STORE, "readonly");
+        const req = tx.objectStore(IDB_STORE).get(id);
+        req.onsuccess = () => resolve(req.result ?? null);
+        req.onerror = () => resolve(null);
+      });
+    } catch {
+      return null;
+    }
+  };
+
+  // Walk the scene's image elements and pull binaries from IndexedDB
+  // into imageCacheMap + binaryFiles. Called on mount after tryLoad().
+  const rehydrateImagesFromIdb = async () => {
+    if (!scene) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const imageEls = scene.getNonDeletedElements().filter((el: any) => el.type === "image" && el.fileId) as any[];
+    if (imageEls.length === 0) return;
+    for (const el of imageEls) {
+      if (imageCacheMap.has(el.fileId)) continue;
+      const record = await idbGet(el.fileId);
+      if (!record?.dataURL) continue;
+      try {
+        const img = await loadImage(record.dataURL);
+        imageCacheMap.set(el.fileId, { image: img, mimeType: record.mimeType });
+        binaryFiles[el.fileId] = record;
+      } catch {
+        /* broken dataURL — skip */
+      }
+    }
+    bumpSceneRepaint();
   };
 
   // ── Image paste / drop ───────────────────────────────────────────────
@@ -1031,12 +1123,16 @@
     const fileId = randomId();
     const mimeType = blob.type || "image/png";
     imageCacheMap.set(fileId, { image: img, mimeType });
-    binaryFiles[fileId] = {
+    const record = {
       id: fileId,
       mimeType,
       dataURL,
       created: Date.now(),
     };
+    binaryFiles[fileId] = record;
+    // Persist binary to IndexedDB so reload restores the image bytes.
+    // Fire-and-forget; failures (quota, private mode) log and move on.
+    idbPut(record);
 
     // Scale down if large — fit within 600px max side at 100% zoom.
     const MAX_SIDE = 600;
@@ -1557,6 +1653,13 @@
   // When pointerdown lands on a transform handle of a selected element,
   // we record the handle direction + the element's bbox at that moment.
   // Subsequent pointermoves compute fresh bbox from cursor delta.
+  //
+  // For rotated elements (angle !== 0), we ALSO record the world-coord
+  // anchor (the handle-opposite corner/edge-midpoint that stays fixed
+  // during resize) + the element's angle. The resize math transforms
+  // cursor into the element's LOCAL frame (rotated by -angle around
+  // anchor) before computing new width/height, then rotates the new
+  // bbox back into world space so the anchor stays put.
   type HandleDir = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
   let resizeGesture:
     | {
@@ -1567,6 +1670,57 @@
         origY: number;
         origW: number;
         origH: number;
+        origAngle: number;
+        // World-coord anchor (corner opposite the dragged handle).
+        anchorX: number;
+        anchorY: number;
+      }
+    | null = null;
+
+  // Rotate (x, y) around (cx, cy) by angle radians. Pure helper.
+  const rotPt = (
+    x: number,
+    y: number,
+    cx: number,
+    cy: number,
+    angle: number,
+  ): { x: number; y: number } => {
+    const dx = x - cx;
+    const dy = y - cy;
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+    return { x: cx + dx * c - dy * s, y: cy + dx * s + dy * c };
+  };
+
+  // Local-frame (unrotated) position of the anchor for a given handle.
+  // Coordinates: (0, 0) is element top-left, (w, h) is bottom-right.
+  const anchorLocal = (
+    dir: HandleDir,
+    w: number,
+    h: number,
+  ): { x: number; y: number } => {
+    switch (dir) {
+      case "nw": return { x: w, y: h };
+      case "ne": return { x: 0, y: h };
+      case "se": return { x: 0, y: 0 };
+      case "sw": return { x: w, y: 0 };
+      case "n":  return { x: w / 2, y: h };
+      case "e":  return { x: 0, y: h / 2 };
+      case "s":  return { x: w / 2, y: 0 };
+      case "w":  return { x: w, y: h / 2 };
+    }
+  };
+
+  // ── Endpoint-drag state (linear elements) ─────────────────────────
+  let endpointGesture:
+    | {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        el: any;
+        pointIndex: number;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        origPoints: any[];
+        origX: number;
+        origY: number;
       }
     | null = null;
 
@@ -1617,7 +1771,9 @@
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     | { kind: "resize"; dir: HandleDir; el: any }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    | { kind: "rotate"; el: any };
+    | { kind: "rotate"; el: any }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    | { kind: "endpoint"; el: any; pointIndex: number };
 
   const hitResizeHandle = (sceneX: number, sceneY: number): HandleHit | null => {
     if (!scene) return null;
@@ -1627,6 +1783,25 @@
     const zoomV = (appState.zoom as any).value || 1;
     const tol = 8 / zoomV;
     const rotTol = 10 / zoomV; // rotation handle is slightly more forgiving
+
+    // ── Linear endpoint editor (line / arrow only) ─────────────────
+    // For each selected linear element, test the cursor against each
+    // `points[i]` mapped to scene coords (el.x + point, el.y + point).
+    // Returns a pseudo-handle with kind "endpoint" + point index.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const el of scene.getNonDeletedElements() as any[]) {
+      if (!selectedIds[el.id]) continue;
+      if (el.type !== "line" && el.type !== "arrow") continue;
+      const pts = el.points ?? [];
+      for (let i = 0; i < pts.length; i++) {
+        const [lx, ly] = pts[i];
+        const px = el.x + lx;
+        const py = el.y + ly;
+        if (Math.abs(sceneX - px) <= tol && Math.abs(sceneY - py) <= tol) {
+          return { kind: "endpoint", el, pointIndex: i };
+        }
+      }
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const el of scene.getNonDeletedElements() as any[]) {
@@ -1644,36 +1819,28 @@
         return { kind: "rotate", el };
       }
 
-      // Resize handles — axis-aligned bbox handles ignore element rotation
-      // for simplicity. Upstream rotates them too; for PoC we disable
-      // resize while rotated (angle !== 0) — user can still rotate and
-      // drag, just not resize post-rotation. Documented in memory.
-      if (el.angle && el.angle !== 0) continue;
-
+      // Resize handles work on ROTATED elements too. Compute each handle's
+      // world position by rotating its local position around the element
+      // center by el.angle.
       const { x, y, width: w, height: h } = el;
       const cx = x + w / 2;
       const cy = y + h / 2;
+      const angle = el.angle || 0;
 
-      // Corner handles first (priority — visually on top of edges).
-      const corners: Array<[HandleDir, number, number]> = [
+      // 4 corners + 4 edges in local unrotated frame.
+      const handles: Array<[HandleDir, number, number]> = [
         ["nw", x, y],
         ["ne", x + w, y],
         ["se", x + w, y + h],
         ["sw", x, y + h],
-      ];
-      for (const [dir, hx, hy] of corners) {
-        if (Math.abs(sceneX - hx) <= tol && Math.abs(sceneY - hy) <= tol) {
-          return { kind: "resize", dir, el };
-        }
-      }
-      const edges: Array<[HandleDir, number, number]> = [
         ["n", cx, y],
         ["e", x + w, cy],
         ["s", cx, y + h],
         ["w", x, cy],
       ];
-      for (const [dir, hx, hy] of edges) {
-        if (Math.abs(sceneX - hx) <= tol && Math.abs(sceneY - hy) <= tol) {
+      for (const [dir, lx, ly] of handles) {
+        const p = angle === 0 ? { x: lx, y: ly } : rotPt(lx, ly, cx, cy, angle);
+        if (Math.abs(sceneX - p.x) <= tol && Math.abs(sceneY - p.y) <= tol) {
           return { kind: "resize", dir, el };
         }
       }
@@ -1681,46 +1848,78 @@
     return null;
   };
 
-  // Apply resize given handle direction + scene-coord delta. Minimum
-  // 1px on either dim to avoid zero-area elements.
+  // Apply resize given handle direction + scene-coord cursor.
+  //
+  // The anchor (corner/edge-midpoint opposite the dragged handle) must
+  // stay FIXED in world space throughout the drag. That determines
+  // (el.x, el.y) once we know the new width/height, because:
+  //
+  //   anchorWorld = centerWorld + Rot(angle) · (anchorLocal - centerLocal)
+  //
+  // where centerLocal = (w/2, h/2) in the element's unrotated local frame.
+  // Solve for centerWorld, then el.{x,y} = centerWorld - (newW/2, newH/2).
+  //
+  // For width/height themselves: map cursor into the element's local frame
+  // (rotate around anchor by -angle), extract the dragged-axis components,
+  // clamp to 1px min.
   const applyResize = (sceneX: number, sceneY: number) => {
     if (!resizeGesture || !scene) return;
-    const { dir, el, origX, origY, origW, origH } = resizeGesture;
-    const dx = sceneX - (origX + (dir.includes("e") ? origW : dir.includes("w") ? 0 : origW / 2));
-    const dy = sceneY - (origY + (dir.includes("s") ? origH : dir.includes("n") ? 0 : origH / 2));
+    const { dir, el, origW, origH, origAngle, anchorX, anchorY } = resizeGesture;
 
-    // Start from original bbox, then adjust the edges the handle controls.
-    let nx = origX;
-    let ny = origY;
-    let nw = origW;
-    let nh = origH;
-
-    if (dir.includes("e")) nw = origW + dx;
-    if (dir.includes("w")) {
-      nx = origX + dx;
-      nw = origW - dx;
-    }
-    if (dir.includes("s")) nh = origH + dy;
-    if (dir.includes("n")) {
-      ny = origY + dy;
-      nh = origH - dy;
+    // Cursor in anchor-local frame. Unrotated: straight translation.
+    // Rotated: undo the rotation around the anchor.
+    let lx: number, ly: number;
+    if (origAngle === 0) {
+      lx = sceneX - anchorX;
+      ly = sceneY - anchorY;
+    } else {
+      const c = Math.cos(-origAngle);
+      const s = Math.sin(-origAngle);
+      const dx = sceneX - anchorX;
+      const dy = sceneY - anchorY;
+      lx = dx * c - dy * s;
+      ly = dx * s + dy * c;
     }
 
-    // Min size + flip-prevention. If the user drags past the opposite
-    // edge (nw <= 0), pin the bbox to a 1-px minimum on that side. Real
-    // editors flip the element; we keep PoC scope tight.
-    if (nw < 1) {
-      if (dir.includes("w")) nx = origX + origW - 1;
-      nw = 1;
-    }
-    if (nh < 1) {
-      if (dir.includes("n")) ny = origY + origH - 1;
-      nh = 1;
+    // New width/height in local frame.
+    // e* handles: width tracks cursor.x; w* handles: width tracks -cursor.x.
+    // n/s edge handles preserve width; e/w edge handles preserve height.
+    let newW = origW;
+    let newH = origH;
+    if (dir.includes("e")) newW = lx;
+    else if (dir.includes("w")) newW = -lx;
+    if (dir.includes("s")) newH = ly;
+    else if (dir.includes("n")) newH = -ly;
+
+    // Flip-prevention + min size.
+    if (newW < 1) newW = 1;
+    if (newH < 1) newH = 1;
+
+    // centerWorld from fixed anchor. Use the NEW anchorLocal (same dir,
+    // new width/height) to get the offset between anchor and center in
+    // the element's local frame, then rotate by origAngle and subtract.
+    const aln = anchorLocal(dir, newW, newH);
+    const offLx = aln.x - newW / 2;
+    const offLy = aln.y - newH / 2;
+    let centerX: number, centerY: number;
+    if (origAngle === 0) {
+      centerX = anchorX - offLx;
+      centerY = anchorY - offLy;
+    } else {
+      const c = Math.cos(origAngle);
+      const s = Math.sin(origAngle);
+      centerX = anchorX - (offLx * c - offLy * s);
+      centerY = anchorY - (offLx * s + offLy * c);
     }
 
     scene.mutateElement(
       el,
-      { x: nx, y: ny, width: nw, height: nh },
+      {
+        x: centerX - newW / 2,
+        y: centerY - newH / 2,
+        width: newW,
+        height: newH,
+      },
       { informMutation: false, isDragging: true },
     );
     bumpSceneRepaint();
@@ -1989,14 +2188,36 @@
             origAngle: handleHit.el.angle || 0,
             startCursorAngle: Math.atan2(y - cy, x - cx),
           };
+        } else if (handleHit.kind === "endpoint") {
+          const el = handleHit.el;
+          endpointGesture = {
+            el,
+            pointIndex: handleHit.pointIndex,
+            origPoints: el.points.map((p: number[]) => [p[0], p[1]]),
+            origX: el.x,
+            origY: el.y,
+          };
         } else {
+          const el = handleHit.el;
+          const angle = el.angle || 0;
+          const ecx = el.x + el.width / 2;
+          const ecy = el.y + el.height / 2;
+          // Anchor (opposite-side point of the handle) in world coords.
+          const aLocal = anchorLocal(handleHit.dir, el.width, el.height);
+          const aWorldLocal = { x: el.x + aLocal.x, y: el.y + aLocal.y };
+          const aWorld = angle === 0
+            ? aWorldLocal
+            : rotPt(aWorldLocal.x, aWorldLocal.y, ecx, ecy, angle);
           resizeGesture = {
             dir: handleHit.dir,
-            el: handleHit.el,
-            origX: handleHit.el.x,
-            origY: handleHit.el.y,
-            origW: handleHit.el.width,
-            origH: handleHit.el.height,
+            el,
+            origX: el.x,
+            origY: el.y,
+            origW: el.width,
+            origH: el.height,
+            origAngle: angle,
+            anchorX: aWorld.x,
+            anchorY: aWorld.y,
           };
         }
         dragStart = { x, y }; // used only as "drag active" sentinel
@@ -2143,6 +2364,36 @@
       return;
     }
 
+    // Endpoint drag for linear elements — update points[i] to follow
+    // cursor. Recompute bbox (width/height) from the new points so the
+    // renderer's dirty-rect culling stays correct. Keep el.x/el.y at
+    // their original value so other points stay put.
+    if (endpointGesture) {
+      const { x, y } = toSceneCoords(event.clientX, event.clientY);
+      const { el, pointIndex, origPoints, origX, origY } = endpointGesture;
+      const nextPoints = origPoints.map((p) => [p[0], p[1]]);
+      nextPoints[pointIndex] = [x - origX, y - origY];
+      // bbox from points relative to el.x/y (which we don't change here).
+      let minX = 0, minY = 0, maxX = 0, maxY = 0;
+      for (const [px, py] of nextPoints) {
+        if (px < minX) minX = px;
+        if (py < minY) minY = py;
+        if (px > maxX) maxX = px;
+        if (py > maxY) maxY = py;
+      }
+      scene.mutateElement(
+        el,
+        {
+          points: nextPoints,
+          width: Math.max(1, maxX - minX),
+          height: Math.max(1, maxY - minY),
+        },
+        { informMutation: false, isDragging: true },
+      );
+      bumpSceneRepaint();
+      return;
+    }
+
     // Rotation gesture.
     if (rotateGesture) {
       const { x, y } = toSceneCoords(event.clientX, event.clientY);
@@ -2273,6 +2524,19 @@
       return;
     }
 
+    // Finalize endpoint drag.
+    if (endpointGesture) {
+      const { el, origPoints } = endpointGesture;
+      const changed =
+        JSON.stringify(el.points) !== JSON.stringify(origPoints);
+      endpointGesture = null;
+      dragStart = null;
+      if (changed) pushHistory();
+      bumpSceneRepaint();
+      tryRelease(event.currentTarget as HTMLElement | null, event.pointerId);
+      return;
+    }
+
     // Finalize rotate gesture.
     if (rotateGesture) {
       const changed =
@@ -2354,6 +2618,35 @@
     }
 
     tryRelease(event.currentTarget as HTMLElement | null, event.pointerId);
+  };
+
+  // Double-click on text element → open editor for that element.
+  // Double-click on empty canvas → open a new text editor at that point
+  // (matches Excalidraw's UX: double-click is a quick way to add text
+  // without first switching to the text tool).
+  const onInteractiveDoubleClick = (event: MouseEvent) => {
+    if (!scene) return;
+    const { x, y } = toSceneCoords(event.clientX, event.clientY);
+    const hit = hitTestAt(x, y);
+    if (hit && hit.type === "text") {
+      // Commit any open editor first.
+      if (textEditor) commitTextEditor();
+      // Remove the element from scene while editing so it doesn't render
+      // under the textarea. Batch 21 simple path: keep the element in
+      // scene, textarea overlays. User will see two copies briefly; fine.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const el = hit as any;
+      openTextEditor(el.x, el.y, {
+        initialValue: el.text ?? "",
+        editingElementId: el.id,
+      });
+      event.preventDefault();
+      return;
+    }
+    if (!hit) {
+      openTextEditor(x, y);
+      event.preventDefault();
+    }
   };
 
   // No-op passthroughs for events we don't handle yet.
@@ -2513,7 +2806,7 @@
     onpointercancel={onInteractivePointerUp}
     ontouchmove={noop}
     onpointerdown={onInteractivePointerDown}
-    ondblclick={noop}
+    ondblclick={onInteractiveDoubleClick}
   />
 
   <NewElementCanvas

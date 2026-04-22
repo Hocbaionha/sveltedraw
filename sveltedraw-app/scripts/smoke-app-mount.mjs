@@ -125,12 +125,20 @@ async function main() {
   await send("Runtime.enable");
   await send("Console.enable");
   await send("Page.enable");
-  // Wipe localStorage BEFORE the reload so App.svelte's tryLoad() finds
-  // nothing and mounts an empty scene. Batch 13 persists scene state, so
-  // without this, the prior smoke run's 6 shapes would carry over and
-  // break the "count=1" assertions.
+  // Wipe localStorage + IndexedDB BEFORE the reload so App.svelte's
+  // tryLoad() and rehydrateImagesFromIdb() find nothing. Otherwise
+  // prior smoke runs carry scene state / image blobs across.
   await send("Runtime.evaluate", {
-    expression: `try { localStorage.removeItem('sveltedraw:scene:v1'); } catch {}`,
+    expression: `(async () => {
+      try { localStorage.removeItem('sveltedraw:scene:v1'); } catch {}
+      try {
+        await new Promise((resolve) => {
+          const req = indexedDB.deleteDatabase('sveltedraw');
+          req.onsuccess = req.onerror = req.onblocked = () => resolve();
+        });
+      } catch {}
+    })()`,
+    awaitPromise: true,
   });
   // Reload to re-capture initial mount (the initial page load may have
   // fired before we subscribed).
@@ -559,6 +567,146 @@ async function main() {
         firstHeight: imgEls[0]?.height ?? 0,
       };
 
+      // ── Batch 23: image resize works ──────────────────────────────
+      // The test PNG is 1×1 → too small for handle hit-testing (8px
+      // tolerance collapses all 8 handles into one point). Grow the
+      // image via mutateElement before testing resize.
+      const imgForResize = (p.scene?.getNonDeletedElements?.() ?? []).find(el => el.type === 'image');
+      if (imgForResize) {
+        p.scene.mutateElement(imgForResize, { width: 100, height: 80 }, { informMutation: false });
+        await new Promise(r => setTimeout(r, 30));
+        // Click center to select.
+        const imCtr = sceneToVp(imgForResize.x + imgForResize.width / 2, imgForResize.y + imgForResize.height / 2);
+        iv.dispatchEvent(mk('pointerdown', imCtr.x, imCtr.y));
+        iv.dispatchEvent(mk('pointerup', imCtr.x, imCtr.y));
+        await new Promise(r => setTimeout(r, 30));
+        const origImW = imgForResize.width;
+        const origImH = imgForResize.height;
+        const seVp = sceneToVp(imgForResize.x + imgForResize.width, imgForResize.y + imgForResize.height);
+        iv.dispatchEvent(mk('pointerdown', seVp.x, seVp.y));
+        await new Promise(r => setTimeout(r, 20));
+        iv.dispatchEvent(mk('pointermove', seVp.x + 30 * zoomR, seVp.y + 20 * zoomR));
+        await new Promise(r => setTimeout(r, 20));
+        iv.dispatchEvent(mk('pointerup', seVp.x + 30 * zoomR, seVp.y + 20 * zoomR));
+        await new Promise(r => setTimeout(r, 30));
+        const resizedIm = (p.scene?.getNonDeletedElements?.() ?? []).find(el => el.id === imgForResize.id);
+        var afterImageResize = {
+          dw: (resizedIm?.width ?? 0) - origImW,
+          dh: (resizedIm?.height ?? 0) - origImH,
+        };
+      } else {
+        var afterImageResize = { err: 'no image' };
+      }
+
+      // ── Batch 16: drag line endpoint ──────────────────────────────
+      const lineForEp = (p.scene?.getNonDeletedElements?.() ?? []).find(el => el.type === 'line');
+      if (lineForEp) {
+        // Select line (click near its midpoint).
+        const midLocalX = (lineForEp.points[0][0] + lineForEp.points[1][0]) / 2;
+        const midLocalY = (lineForEp.points[0][1] + lineForEp.points[1][1]) / 2;
+        const midVp = sceneToVp(lineForEp.x + midLocalX, lineForEp.y + midLocalY);
+        iv.dispatchEvent(mk('pointerdown', midVp.x, midVp.y));
+        iv.dispatchEvent(mk('pointerup', midVp.x, midVp.y));
+        await new Promise(r => setTimeout(r, 30));
+
+        // Grab endpoint 1 (points[1]) and drag +40, +25.
+        const origEndPt = [lineForEp.points[1][0], lineForEp.points[1][1]];
+        const endSceneX = lineForEp.x + origEndPt[0];
+        const endSceneY = lineForEp.y + origEndPt[1];
+        const endVp = sceneToVp(endSceneX, endSceneY);
+        iv.dispatchEvent(mk('pointerdown', endVp.x, endVp.y));
+        await new Promise(r => setTimeout(r, 20));
+        iv.dispatchEvent(mk('pointermove', endVp.x + 40 * zoomR, endVp.y + 25 * zoomR));
+        await new Promise(r => setTimeout(r, 20));
+        iv.dispatchEvent(mk('pointerup', endVp.x + 40 * zoomR, endVp.y + 25 * zoomR));
+        await new Promise(r => setTimeout(r, 30));
+
+        const draggedLine = (p.scene?.getNonDeletedElements?.() ?? []).find(el => el.id === lineForEp.id);
+        var afterLineEndpoint = {
+          origPt: origEndPt,
+          newPt: draggedLine?.points?.[1] ?? null,
+          dx: (draggedLine?.points?.[1]?.[0] ?? 0) - origEndPt[0],
+          dy: (draggedLine?.points?.[1]?.[1] ?? 0) - origEndPt[1],
+        };
+      } else {
+        var afterLineEndpoint = { err: 'no line' };
+      }
+
+      // ── Batch 21: double-click text to edit ───────────────────────
+      // Create a text element first (batch 9's hello-world test hasn't
+      // run yet in this flow). Then double-click it to open the editor
+      // with its existing content, edit, commit.
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 't', bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 20));
+      const dblTextVp = sceneToVp(700, 500);
+      iv.dispatchEvent(mk('pointerdown', dblTextVp.x, dblTextVp.y));
+      iv.dispatchEvent(mk('pointerup', dblTextVp.x, dblTextVp.y));
+      await new Promise(r => setTimeout(r, 100));
+      const initTa = document.querySelector('.sveltedraw-text-editor');
+      if (initTa) {
+        const s0 = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+        s0.call(initTa, 'hello world');
+        initTa.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 30));
+        initTa.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 50));
+      }
+      const existingText = (p.scene?.getNonDeletedElements?.() ?? []).find(el => el.type === 'text' && el.text === 'hello world');
+      if (existingText) {
+        const txCtr = sceneToVp(existingText.x + existingText.width / 2, existingText.y + existingText.height / 2);
+        // dispatch a dblclick event
+        iv.dispatchEvent(new MouseEvent('dblclick', { clientX: txCtr.x, clientY: txCtr.y, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 100));
+        const taEdit = document.querySelector('.sveltedraw-text-editor');
+        var afterDblClickOpen = { opened: !!taEdit, initialValue: taEdit?.value ?? null };
+        if (taEdit) {
+          const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+          setter.call(taEdit, 'hello edited');
+          taEdit.dispatchEvent(new Event('input', { bubbles: true }));
+          await new Promise(r => setTimeout(r, 30));
+          taEdit.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+          await new Promise(r => setTimeout(r, 50));
+        }
+        const editedText = (p.scene?.getNonDeletedElements?.() ?? []).find(el => el.id === existingText.id);
+        var afterDblClickEdit = { newText: editedText?.text ?? null, sameId: editedText?.id === existingText.id };
+      } else {
+        var afterDblClickOpen = { err: 'no text' };
+        var afterDblClickEdit = { err: 'no text' };
+      }
+
+      // Placeholder — filled after batch 9 creates text.
+      var svgInlined = null;
+
+      // ── Batch 22: IndexedDB persistence ───────────────────────────
+      // Read from IDB directly to verify the blob was written.
+      var idbCheck = null;
+      try {
+        const db = await new Promise((resolve, reject) => {
+          const r = indexedDB.open('sveltedraw', 1);
+          r.onsuccess = () => resolve(r.result);
+          r.onerror = () => reject(r.error);
+        });
+        const imgEl = (p.scene?.getNonDeletedElements?.() ?? []).find(el => el.type === 'image');
+        if (imgEl) {
+          const rec = await new Promise((resolve) => {
+            const tx = db.transaction('files', 'readonly');
+            const req = tx.objectStore('files').get(imgEl.fileId);
+            req.onsuccess = () => resolve(req.result ?? null);
+            req.onerror = () => resolve(null);
+          });
+          idbCheck = {
+            found: !!rec,
+            fileId: imgEl.fileId,
+            mimeType: rec?.mimeType ?? null,
+            dataUrlLen: rec?.dataURL?.length ?? 0,
+          };
+        } else {
+          idbCheck = { err: 'no image in scene' };
+        }
+      } catch (err) {
+        idbCheck = { err: String(err) };
+      }
+
       // ── Batch 17: style panel ────────────────────────────────────
       // Select a rectangle, click red stroke preset, verify color.
       const rectForStyle = p.scene?.getNonDeletedElements?.()?.find(el => el.type === 'rectangle');
@@ -765,7 +913,10 @@ async function main() {
       const afterTextCommit = {
         textareaGone: !document.querySelector('.sveltedraw-text-editor'),
         count: textEls.length,
-        firstText: textEls[0]?.text ?? null,
+        // Batch 21 runs before batch 9 and edits the first text to
+        // "hello edited"; check for any element matching "hello world"
+        // (the one this batch just created) rather than textEls[0].
+        hasHelloWorld: textEls.some(el => el.text === 'hello world'),
       };
 
       // Vietnamese text roundtrip — exercises the Patrick Hand font fallback.
@@ -799,6 +950,25 @@ async function main() {
         excalifont: document.fonts.check('20px Excalifont', 'ả ẫ ặ ế'),
         patrickhand: document.fonts.check('20px "Patrick Hand"', 'ả ẫ ặ ế'),
       };
+
+      // ── Batch 20: SVG export with font inlining ─────────────────
+      // Now that batch 9 has created text elements, font inlining has
+      // characters to subset — the exported SVG should embed @font-face
+      // declarations with base64-encoded woff2 data.
+      try {
+        const svg2 = await p.exportAsSvg();
+        if (svg2) {
+          const src = new XMLSerializer().serializeToString(svg2);
+          svgInlined = {
+            tag: svg2.tagName,
+            hasFontFace: src.includes('@font-face'),
+            hasBase64Font: src.includes('data:font'),
+            len: src.length,
+          };
+        }
+      } catch (err) {
+        svgInlined = { err: String(err) };
+      }
 
       // ── Batch 12: export PNG + SVG ───────────────────────────────
       // Call probe helpers directly; avoids dealing with blob downloads
@@ -842,6 +1012,9 @@ async function main() {
         afterRotation, afterUndoRotation,
         afterStyleStroke, afterStyleWidth, afterStyleUndo,
         afterImagePaste,
+        afterImageResize, afterLineEndpoint,
+        afterDblClickOpen, afterDblClickEdit,
+        svgInlined, idbCheck,
         exportPng, exportSvg,
       };
     })()`,
@@ -1244,6 +1417,60 @@ async function main() {
     `${probe?.afterImagePaste?.firstWidth}x${probe?.afterImagePaste?.firstHeight}`,
   );
 
+  // Batch 23: image resize.
+  pass(
+    "image-se-resize-width",
+    Math.abs((probe?.afterImageResize?.dw ?? 0) - 30) < 5,
+    `dw=${probe?.afterImageResize?.dw} (expected ~30)`,
+  );
+  pass(
+    "image-se-resize-height",
+    Math.abs((probe?.afterImageResize?.dh ?? 0) - 20) < 5,
+    `dh=${probe?.afterImageResize?.dh} (expected ~20)`,
+  );
+
+  // Batch 16: line endpoint drag.
+  pass(
+    "line-endpoint-moves-x",
+    Math.abs((probe?.afterLineEndpoint?.dx ?? 0) - 40) < 5,
+    `dx=${probe?.afterLineEndpoint?.dx} (expected ~40)`,
+  );
+  pass(
+    "line-endpoint-moves-y",
+    Math.abs((probe?.afterLineEndpoint?.dy ?? 0) - 25) < 5,
+    `dy=${probe?.afterLineEndpoint?.dy} (expected ~25)`,
+  );
+
+  // Batch 21: double-click text edit.
+  pass(
+    "dblclick-opens-editor-with-text",
+    probe?.afterDblClickOpen?.opened === true &&
+      probe?.afterDblClickOpen?.initialValue === "hello world",
+    `opened=${probe?.afterDblClickOpen?.opened} initial=${JSON.stringify(probe?.afterDblClickOpen?.initialValue)}`,
+  );
+  pass(
+    "dblclick-edit-commits-new-text",
+    probe?.afterDblClickEdit?.newText === "hello edited" &&
+      probe?.afterDblClickEdit?.sameId === true,
+    `newText=${JSON.stringify(probe?.afterDblClickEdit?.newText)} sameId=${probe?.afterDblClickEdit?.sameId}`,
+  );
+
+  // Batch 20: SVG export with font inlining.
+  pass(
+    "svg-export-inlines-fonts",
+    probe?.svgInlined?.hasFontFace === true &&
+      probe?.svgInlined?.hasBase64Font === true,
+    `hasFontFace=${probe?.svgInlined?.hasFontFace} hasBase64=${probe?.svgInlined?.hasBase64Font} len=${probe?.svgInlined?.len}`,
+  );
+
+  // Batch 22: IndexedDB image persistence.
+  pass(
+    "idb-stores-image-blob",
+    probe?.idbCheck?.found === true &&
+      probe?.idbCheck?.dataUrlLen > 100,
+    `found=${probe?.idbCheck?.found} mime=${probe?.idbCheck?.mimeType} dataUrlLen=${probe?.idbCheck?.dataUrlLen}`,
+  );
+
   // Batch 11: shift-click + marquee.
   pass(
     "shift-click-selects-one",
@@ -1285,12 +1512,12 @@ async function main() {
   pass(
     "text-commit-creates-element",
     probe?.afterTextCommit?.count >= 1,
-    `count=${probe?.afterTextCommit?.count} text=${probe?.afterTextCommit?.firstText}`,
+    `count=${probe?.afterTextCommit?.count} hasHelloWorld=${probe?.afterTextCommit?.hasHelloWorld}`,
   );
   pass(
     "text-commit-stores-string",
-    probe?.afterTextCommit?.firstText === "hello world",
-    `firstText=${JSON.stringify(probe?.afterTextCommit?.firstText)}`,
+    probe?.afterTextCommit?.hasHelloWorld === true,
+    `hasHelloWorld=${probe?.afterTextCommit?.hasHelloWorld}`,
   );
   pass(
     "text-vietnamese-roundtrip",
@@ -1339,11 +1566,9 @@ async function main() {
 
   pass(
     "reload-restores-scene",
-    // 6 shapes + 2 text + 1 image = 9.
-    // Image element persists (localStorage) but the binary blob isn't
-    // persisted in this PoC — the element renders as a placeholder
-    // until re-pasted.
-    afterReload?.count === 9,
+    // 6 shapes + 3 text (batch 9 English + VN + batch 21 edited) + 1 image = 10.
+    // With IndexedDB (batch 22), the image binary is restored too.
+    afterReload?.count === 10,
     `count=${afterReload?.count} types=${JSON.stringify(afterReload?.types)}`,
   );
 
