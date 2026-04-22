@@ -339,11 +339,14 @@ export const resizeImageFile = async (
 
   if (opts.outputType) {
     const { outputType } = opts;
-    reduce._create_blob = function (env) {
-      return this.pica.toBlob(env.out_canvas, outputType, 0.8).then((blob) => {
-        env.out_blob = blob;
-        return env;
-      });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    reduce._create_blob = function (env: any) {
+      return this.pica
+        .toBlob(env.out_canvas, outputType, 0.8)
+        .then((blob: Blob) => {
+          env.out_blob = blob;
+          return env;
+        });
     };
   }
 

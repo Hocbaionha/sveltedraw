@@ -15,7 +15,9 @@ export const getTEXtChunk = async (
   blob: Blob,
 ): Promise<{ keyword: string; text: string } | null> => {
   const chunks = decodePng(new Uint8Array(await blobToArrayBuffer(blob)));
-  const metadataChunk = chunks.find((chunk) => chunk.name === "tEXt");
+  const metadataChunk = chunks.find(
+    (chunk: { name: string; data: Uint8Array }) => chunk.name === "tEXt",
+  );
   if (metadataChunk) {
     return tEXt.decode(metadataChunk.data);
   }

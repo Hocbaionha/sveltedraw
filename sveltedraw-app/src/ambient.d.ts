@@ -45,6 +45,16 @@ declare namespace React {
   type ForwardRefRenderFunction<_T, _P = any> = any;
 }
 
+// ─── Untyped CommonJS libs upstream still imports ─────────────────
+// These are small pure-JS packages without @types/ packages. Upstream
+// uses them for image processing + png-chunk round-tripping.
+declare module "lodash.throttle";
+declare module "lodash.debounce";
+declare module "png-chunk-text";
+declare module "png-chunks-encode";
+declare module "png-chunks-extract";
+declare module "image-blob-reduce";
+
 // Upstream `types.ts` does `import type { PointerEvent, ... }
 // from "react"`. Declare the module with the members as `any` —
 // real React isn't installed; these are erased types.

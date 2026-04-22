@@ -9,16 +9,7 @@
     "isolatedModules": true,
     "moduleDetection": "force",
     "noEmit": true,
-    // Upstream `packages/excalidraw/**.ts` files are type-checked by
-    // svelte-check because they're transitively imported from our
-    // Svelte port. They predate our tsconfig and violate strict
-    // settings in ways we can't fix without touching upstream code.
-    // We turn strict OFF at the root; our own code enforces strict
-    // via per-file discipline and the `@ts-check` comment pattern.
-    // The effective loss: fewer compile-time safety nets on our own
-    // Svelte port files. svelte-check still catches real runtime
-    // issues via its Svelte-specific analysis.
-    "strict": false,
+    "strict": true,
     "skipLibCheck": true,
     "verbatimModuleSyntax": true,
     "paths": {

@@ -652,8 +652,10 @@ export const updateFrameMembershipOfSelectedElements = <
         elementsToFilter.add(element);
       } else {
         element.groupIds
-          .flatMap((gid) => getElementsInGroup(allElements, gid))
-          .forEach((element) => elementsToFilter.add(element));
+          .flatMap((gid: string) => getElementsInGroup(allElements, gid))
+          .forEach((element: ExcalidrawElement) =>
+            elementsToFilter.add(element),
+          );
       }
     }
   }
