@@ -1356,6 +1356,88 @@
     (appState as any).selectedElementIds = { [id]: true };
   };
 
+  const toggleInSelection = (id: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cur = { ...((appState as any).selectedElementIds ?? {}) };
+    if (cur[id]) {
+      delete cur[id];
+    } else {
+      cur[id] = true;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).selectedElementIds = cur;
+  };
+
+  // ── Marquee (rubber-band) state ───────────────────────────────────
+  // Represented as 4 scene-coords + a shiftHeld flag (additive vs replace
+  // on commit). Rendered in the DOM overlay, not the canvas, to avoid
+  // touching upstream renderer configs.
+  let marquee: {
+    startX: number;
+    startY: number;
+    curX: number;
+    curY: number;
+    additive: boolean;
+  } | null = $state(null);
+
+  // Marquee bbox in VIEWPORT coords (for rendering the overlay div).
+  const marqueeRect = $derived.by(() => {
+    if (!marquee) return null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const zoomV = (appState.zoom as any).value || 1;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sX = (appState.scrollX as any) ?? 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sY = (appState.scrollY as any) ?? 0;
+    const oL = (appState.offsetLeft as number) ?? 0;
+    const oT = (appState.offsetTop as number) ?? 0;
+    const toVp = (sx: number, sy: number) => ({
+      x: (sx + sX) * zoomV + oL,
+      y: (sy + sY) * zoomV + oT,
+    });
+    const a = toVp(marquee.startX, marquee.startY);
+    const b = toVp(marquee.curX, marquee.curY);
+    return {
+      left: Math.min(a.x, b.x),
+      top: Math.min(a.y, b.y),
+      width: Math.abs(a.x - b.x),
+      height: Math.abs(a.y - b.y),
+    };
+  });
+
+  // Commit the marquee: pick every element whose AABB intersects the
+  // marquee rectangle. `additive` = shift was held at pointerdown.
+  const commitMarquee = () => {
+    if (!marquee || !scene) return;
+    const x0 = Math.min(marquee.startX, marquee.curX);
+    const y0 = Math.min(marquee.startY, marquee.curY);
+    const x1 = Math.max(marquee.startX, marquee.curX);
+    const y1 = Math.max(marquee.startY, marquee.curY);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const base: Record<string, true> = marquee.additive
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { ...((appState as any).selectedElementIds ?? {}) }
+      : {};
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const el of scene.getNonDeletedElements() as any[]) {
+      if (el.locked) continue;
+      // AABB intersection: element's bbox vs marquee. Linear/freedraw use
+      // their element x/y/width/height which approximates the bbox well
+      // enough for selection purposes.
+      const ex1 = el.x;
+      const ey1 = el.y;
+      const ex2 = el.x + el.width;
+      const ey2 = el.y + el.height;
+      const intersects = ex1 < x1 && ex2 > x0 && ey1 < y1 && ey2 > y0;
+      if (intersects) base[el.id] = true;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).selectedElementIds = base;
+    marquee = null;
+  };
+
   const onInteractivePointerDown = (event: PointerEvent) => {
     // ── Pan gesture (middle mouse OR space held OR left+Alt via upstream)
     //    takes precedence over any tool's pointerdown. ────────────────
@@ -1394,17 +1476,37 @@
 
       const hit = hitTestAt(x, y);
       if (!hit) {
-        clearSelection();
-        dragStart = null;
+        // ── Marquee rubber-band ──
+        // Shift held → additive on commit (keeps existing selection);
+        // no shift → replace (committed selection = only what marquee hit).
+        marquee = {
+          startX: x,
+          startY: y,
+          curX: x,
+          curY: y,
+          additive: event.shiftKey,
+        };
+        dragStart = { x, y };
         dragOrigins = [];
+        tryCapture(event.currentTarget as HTMLElement | null, event.pointerId);
+        event.preventDefault();
         return;
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sel = (appState as any).selectedElementIds ?? {};
+      if (event.shiftKey) {
+        // Shift-click on an element toggles its membership in the selection.
+        // Doesn't start a drag — user must click-and-hold a non-shift
+        // pointerdown to drag multi-selections.
+        toggleInSelection(hit.id);
+        dragStart = null;
+        dragOrigins = [];
+        event.preventDefault();
+        return;
+      }
       if (!sel[hit.id]) {
-        // Clicking unselected element replaces selection (shift-click for
-        // additive selection lands in a later batch).
+        // Clicking unselected element replaces selection.
         selectOnly(hit.id);
       }
 
@@ -1497,6 +1599,13 @@
       return;
     }
 
+    // Marquee: extend its moving corner; commit happens on pointerup.
+    if (marquee) {
+      const { x, y } = toSceneCoords(event.clientX, event.clientY);
+      marquee = { ...marquee, curX: x, curY: y };
+      return;
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cur = (appState as any).newElement;
 
@@ -1584,6 +1693,15 @@
   const onInteractivePointerUp = (event: PointerEvent) => {
     if (isPanning) {
       endPan();
+      tryRelease(event.currentTarget as HTMLElement | null, event.pointerId);
+      return;
+    }
+
+    // Finalize marquee — commit selection, then clear.
+    if (marquee) {
+      commitMarquee();
+      dragStart = null;
+      bumpSceneRepaint();
       tryRelease(event.currentTarget as HTMLElement | null, event.pointerId);
       return;
     }
@@ -1758,6 +1876,24 @@
     renderConfig={undefined}
     render={newElementRender}
   />
+
+  <!-- Marquee rubber-band overlay. Rendered as a DOM div (not on canvas)
+       to avoid touching upstream renderer configs. Position is in VIEWPORT
+       coords; marqueeRect derivation factors zoom + scroll + offset. -->
+  {#if marqueeRect}
+    <div
+      class="sveltedraw-marquee"
+      style="position: absolute;
+             left: {marqueeRect.left - (appState.offsetLeft as number)}px;
+             top: {marqueeRect.top - (appState.offsetTop as number)}px;
+             width: {marqueeRect.width}px;
+             height: {marqueeRect.height}px;
+             border: 1px dashed #6965db;
+             background: rgba(105, 101, 219, 0.1);
+             pointer-events: none;
+             z-index: 10;"
+    ></div>
+  {/if}
 </div>
 
 <style>

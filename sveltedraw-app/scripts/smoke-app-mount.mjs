@@ -527,6 +527,84 @@ async function main() {
         h: rectAfterUndoResize?.height ?? 0,
       };
 
+      // ── Batch 11: shift-click + marquee ───────────────────────────
+      // Starting state: 6 shapes (after the batch 5 pass + subsequent
+      // resize edits on the rectangle). Clear selection first.
+      iv.dispatchEvent(mk('pointerdown', rect.left + 5, rect.top + 5));
+      iv.dispatchEvent(mk('pointerup', rect.left + 5, rect.top + 5));
+      await new Promise(r => setTimeout(r, 20));
+
+      // Shift-click the rectangle → 1 selected.
+      const rectNow = p.scene?.getNonDeletedElements?.()?.find(el => el.type === 'rectangle');
+      const rectCtr = sceneToVp(rectNow.x + rectNow.width / 2, rectNow.y + rectNow.height / 2);
+      iv.dispatchEvent(new PointerEvent('pointerdown', { clientX: rectCtr.x, clientY: rectCtr.y, button: 0, pointerId: 1, shiftKey: true, bubbles: true, cancelable: true }));
+      iv.dispatchEvent(new PointerEvent('pointerup', { clientX: rectCtr.x, clientY: rectCtr.y, button: 0, pointerId: 1, shiftKey: true, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 30));
+      const afterShiftClick1 = {
+        selectedCount: Object.keys(p.appState?.selectedElementIds ?? {}).length,
+      };
+
+      // Shift-click the diamond → 2 selected (additive).
+      const diamondNow = p.scene?.getNonDeletedElements?.()?.find(el => el.type === 'diamond');
+      const diaCtr = sceneToVp(diamondNow.x + diamondNow.width / 2, diamondNow.y + diamondNow.height / 2);
+      iv.dispatchEvent(new PointerEvent('pointerdown', { clientX: diaCtr.x, clientY: diaCtr.y, button: 0, pointerId: 1, shiftKey: true, bubbles: true, cancelable: true }));
+      iv.dispatchEvent(new PointerEvent('pointerup', { clientX: diaCtr.x, clientY: diaCtr.y, button: 0, pointerId: 1, shiftKey: true, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 30));
+      const afterShiftClick2 = {
+        selectedCount: Object.keys(p.appState?.selectedElementIds ?? {}).length,
+      };
+
+      // Shift-click the diamond AGAIN → toggles off, 1 selected.
+      iv.dispatchEvent(new PointerEvent('pointerdown', { clientX: diaCtr.x, clientY: diaCtr.y, button: 0, pointerId: 1, shiftKey: true, bubbles: true, cancelable: true }));
+      iv.dispatchEvent(new PointerEvent('pointerup', { clientX: diaCtr.x, clientY: diaCtr.y, button: 0, pointerId: 1, shiftKey: true, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 30));
+      const afterShiftClickToggleOff = {
+        selectedCount: Object.keys(p.appState?.selectedElementIds ?? {}).length,
+      };
+
+      // Clear selection, then marquee around a region that contains at
+      // least 3 of the 6 shapes. The shapes were drawn at:
+      //   rectangle: (100,100)-(200,150)  -> then resized to include more
+      //   diamond:   (250,100)-(350,150)
+      //   ellipse:   (400,100)-(500,150)
+      //   arrow:     (100,250)-(200,300)
+      //   line:      (250,250)-(350,300)
+      //   freedraw:  starting (400,250) zigzag
+      // Marquee from (50,50) to (550,200) should hit rectangle+diamond+ellipse.
+      iv.dispatchEvent(mk('pointerdown', rect.left + 5, rect.top + 5));
+      iv.dispatchEvent(mk('pointerup', rect.left + 5, rect.top + 5));
+      await new Promise(r => setTimeout(r, 20));
+
+      const marqueeStart = sceneToVp(50, 50);
+      const marqueeEnd = sceneToVp(550, 200);
+      iv.dispatchEvent(mk('pointerdown', marqueeStart.x, marqueeStart.y));
+      await new Promise(r => setTimeout(r, 20));
+      iv.dispatchEvent(mk('pointermove', (marqueeStart.x + marqueeEnd.x) / 2, (marqueeStart.y + marqueeEnd.y) / 2));
+      await new Promise(r => setTimeout(r, 20));
+      iv.dispatchEvent(mk('pointermove', marqueeEnd.x, marqueeEnd.y));
+      await new Promise(r => setTimeout(r, 20));
+      iv.dispatchEvent(mk('pointerup', marqueeEnd.x, marqueeEnd.y));
+      await new Promise(r => setTimeout(r, 50));
+      const afterMarquee = {
+        selectedCount: Object.keys(p.appState?.selectedElementIds ?? {}).length,
+        selectedTypes: Object.keys(p.appState?.selectedElementIds ?? {})
+          .map(id => p.scene?.getNonDeletedElementsMap?.()?.get(id)?.type)
+          .sort(),
+      };
+
+      // Shift+marquee around the bottom row (y=250..300 area) → additive.
+      const m2Start = sceneToVp(50, 240);
+      const m2End = sceneToVp(230, 320);
+      iv.dispatchEvent(new PointerEvent('pointerdown', { clientX: m2Start.x, clientY: m2Start.y, button: 0, pointerId: 1, shiftKey: true, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 20));
+      iv.dispatchEvent(new PointerEvent('pointermove', { clientX: m2End.x, clientY: m2End.y, pointerId: 1, shiftKey: true, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 20));
+      iv.dispatchEvent(new PointerEvent('pointerup', { clientX: m2End.x, clientY: m2End.y, button: 0, pointerId: 1, shiftKey: true, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 50));
+      const afterShiftMarquee = {
+        selectedCount: Object.keys(p.appState?.selectedElementIds ?? {}).length,
+      };
+
       return {
         ...afterDraw,
         afterSelect, afterDrag, afterClickEmpty,
@@ -536,6 +614,8 @@ async function main() {
         zoomBefore, afterZoomIn, afterZoomReset, afterPan, afterKeyZoomIn, afterMiddlePan,
         afterShapes, afterSaveCheck, afterClearCanvas, afterUndoClear,
         afterResizeSE, afterResizeNW, afterUndoResize,
+        afterShiftClick1, afterShiftClick2, afterShiftClickToggleOff,
+        afterMarquee, afterShiftMarquee,
       };
     })()`,
     returnByValue: true,
@@ -867,6 +947,33 @@ async function main() {
     "resize-is-undoable",
     (probe?.afterUndoResize?.w ?? 0) > 150 && (probe?.afterUndoResize?.w ?? 0) < 280,
     `w=${probe?.afterUndoResize?.w} h=${probe?.afterUndoResize?.h} (post-SE pre-NW bounds)`,
+  );
+
+  // Batch 11: shift-click + marquee.
+  pass(
+    "shift-click-selects-one",
+    probe?.afterShiftClick1?.selectedCount === 1,
+    `count=${probe?.afterShiftClick1?.selectedCount}`,
+  );
+  pass(
+    "shift-click-additive",
+    probe?.afterShiftClick2?.selectedCount === 2,
+    `count=${probe?.afterShiftClick2?.selectedCount}`,
+  );
+  pass(
+    "shift-click-toggles-off",
+    probe?.afterShiftClickToggleOff?.selectedCount === 1,
+    `count=${probe?.afterShiftClickToggleOff?.selectedCount}`,
+  );
+  pass(
+    "marquee-selects-intersecting",
+    probe?.afterMarquee?.selectedCount === 3,
+    `count=${probe?.afterMarquee?.selectedCount} types=${JSON.stringify(probe?.afterMarquee?.selectedTypes)}`,
+  );
+  pass(
+    "shift-marquee-is-additive",
+    (probe?.afterShiftMarquee?.selectedCount ?? 0) > probe?.afterMarquee?.selectedCount,
+    `before=${probe?.afterMarquee?.selectedCount} after=${probe?.afterShiftMarquee?.selectedCount}`,
   );
 
   pass(
