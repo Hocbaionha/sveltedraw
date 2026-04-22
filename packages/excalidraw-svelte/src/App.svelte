@@ -64,7 +64,7 @@
   // prettier-ignore
   import { getFormFactor, createUserAgentDescriptor, MQ_RIGHT_SIDEBAR_MIN_WIDTH, supportsResizeObserver, POINTER_EVENTS, randomId, viewportCoordsToSceneCoords, DEFAULT_ELEMENT_PROPS, DEFAULT_FONT_FAMILY, FONT_FAMILY } from "@excalidraw/common";
   // @ts-ignore — upstream
-  import { newElement, newLinearElement, newArrowElement, newFreeDrawElement, newTextElement, newImageElement, hitElementItself, duplicateElements, deepCopyElement } from "@excalidraw/element";
+  import { newElement, newLinearElement, newArrowElement, newFreeDrawElement, newTextElement, newImageElement, hitElementItself, duplicateElements, deepCopyElement, moveOneLeft, moveOneRight, moveAllLeft, moveAllRight } from "@excalidraw/element";
   // @ts-ignore — upstream
   import { DEFAULT_FONT_SIZE, getFontFamilyString } from "@excalidraw/common";
   // @ts-ignore — upstream, resolved via Vite alias
@@ -906,6 +906,29 @@
     bumpSceneRepaint();
   };
 
+  // ── Z-order: bring forward / send backward / to front / to back ─────
+  // Upstream's shiftElementsByOne returns the full reordered array;
+  // replaceAllElements with skipValidation bypasses fractional-index
+  // validation since upstream sync happens inside replaceAllElements.
+  const reorderSelected = (
+    direction: "forward" | "backward" | "front" | "back",
+  ) => {
+    if (!scene) return;
+    const selected = getSelectedElements();
+    if (selected.length === 0) return;
+    const elements = scene.getElementsIncludingDeleted();
+    let next;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const as = appState as any;
+    if (direction === "forward") next = moveOneRight(elements, as, scene);
+    else if (direction === "backward") next = moveOneLeft(elements, as, scene);
+    else if (direction === "front") next = moveAllRight(elements, as);
+    else next = moveAllLeft(elements, as);
+    scene.replaceAllElements(next, { skipValidation: true });
+    pushHistory();
+    bumpSceneRepaint();
+  };
+
   // ── Export ───────────────────────────────────────────────────────────
   //
   // Thin wrappers over upstream `@excalidraw/utils/export`. Those helpers
@@ -1574,6 +1597,19 @@
 
     // ── Ctrl/Cmd + (Shift) shortcuts ──────────────────────────────────
     if (mod && !event.altKey) {
+      // Z-order: Ctrl+] / Ctrl+[ (one step), Ctrl+Shift+] / Ctrl+Shift+[
+      // (to front / to back). Matches upstream keybindings.
+      if (event.key === "]") {
+        reorderSelected(event.shiftKey ? "front" : "forward");
+        event.preventDefault();
+        return;
+      }
+      if (event.key === "[") {
+        reorderSelected(event.shiftKey ? "back" : "backward");
+        event.preventDefault();
+        return;
+      }
+
       // Clear canvas: Ctrl+Shift+Delete (or Backspace). Destructive but
       // undoable via Ctrl+Z since `clearCanvas` pushes history.
       if (
@@ -2291,6 +2327,124 @@
     bumpSceneRepaint();
   };
 
+  // ── Context menu (right-click) ────────────────────────────────────
+  // Opens at the cursor's viewport coords. Selection under the cursor
+  // (if any, and not already selected) replaces the selection first.
+  // Items are a static array; only the actions that make sense for the
+  // current state are rendered.
+  let contextMenu: {
+    vpX: number;
+    vpY: number;
+    hasSelection: boolean;
+  } | null = $state(null);
+
+  const closeContextMenu = () => {
+    contextMenu = null;
+  };
+
+  // Close on outside-click or Escape while open. The menu's root div
+  // stops pointerdown-propagation so clicks inside don't trigger this.
+  $effect(() => {
+    if (!contextMenu) return;
+    const onDocPointerDown = () => closeContextMenu();
+    const onDocKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeContextMenu();
+    };
+    window.addEventListener("pointerdown", onDocPointerDown);
+    window.addEventListener("keydown", onDocKey);
+    return () => {
+      window.removeEventListener("pointerdown", onDocPointerDown);
+      window.removeEventListener("keydown", onDocKey);
+    };
+  });
+
+  // In-memory scene-copy buffer for context-menu Copy/Cut/Paste. Browser
+  // clipboard APIs require user-gesture + permissions for text; for a
+  // PoC PoC we keep it local to the editor instance. Deep-cloned so
+  // subsequent scene mutations don't affect the copy.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let clipboardBuffer: any[] = [];
+
+  const copySelectedToBuffer = () => {
+    const selected = getSelectedElements();
+    if (selected.length === 0) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    clipboardBuffer = selected.map((el: any) => deepCopyElement(el));
+  };
+
+  const pasteFromBuffer = (sceneX?: number, sceneY?: number) => {
+    if (!scene || clipboardBuffer.length === 0) return;
+    // Compute bbox of copied elements to translate them to the target.
+    let minX = Infinity, minY = Infinity;
+    for (const el of clipboardBuffer) {
+      if (el.x < minX) minX = el.x;
+      if (el.y < minY) minY = el.y;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const zoomV = (appState.zoom as any).value || 1;
+    const tx =
+      (sceneX ??
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        appState.width / 2 / zoomV - ((appState as any).scrollX ?? 0)) - minX;
+    const ty =
+      (sceneY ??
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        appState.height / 2 / zoomV - ((appState as any).scrollY ?? 0)) - minY;
+    // Duplicate through upstream helper so ids / group-ids rewire
+    // correctly. `in-place` mode + override(x,y) translates each one.
+    const existing = scene.getElementsIncludingDeleted();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const idsMap = new Map<string, any>(clipboardBuffer.map((el) => [el.id, el]));
+    const { elementsWithDuplicates, origIdToDuplicateId } = duplicateElements({
+      type: "in-place",
+      elements: [...existing, ...clipboardBuffer],
+      idsOfElementsToDuplicate: idsMap,
+      appState: { editingGroupId: null, selectedGroupIds: {} },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dupIds = new Set<string>(origIdToDuplicateId.values() as any);
+    // Translate the duplicates to the paste location; also filter out
+    // the temporary clipboard-buffer copies we inserted for dedup.
+    const clipIds = new Set(clipboardBuffer.map((el) => el.id));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const next = elementsWithDuplicates
+      .filter((el: any) => !clipIds.has(el.id))
+      .map((el: any) =>
+        dupIds.has(el.id) ? { ...el, x: el.x + tx, y: el.y + ty } : el,
+      );
+    scene.replaceAllElements(next, { skipValidation: true });
+    const nextSel: Record<string, true> = {};
+    for (const id of dupIds) nextSel[id] = true;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).selectedElementIds = nextSel;
+    pushHistory();
+    bumpSceneRepaint();
+  };
+
+  const onContainerContextMenu = (event: MouseEvent) => {
+    event.preventDefault();
+    if (!scene) return;
+    const { x: sx, y: sy } = toSceneCoords(event.clientX, event.clientY);
+    const hit = hitTestAt(sx, sy);
+    if (hit) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sel = (appState as any).selectedElementIds ?? {};
+      if (!sel[(hit as any).id]) selectOnly((hit as any).id);
+    } else {
+      clearSelection();
+    }
+    // Position the menu inside the container (relative to its
+    // viewport-offset origin), not the window.
+    contextMenu = {
+      vpX: event.clientX - (appState.offsetLeft as number),
+      vpY: event.clientY - (appState.offsetTop as number),
+      hasSelection: Object.keys(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (appState as any).selectedElementIds ?? {},
+      ).length > 0,
+    };
+  };
+
   // ── Marquee (rubber-band) state ───────────────────────────────────
   // Represented as 4 scene-coords + a shiftHeld flag (additive vs replace
   // on commit). Rendered in the DOM overlay, not the canvas, to avoid
@@ -2465,6 +2619,34 @@
       if (!sel[hit.id]) {
         // Clicking unselected element replaces selection.
         selectOnly(hit.id);
+      }
+
+      // Alt-held at drag-start → duplicate the selection first, then
+      // drag the DUPLICATES. Matches Excalidraw upstream UX. The
+      // originals stay pinned at their original position; the new
+      // copies follow the cursor.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (event.altKey) {
+        const selectedNow = getSelectedElements();
+        if (selectedNow.length > 0) {
+          const elements = scene.getElementsIncludingDeleted();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const idsMap = new Map<string, any>(selectedNow.map((el) => [el.id, el]));
+          const { elementsWithDuplicates, origIdToDuplicateId } = duplicateElements({
+            type: "in-place",
+            elements,
+            idsOfElementsToDuplicate: idsMap,
+            appState: { editingGroupId: null, selectedGroupIds: {} },
+          });
+          scene.replaceAllElements(elementsWithDuplicates, { skipValidation: true });
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const dupIds = new Set<string>(origIdToDuplicateId.values() as any);
+          const nextSel: Record<string, true> = {};
+          for (const id of dupIds) nextSel[id] = true;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (appState as any).selectedElementIds = nextSel;
+          bumpSceneRepaint();
+        }
       }
 
       // Snapshot every currently-selected element's origin for the drag.
@@ -3195,7 +3377,7 @@
     }}
     {scale}
     handleCanvasRef={handleInteractiveCanvasRef}
-    oncontextmenu={noop}
+    oncontextmenu={onContainerContextMenu}
     onclick={noop}
     onpointermove={onInteractivePointerMove}
     onpointerup={onInteractivePointerUp}
@@ -3297,6 +3479,49 @@
   <!-- Marquee rubber-band overlay. Rendered as a DOM div (not on canvas)
        to avoid touching upstream renderer configs. Position is in VIEWPORT
        coords; marqueeRect derivation factors zoom + scroll + offset. -->
+  <!-- Right-click context menu. Absolute-positioned at the click point.
+       Outside-click / Escape closes via a single-use window listener. -->
+  {#if contextMenu}
+    <div
+      class="sveltedraw-ctx-menu"
+      style="position: absolute;
+             left: {contextMenu.vpX}px;
+             top: {contextMenu.vpY}px;
+             z-index: 100;"
+      role="menu"
+      onpointerdown={(e) => e.stopPropagation()}
+    >
+      {#if contextMenu.hasSelection}
+        <button type="button" class="ctx-item" onclick={() => { copySelectedToBuffer(); closeContextMenu(); }}>Copy</button>
+        <button type="button" class="ctx-item" onclick={() => {
+          copySelectedToBuffer();
+          deleteSelected();
+          closeContextMenu();
+        }}>Cut</button>
+      {/if}
+      <button type="button" class="ctx-item" disabled={clipboardBuffer.length === 0} onclick={() => {
+        if (contextMenu) {
+          const { x, y } = toSceneCoords(
+            (contextMenu.vpX + (appState.offsetLeft as number)),
+            (contextMenu.vpY + (appState.offsetTop as number)),
+          );
+          pasteFromBuffer(x, y);
+        }
+        closeContextMenu();
+      }}>Paste</button>
+      {#if contextMenu.hasSelection}
+        <div class="ctx-sep"></div>
+        <button type="button" class="ctx-item" onclick={() => { duplicateSelected(); closeContextMenu(); }}>Duplicate</button>
+        <button type="button" class="ctx-item" onclick={() => { reorderSelected("forward"); closeContextMenu(); }}>Bring forward</button>
+        <button type="button" class="ctx-item" onclick={() => { reorderSelected("front"); closeContextMenu(); }}>Bring to front</button>
+        <button type="button" class="ctx-item" onclick={() => { reorderSelected("backward"); closeContextMenu(); }}>Send backward</button>
+        <button type="button" class="ctx-item" onclick={() => { reorderSelected("back"); closeContextMenu(); }}>Send to back</button>
+        <div class="ctx-sep"></div>
+        <button type="button" class="ctx-item ctx-item--danger" onclick={() => { deleteSelected(); closeContextMenu(); }}>Delete</button>
+      {/if}
+    </div>
+  {/if}
+
   {#if marqueeRect}
     <div
       class="sveltedraw-marquee"
@@ -3396,5 +3621,40 @@
   :global(.sveltedraw-style-panel .sp-icon-btn svg) {
     width: 16px;
     height: 16px;
+  }
+
+  .sveltedraw-ctx-menu {
+    background: #fff;
+    border: 1px solid #d1d4da;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    min-width: 160px;
+    padding: 4px 0;
+    font-size: 13px;
+  }
+  .sveltedraw-ctx-menu .ctx-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 6px 12px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: #1e1e1e;
+  }
+  .sveltedraw-ctx-menu .ctx-item:hover:not([disabled]) {
+    background: #eeedfa;
+  }
+  .sveltedraw-ctx-menu .ctx-item[disabled] {
+    color: #a0a3a9;
+    cursor: not-allowed;
+  }
+  .sveltedraw-ctx-menu .ctx-item--danger {
+    color: #e03131;
+  }
+  .sveltedraw-ctx-menu .ctx-sep {
+    height: 1px;
+    background: #e5e7ea;
+    margin: 4px 0;
   }
 </style>

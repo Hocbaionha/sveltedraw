@@ -1033,6 +1033,149 @@ async function main() {
         exportSvg = { err: String(err) };
       }
 
+      // ── Context menu: right-click opens menu with selection items ──
+      // Right-click a rectangle. Assert menu appears with Delete item.
+      // Click Duplicate. Verify scene element count increased. Then
+      // dispatch a global pointerdown to close the (now-hidden) menu.
+      let ctxMenuDup = null;
+      try {
+        const rec = p.scene?.getNonDeletedElements?.()?.find(el => el.type === 'rectangle');
+        if (!rec) throw new Error('no rect');
+        // Clear selection so right-click isolates to just this one.
+        p.appState.selectedElementIds = {};
+        await new Promise(r => setTimeout(r, 20));
+        const beforeCount = p.scene?.getNonDeletedElements?.()?.length ?? 0;
+        const ctr = sceneToVp(rec.x + rec.width / 2, rec.y + rec.height / 2);
+        iv.dispatchEvent(new MouseEvent('contextmenu', { clientX: ctr.x, clientY: ctr.y, button: 2, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 50));
+        const menu = document.querySelector('.sveltedraw-ctx-menu');
+        const items = menu ? Array.from(menu.querySelectorAll('.ctx-item')).map(b => b.textContent.trim()) : [];
+        // Find the Duplicate button specifically.
+        const dupBtn = menu && Array.from(menu.querySelectorAll('.ctx-item')).find(b => b.textContent.trim() === 'Duplicate');
+        if (dupBtn) dupBtn.click();
+        await new Promise(r => setTimeout(r, 50));
+        const afterCount = p.scene?.getNonDeletedElements?.()?.length ?? 0;
+        const menuGoneAfter = !document.querySelector('.sveltedraw-ctx-menu');
+        ctxMenuDup = {
+          menuOpened: !!menu,
+          items,
+          beforeCount,
+          afterCount,
+          menuClosedAfterAction: menuGoneAfter,
+        };
+        // Undo the duplicate (restores pre-duplicate scene).
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+      } catch (err) {
+        ctxMenuDup = { err: String(err) };
+      }
+
+      // ── Context menu: outside-click closes the menu ──
+      let ctxMenuClose = null;
+      try {
+        const rec = p.scene?.getNonDeletedElements?.()?.find(el => el.type === 'rectangle');
+        if (!rec) throw new Error('no rect');
+        const ctr = sceneToVp(rec.x + rec.width / 2, rec.y + rec.height / 2);
+        iv.dispatchEvent(new MouseEvent('contextmenu', { clientX: ctr.x, clientY: ctr.y, button: 2, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 50));
+        const openedMenu = !!document.querySelector('.sveltedraw-ctx-menu');
+        window.dispatchEvent(new PointerEvent('pointerdown', { clientX: 10, clientY: 10, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+        ctxMenuClose = {
+          opened: openedMenu,
+          closedAfterOutsideClick: !document.querySelector('.sveltedraw-ctx-menu'),
+        };
+      } catch (err) {
+        ctxMenuClose = { err: String(err) };
+      }
+
+      // ── Z-order: Ctrl+] moves selected forward one spot ──
+      let zOrderForward = null;
+      try {
+        const all = p.scene?.getNonDeletedElements?.() ?? [];
+        if (all.length < 2) throw new Error('need ≥2 elements');
+        // Pick the first rectangle — confirmed to be near the front of
+        // the z-order. After Ctrl+], it should swap with its right
+        // neighbor.
+        const rec = all.find(el => el.type === 'rectangle');
+        if (!rec) throw new Error('no rect');
+        const beforeIdx = all.findIndex(el => el.id === rec.id);
+        p.appState.selectedElementIds = { [rec.id]: true };
+        await new Promise(r => setTimeout(r, 20));
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: ']', ctrlKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 40));
+        const after = p.scene?.getNonDeletedElements?.() ?? [];
+        const afterIdx = after.findIndex(el => el.id === rec.id);
+        // Undo so later tests aren't affected by the reorder.
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+        zOrderForward = { beforeIdx, afterIdx, moved: afterIdx > beforeIdx };
+      } catch (err) {
+        zOrderForward = { err: String(err) };
+      }
+
+      // ── Z-order: Ctrl+[ moves selected back one spot ──
+      let zOrderBackward = null;
+      try {
+        const all = p.scene?.getNonDeletedElements?.() ?? [];
+        // Pick text element — known to be at the end.
+        const txtEnd = [...all].reverse().find(el => el.type === 'text');
+        if (!txtEnd) throw new Error('no text');
+        const beforeIdx = all.findIndex(el => el.id === txtEnd.id);
+        p.appState.selectedElementIds = { [txtEnd.id]: true };
+        await new Promise(r => setTimeout(r, 20));
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: '[', ctrlKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 40));
+        const after = p.scene?.getNonDeletedElements?.() ?? [];
+        const afterIdx = after.findIndex(el => el.id === txtEnd.id);
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+        zOrderBackward = { beforeIdx, afterIdx, moved: afterIdx < beforeIdx };
+      } catch (err) {
+        zOrderBackward = { err: String(err) };
+      }
+
+      // ── Alt-drag duplicates while dragging ──
+      // Select a rectangle, hold Alt, press+drag its center. Verify:
+      // 1) scene element count increased by 1
+      // 2) original stays at its starting position
+      // 3) a duplicate lands near the drag-end position
+      let altDragDup = null;
+      try {
+        const rec = p.scene?.getNonDeletedElements?.()?.find(el => el.type === 'rectangle');
+        if (!rec) throw new Error('no rect');
+        const origX = rec.x;
+        const origY = rec.y;
+        const beforeCount = p.scene?.getNonDeletedElements?.()?.length ?? 0;
+        const ctr = sceneToVp(rec.x + rec.width / 2, rec.y + rec.height / 2);
+        p.appState.selectedElementIds = { [rec.id]: true };
+        await new Promise(r => setTimeout(r, 20));
+        // Alt-pointerdown then drag.
+        iv.dispatchEvent(new PointerEvent('pointerdown', { clientX: ctr.x, clientY: ctr.y, button: 0, pointerId: 1, altKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 20));
+        iv.dispatchEvent(new PointerEvent('pointermove', { clientX: ctr.x + 80, clientY: ctr.y + 40, pointerId: 1, altKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 20));
+        iv.dispatchEvent(new PointerEvent('pointerup', { clientX: ctr.x + 80, clientY: ctr.y + 40, button: 0, pointerId: 1, altKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 40));
+        const after = p.scene?.getNonDeletedElements?.() ?? [];
+        const origEl = after.find(el => el.id === rec.id);
+        // Duplicate = any rectangle OTHER than the original.
+        const dup = after.filter(el => el.type === 'rectangle' && el.id !== rec.id).pop();
+        altDragDup = {
+          beforeCount,
+          afterCount: after.length,
+          origStayed: origEl && Math.abs(origEl.x - origX) < 1 && Math.abs(origEl.y - origY) < 1,
+          dupMoved: dup ? Math.abs(dup.x - origX - 80) < 5 && Math.abs(dup.y - origY - 40) < 5 : false,
+        };
+        // Undo once — duplicate-create does NOT push history, the drag
+        // commit is the only snapshot, so one Ctrl+Z restores the
+        // pre-drag scene (without duplicates).
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+      } catch (err) {
+        altDragDup = { err: String(err) };
+      }
+
       // ── Rotated text editor overlay ──
       // Rotate a text element 45°, dblclick it, verify the textarea has
       // a transform: rotate(~0.785) applied. Commit immediately (Escape)
@@ -1393,6 +1536,8 @@ async function main() {
         polylineLine, polylineEscape,
         fontPicker, styleExt,
         rotatedTextOverlay,
+        zOrderForward, zOrderBackward, altDragDup,
+        ctxMenuDup, ctxMenuClose,
       };
     })()`,
     returnByValue: true,
@@ -1991,6 +2136,49 @@ async function main() {
       (probe?.undoFloor?.atFloor ?? -1) >= 0 &&
       (probe?.undoFloor?.final ?? -1) === (probe?.undoFloor?.before ?? -2),
     `before=${probe?.undoFloor?.before} atFloor=${probe?.undoFloor?.atFloor} afterRedo=${probe?.undoFloor?.afterRedo} final=${probe?.undoFloor?.final} alive=${probe?.undoFloor?.appStateAlive}`,
+  );
+
+  // Context menu.
+  pass(
+    "context-menu-opens-with-items",
+    probe?.ctxMenuDup?.menuOpened === true &&
+      (probe?.ctxMenuDup?.items ?? []).includes("Duplicate") &&
+      (probe?.ctxMenuDup?.items ?? []).includes("Delete") &&
+      (probe?.ctxMenuDup?.items ?? []).includes("Bring forward"),
+    `opened=${probe?.ctxMenuDup?.menuOpened} items=${JSON.stringify(probe?.ctxMenuDup?.items)}`,
+  );
+  pass(
+    "context-menu-duplicate-works",
+    (probe?.ctxMenuDup?.afterCount ?? 0) === (probe?.ctxMenuDup?.beforeCount ?? -1) + 1 &&
+      probe?.ctxMenuDup?.menuClosedAfterAction === true,
+    `before=${probe?.ctxMenuDup?.beforeCount} after=${probe?.ctxMenuDup?.afterCount} menuClosed=${probe?.ctxMenuDup?.menuClosedAfterAction}`,
+  );
+  pass(
+    "context-menu-closes-on-outside-click",
+    probe?.ctxMenuClose?.opened === true &&
+      probe?.ctxMenuClose?.closedAfterOutsideClick === true,
+    `opened=${probe?.ctxMenuClose?.opened} closedAfter=${probe?.ctxMenuClose?.closedAfterOutsideClick}`,
+  );
+
+  // Z-order shortcuts.
+  pass(
+    "ctrl-bracket-right-brings-forward",
+    probe?.zOrderForward?.moved === true,
+    `beforeIdx=${probe?.zOrderForward?.beforeIdx} afterIdx=${probe?.zOrderForward?.afterIdx}`,
+  );
+  pass(
+    "ctrl-bracket-left-sends-backward",
+    probe?.zOrderBackward?.moved === true,
+    `beforeIdx=${probe?.zOrderBackward?.beforeIdx} afterIdx=${probe?.zOrderBackward?.afterIdx}`,
+  );
+
+  // Alt-drag duplicates instead of moving.
+  pass(
+    "alt-drag-creates-duplicate",
+    (probe?.altDragDup?.afterCount ?? 0) === (probe?.altDragDup?.beforeCount ?? -1) + 1 &&
+      probe?.altDragDup?.origStayed === true &&
+      probe?.altDragDup?.dupMoved === true,
+    `before=${probe?.altDragDup?.beforeCount} after=${probe?.altDragDup?.afterCount} origStayed=${probe?.altDragDup?.origStayed} dupMoved=${probe?.altDragDup?.dupMoved}`,
   );
 
   // Rotated text editor overlay: dblclick on a 45°-rotated text element
