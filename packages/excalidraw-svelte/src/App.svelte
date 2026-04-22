@@ -655,6 +655,9 @@
   };
 
   const setActiveTool = (type: string) => {
+    // Commit any in-progress polyline before switching tool — otherwise
+    // the floating newElement would leak across tool changes.
+    if (polylineActive) commitPolyline();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (appState as any).activeTool = {
       type,
@@ -1597,10 +1600,19 @@
       return;
     }
 
+    // Enter (no modifiers) → commit in-progress polyline if any.
+    if (event.key === "Enter" && polylineActive && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+      commitPolyline();
+      setActiveTool("selection");
+      event.preventDefault();
+      return;
+    }
+
     // Escape → clear in-progress element + selection + back to selection tool.
     if (event.key === "Escape") {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (appState as any).newElement = null;
+      polylineActive = false;
       clearSelection();
       setActiveTool("selection");
       bumpSceneRepaint();
@@ -2127,6 +2139,70 @@
     });
   };
 
+  // ── Multi-point line/arrow (polyline) state ─────────────────────
+  // Upstream UX:
+  //   - Click-drag-release on the line/arrow tool → 2-point line, commits
+  //     immediately (existing behavior).
+  //   - Click-release without drag → enters polyline mode. Each subsequent
+  //     click anchors a new vertex; the last point floats under the
+  //     cursor until anchored. Enter / dblclick commits; Escape cancels.
+  let polylineActive = $state(false);
+
+  // Drop trailing floating points that duplicate the previous vertex
+  // (within 0.5 scene px). Happens after dblclick or an accidental
+  // back-to-back click in polyline mode.
+  const trimPolylineTail = (
+    points: readonly (readonly number[])[],
+  ): readonly (readonly number[])[] => {
+    let out = points;
+    while (out.length >= 2) {
+      const [ax, ay] = out[out.length - 1];
+      const [bx, by] = out[out.length - 2];
+      if (Math.hypot(ax - bx, ay - by) < 0.5) out = out.slice(0, -1);
+      else break;
+    }
+    return out;
+  };
+
+  // Commit the in-progress polyline newElement. The last point in
+  // `points` is the UNANCHORED floating preview (tracking the cursor);
+  // we drop it here since only user-clicked vertices are intended to
+  // persist. Any remaining duplicate tail (from dblclick's second
+  // press) is trimmed too. No-op if newElement isn't a line/arrow.
+  const commitPolyline = () => {
+    if (!scene) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cur = (appState as any).newElement;
+    if (!cur || (cur.type !== "line" && cur.type !== "arrow")) return;
+    let points = cur.points ?? [];
+    if (points.length >= 1) points = points.slice(0, -1);
+    points = trimPolylineTail(points);
+    if (points.length >= 2) {
+      let minX = 0, minY = 0, maxX = 0, maxY = 0;
+      for (const [px, py] of points) {
+        if (px < minX) minX = px;
+        if (py < minY) minY = py;
+        if (px > maxX) maxX = px;
+        if (py > maxY) maxY = py;
+      }
+      const committed = {
+        ...cur,
+        points,
+        width: Math.max(1, maxX - minX),
+        height: Math.max(1, maxY - minY),
+        version: (cur.version ?? 1) + 1,
+      };
+      const existing = scene.getElementsIncludingDeleted();
+      scene.replaceAllElements([...existing, committed], { skipValidation: true });
+      pushHistory();
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).newElement = null;
+    polylineActive = false;
+    dragStart = null;
+    bumpSceneRepaint();
+  };
+
   // ── Marquee (rubber-band) state ───────────────────────────────────
   // Represented as 4 scene-coords + a shiftHeld flag (additive vs replace
   // on commit). Rendered in the DOM overlay, not the canvas, to avoid
@@ -2347,6 +2423,47 @@
       dragStart = { x, y };
       dragOrigins = [];
 
+      // ── Polyline: subsequent click anchors a new vertex ───────────
+      // Only engages when we're already in polyline mode AND the current
+      // newElement is the matching linear type. The previous floating
+      // last-point becomes fixed at this click's local coord, and a new
+      // floating point is appended to track the cursor going forward.
+      if (polylineActive && (tool === "line" || tool === "arrow")) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const curLine = (appState as any).newElement;
+        if (curLine && (curLine.type === "line" || curLine.type === "arrow")) {
+          const dx = x - curLine.x;
+          const dy = y - curLine.y;
+          const pts = [...(curLine.points ?? [])];
+          if (pts.length === 0) pts.push([0, 0]);
+          // Overwrite the floating last point with the click coord, then
+          // append a new floating point identical to it.
+          pts[pts.length - 1] = [dx, dy];
+          pts.push([dx, dy]);
+          let minX = 0, minY = 0, maxX = 0, maxY = 0;
+          for (const [px, py] of pts) {
+            if (px < minX) minX = px;
+            if (py < minY) minY = py;
+            if (px > maxX) maxX = px;
+            if (py > maxY) maxY = py;
+          }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (appState as any).newElement = {
+            ...curLine,
+            points: pts,
+            width: Math.max(1, maxX - minX),
+            height: Math.max(1, maxY - minY),
+            version: (curLine.version ?? 1) + 1,
+          };
+          tryCapture(event.currentTarget as HTMLElement | null, event.pointerId);
+          bumpSceneRepaint();
+          return;
+        }
+        // newElement was somehow cleared mid-polyline — reset flag and
+        // fall through to fresh creation below.
+        polylineActive = false;
+      }
+
       const baseOpts = {
         x,
         y,
@@ -2495,21 +2612,31 @@
       const dy = y - dragStart.y;
 
       if (cur.type === "line" || cur.type === "arrow") {
-        // Linear elements: x/y stays at drag-start; update points[1] to
-        // (dx, dy) so the second vertex tracks the cursor. `points` are
-        // LOCAL coords relative to element's x/y.
-        const nextPoints = [
-          [0, 0],
-          [dx, dy],
-        ];
-        // width/height must equal the points' bounding box; upstream render
-        // uses them for dirty-rect. Approximate with abs(dx)/abs(dy), min 1.
+        // Linear elements: x/y stays at drag-start; the LAST point floats
+        // with the cursor. Generalizes to N-point polylines: earlier
+        // vertices were anchored by prior click-events (polyline mode).
+        // Points are LOCAL coords relative to element's x/y.
+        const basePts = cur.points && cur.points.length >= 1
+          ? [...cur.points]
+          : [[0, 0]];
+        if (basePts.length === 1) {
+          basePts.push([dx, dy]);
+        } else {
+          basePts[basePts.length - 1] = [dx, dy];
+        }
+        let minX = 0, minY = 0, maxX = 0, maxY = 0;
+        for (const [px, py] of basePts) {
+          if (px < minX) minX = px;
+          if (py < minY) minY = py;
+          if (px > maxX) maxX = px;
+          if (py > maxY) maxY = py;
+        }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (appState as any).newElement = {
           ...cur,
-          points: nextPoints,
-          width: Math.abs(dx) || 1,
-          height: Math.abs(dy) || 1,
+          points: basePts,
+          width: Math.max(1, maxX - minX),
+          height: Math.max(1, maxY - minY),
           version: (cur.version ?? 1) + 1,
         };
       } else if (cur.type === "freedraw") {
@@ -2630,6 +2757,37 @@
 
     // ── Finalize in-progress newElement ──
     if (cur) {
+      // Line/arrow dual-mode: click-release-without-drag enters polyline
+      // mode (keep newElement alive for next vertex); drag-release
+      // commits a 2-point line (existing UX). In polyline mode the
+      // pointerdown handler already anchored a vertex — here we just
+      // keep the element alive.
+      if (cur.type === "line" || cur.type === "arrow") {
+        const { x: ux, y: uy } = toSceneCoords(event.clientX, event.clientY);
+        const ds = dragStart;
+        const dragDist = ds ? Math.hypot(ux - ds.x, uy - ds.y) : 0;
+        const CLICK_EPS = 4;
+        if (polylineActive || dragDist < CLICK_EPS) {
+          // Enter (or stay in) polyline mode. Ensure at least 2 points
+          // so the next pointermove has a floating point to update.
+          const pts = cur.points && cur.points.length >= 1
+            ? [...cur.points]
+            : [[0, 0]];
+          if (pts.length === 1) pts.push([pts[0][0], pts[0][1]]);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (appState as any).newElement = {
+            ...cur,
+            points: pts,
+            version: (cur.version ?? 1) + 1,
+          };
+          polylineActive = true;
+          dragStart = null;
+          bumpSceneRepaint();
+          tryRelease(event.currentTarget as HTMLElement | null, event.pointerId);
+          return;
+        }
+      }
+
       // Per-type commit threshold:
       // - bbox shapes: width & height > 1px
       // - line/arrow: at least a small total distance to avoid 0-length
@@ -2667,6 +2825,15 @@
   // without first switching to the text tool).
   const onInteractiveDoubleClick = (event: MouseEvent) => {
     if (!scene) return;
+    // Polyline mode: dblclick commits the current polyline. The second
+    // pointerdown of the dblclick already anchored a duplicate vertex —
+    // commitPolyline trims trailing duplicates automatically.
+    if (polylineActive) {
+      commitPolyline();
+      setActiveTool("selection");
+      event.preventDefault();
+      return;
+    }
     const { x, y } = toSceneCoords(event.clientX, event.clientY);
     const hit = hitTestAt(x, y);
     if (hit && hit.type === "text") {

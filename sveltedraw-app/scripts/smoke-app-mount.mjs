@@ -1033,6 +1033,66 @@ async function main() {
         exportSvg = { err: String(err) };
       }
 
+      // ── Multi-point line (polyline) probe ────────────────────────
+      // Switch to line tool, click-release at 3 points (no drag), then
+      // press Enter. Verify the committed element has 3 user-anchored
+      // vertices (floating preview dropped on commit).
+      let polylineLine = null;
+      try {
+        const beforeCount = p.scene?.getNonDeletedElements?.()?.length ?? 0;
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'l', bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 20));
+        const clicks = [
+          sceneToVp(900, 100),
+          sceneToVp(1000, 180),
+          sceneToVp(900, 260),
+        ];
+        for (const c of clicks) {
+          iv.dispatchEvent(mk('pointerdown', c.x, c.y));
+          await new Promise(r => setTimeout(r, 20));
+          iv.dispatchEvent(mk('pointerup', c.x, c.y));
+          await new Promise(r => setTimeout(r, 30));
+        }
+        // Commit via Enter.
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 50));
+        const afterEls = p.scene?.getNonDeletedElements?.() ?? [];
+        const committedLine = afterEls[afterEls.length - 1];
+        polylineLine = {
+          beforeCount,
+          afterCount: afterEls.length,
+          committedType: committedLine?.type ?? null,
+          pointCount: committedLine?.points?.length ?? 0,
+          newElementCleared: p.appState?.newElement == null,
+        };
+      } catch (err) {
+        polylineLine = { err: String(err) };
+      }
+
+      // ── Polyline Escape cancels without commit ──────────────────
+      let polylineEscape = null;
+      try {
+        const beforeCount = p.scene?.getNonDeletedElements?.()?.length ?? 0;
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 20));
+        const clicks = [sceneToVp(600, 600), sceneToVp(700, 680)];
+        for (const c of clicks) {
+          iv.dispatchEvent(mk('pointerdown', c.x, c.y));
+          await new Promise(r => setTimeout(r, 20));
+          iv.dispatchEvent(mk('pointerup', c.x, c.y));
+          await new Promise(r => setTimeout(r, 30));
+        }
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+        polylineEscape = {
+          beforeCount,
+          afterCount: p.scene?.getNonDeletedElements?.()?.length ?? 0,
+          newElementCleared: p.appState?.newElement == null,
+        };
+      } catch (err) {
+        polylineEscape = { err: String(err) };
+      }
+
       // ── Deep-review probes (targeted risk verification) ─────────────
       //
       // 1) Rotated-bbox resize: rotate a rect to 45°, drag the NW handle,
@@ -1185,6 +1245,7 @@ async function main() {
         svgInlined, idbCheck,
         exportPng, exportSvg,
         rotatedResize, ctrlASelect, undoFloor,
+        polylineLine, polylineEscape,
       };
     })()`,
     returnByValue: true,
@@ -1785,11 +1846,27 @@ async function main() {
     `before=${probe?.undoFloor?.before} atFloor=${probe?.undoFloor?.atFloor} afterRedo=${probe?.undoFloor?.afterRedo} final=${probe?.undoFloor?.final} alive=${probe?.undoFloor?.appStateAlive}`,
   );
 
+  // Polyline probes (multi-point line/arrow).
+  pass(
+    "polyline-line-commits-3-vertices",
+    probe?.polylineLine?.afterCount === (probe?.polylineLine?.beforeCount ?? 0) + 1 &&
+      probe?.polylineLine?.committedType === "line" &&
+      probe?.polylineLine?.pointCount === 3 &&
+      probe?.polylineLine?.newElementCleared === true,
+    `beforeCount=${probe?.polylineLine?.beforeCount} afterCount=${probe?.polylineLine?.afterCount} type=${probe?.polylineLine?.committedType} pointCount=${probe?.polylineLine?.pointCount} cleared=${probe?.polylineLine?.newElementCleared}`,
+  );
+  pass(
+    "polyline-escape-discards",
+    probe?.polylineEscape?.afterCount === (probe?.polylineEscape?.beforeCount ?? 0) &&
+      probe?.polylineEscape?.newElementCleared === true,
+    `before=${probe?.polylineEscape?.beforeCount} after=${probe?.polylineEscape?.afterCount} cleared=${probe?.polylineEscape?.newElementCleared}`,
+  );
+
   pass(
     "reload-restores-scene",
-    // 6 shapes + 3 text (batch 9 English + VN + batch 21 edited) + 1 image = 10.
-    // With IndexedDB (batch 22), the image binary is restored too.
-    afterReload?.count === 10,
+    // 10 original + polyline line = 11 (Escape in polyline-escape
+    // probe discards, so only the committed polyline adds).
+    afterReload?.count === 11,
     `count=${afterReload?.count} types=${JSON.stringify(afterReload?.types)}`,
   );
 
