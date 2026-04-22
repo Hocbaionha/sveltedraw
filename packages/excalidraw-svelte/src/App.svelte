@@ -476,11 +476,17 @@
     scene = new Scene();
     renderer = new Renderer(scene);
     rc = rough.canvas(staticCanvas);
+
+    // Attempt to hydrate from localStorage BEFORE seeding history so the
+    // initial history floor captures the restored state, not "empty".
+    tryLoad();
     sceneReady++; // triggers the first static paint
 
-    // Seed history with the initial (empty) state. Maintains the invariant
-    // that history[historyIndex] always equals the current scene state,
-    // so `undo` has a floor to land at (never goes past "empty scene").
+    // Seed history with the CURRENT state (empty or restored).
+    // IMPORTANT: pushHistory schedules a save. When loaded from localStorage
+    // this save is a no-op overwrite (same bytes), not a problem; the
+    // alternative (conditional push based on tryLoad result) would leave a
+    // loaded session WITHOUT an undo floor.
     pushHistory();
 
     // Test-only probe: smoke scripts read `window.__sveltedrawProbe` to
@@ -548,13 +554,30 @@
     window.addEventListener("resize", measure);
     measure();
 
+    // Flush any pending save on page unload so nothing is lost.
+    const onBeforeUnload = () => {
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+        saveNow();
+      }
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+
     return () => {
       if (ro) ro.disconnect();
       window.removeEventListener("resize", measure);
       document.removeEventListener("fullscreenchange", onFullscreenChange);
+      window.removeEventListener("beforeunload", onBeforeUnload);
       containerEl?.removeEventListener("keydown", onContainerKeyDown);
       containerEl?.removeEventListener("keyup", onContainerKeyUp);
       containerEl?.removeEventListener("wheel", onContainerWheel);
+      // Flush the pending save synchronously on unmount too.
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+        saveNow();
+      }
       AnimationController.cancel(INTERACTIVE_SCENE_ANIMATION_KEY);
       renderer?.destroy?.();
     };
@@ -609,6 +632,87 @@
     };
   };
 
+  // ── Persistence (localStorage) ───────────────────────────────────────
+  //
+  // Bare-minimum PoC persistence: JSON.stringify scene elements + a small
+  // AppState subset (zoom, scroll, viewBackgroundColor, theme, tool,
+  // selectedElementIds) into a single localStorage key. Debounced saves
+  // (~500ms) so rapid mutations don't thrash storage.
+  //
+  // Schema versioning: SAVE_KEY includes `:v1`. Bump if the shape changes.
+  //
+  // Not ported from upstream:
+  //   - `restoreAppState` / `restoreElements` (defensive migration chains
+  //     for multi-year-old saved data). Our PoC is new; just read/write
+  //     the current shape.
+  //   - LocalData IndexedDB store (images + library). Out-of-scope here.
+
+  const SAVE_KEY = "sveltedraw:scene:v1";
+  let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const pickPersistedAppState = () => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    zoom: (appState as any).zoom,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    scrollX: (appState as any).scrollX,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    scrollY: (appState as any).scrollY,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    viewBackgroundColor: (appState as any).viewBackgroundColor,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    theme: (appState as any).theme,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    activeTool: (appState as any).activeTool,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    selectedElementIds: (appState as any).selectedElementIds,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    gridModeEnabled: (appState as any).gridModeEnabled,
+  });
+
+  const saveNow = () => {
+    if (!scene || typeof localStorage === "undefined") return;
+    try {
+      const payload = {
+        v: 1,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        elements: scene.getElementsIncludingDeleted() as any[],
+        appState: pickPersistedAppState(),
+      };
+      localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+    } catch (err) {
+      // Quota exceeded / private-mode Safari / disabled storage.
+      // Log and move on — loss of persistence is better than a crash.
+      console.warn("sveltedraw: save failed", err);
+    }
+  };
+
+  const scheduleSave = () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveNow, 500);
+  };
+
+  const tryLoad = (): boolean => {
+    if (!scene || typeof localStorage === "undefined") return false;
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.elements)) return false;
+      scene.replaceAllElements(parsed.elements, { skipValidation: true });
+      // Shallow-merge appState subset. Any missing field falls back to
+      // whatever we already have (e.g. width/height come from the live
+      // container measure, not the saved snapshot).
+      for (const [k, v] of Object.entries(parsed.appState ?? {})) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (appState as any)[k] = v;
+      }
+      return true;
+    } catch (err) {
+      console.warn("sveltedraw: load failed", err);
+      return false;
+    }
+  };
+
   // ── History (undo/redo) ──────────────────────────────────────────────
   //
   // Snapshot-based, not delta-based. Upstream's History class is tightly
@@ -651,11 +755,14 @@
   // Push the CURRENT state as the new head (call AFTER a mutation).
   // Truncates the redo tail — any future states past the current index are
   // discarded (standard undo behavior when you edit after undoing).
+  // Also schedules a save — pushHistory is the single source of truth for
+  // "durable scene change happened".
   const pushHistory = () => {
     const snap = captureSnapshot();
     history.length = historyIndex + 1;
     history.push(snap);
     historyIndex = history.length - 1;
+    scheduleSave();
   };
 
   const applySnapshot = (snap: HistorySnapshot) => {
@@ -758,6 +865,14 @@
     bumpSceneRepaint();
   };
 
+  const clearCanvas = () => {
+    if (!scene) return;
+    scene.replaceAllElements([], { skipValidation: true });
+    clearSelection();
+    pushHistory();
+    bumpSceneRepaint();
+  };
+
   const nudgeSelected = (dx: number, dy: number) => {
     if (!scene) return;
     const selected = getSelectedElements();
@@ -796,6 +911,7 @@
     (appState as any).scrollX = next.scrollX;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (appState as any).scrollY = next.scrollY;
+    scheduleSave(); // viewport state is persisted but not history-tracked
   };
 
   // Zoom around the container center (used by Ctrl+= / Ctrl+- / Ctrl+0).
@@ -852,6 +968,7 @@
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (appState as any).scrollY -= (event.deltaY * mult) / zoomV;
     }
+    scheduleSave();
   };
 
   // ── Space-drag / middle-mouse pan ────────────────────────────────────
@@ -882,6 +999,7 @@
   const endPan = () => {
     isPanning = false;
     panStart = null;
+    scheduleSave();
   };
 
   // Defensive wrappers — setPointerCapture throws `NotFoundError` when the
@@ -920,6 +1038,17 @@
 
     // ── Ctrl/Cmd + (Shift) shortcuts ──────────────────────────────────
     if (mod && !event.altKey) {
+      // Clear canvas: Ctrl+Shift+Delete (or Backspace). Destructive but
+      // undoable via Ctrl+Z since `clearCanvas` pushes history.
+      if (
+        event.shiftKey &&
+        (event.key === "Delete" || event.key === "Backspace")
+      ) {
+        clearCanvas();
+        event.preventDefault();
+        return;
+      }
+
       // Undo: Ctrl/Cmd + Z
       // Redo: Ctrl/Cmd + Shift + Z (primary) OR Ctrl + Y (Windows alt)
       if ((event.key === "z" || event.key === "Z") && !event.shiftKey) {

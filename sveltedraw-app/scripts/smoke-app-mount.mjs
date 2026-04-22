@@ -125,6 +125,13 @@ async function main() {
   await send("Runtime.enable");
   await send("Console.enable");
   await send("Page.enable");
+  // Wipe localStorage BEFORE the reload so App.svelte's tryLoad() finds
+  // nothing and mounts an empty scene. Batch 13 persists scene state, so
+  // without this, the prior smoke run's 6 shapes would carry over and
+  // break the "count=1" assertions.
+  await send("Runtime.evaluate", {
+    expression: `try { localStorage.removeItem('sveltedraw:scene:v1'); } catch {}`,
+  });
   // Reload to re-capture initial mount (the initial page load may have
   // fired before we subscribed).
   await send("Page.reload", { ignoreCache: true });
@@ -415,6 +422,32 @@ async function main() {
         freedrawPointCount: freedraw?.points?.length ?? 0,
       };
 
+      // ── Batch 13: localStorage persistence + clear canvas ─────────
+      // Wait past the 500ms debounce so the save is flushed.
+      await new Promise(r => setTimeout(r, 600));
+      let storedRaw = localStorage.getItem('sveltedraw:scene:v1');
+      let stored = null;
+      try { stored = JSON.parse(storedRaw); } catch {}
+      const afterSaveCheck = {
+        hasKey: !!storedRaw,
+        elementCount: stored?.elements?.length ?? 0,
+        hasViewport: stored?.appState?.zoom?.value != null,
+      };
+
+      // Ctrl+Shift+Delete → clear canvas (undoable).
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 30));
+      const afterClearCanvas = {
+        count: p.scene?.getNonDeletedElements?.()?.length ?? -1,
+      };
+
+      // Undo the clear → scene restored.
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 30));
+      const afterUndoClear = {
+        count: p.scene?.getNonDeletedElements?.()?.length ?? 0,
+      };
+
       return {
         ...afterDraw,
         afterSelect, afterDrag, afterClickEmpty,
@@ -422,7 +455,7 @@ async function main() {
         afterDuplicate, afterDelete,
         afterUndoDelete, afterRedoDelete, afterCtrlY,
         zoomBefore, afterZoomIn, afterZoomReset, afterPan, afterKeyZoomIn, afterMiddlePan,
-        afterShapes,
+        afterShapes, afterSaveCheck, afterClearCanvas, afterUndoClear,
       };
     })()`,
     returnByValue: true,
@@ -474,6 +507,33 @@ async function main() {
     })()`,
     returnByValue: true,
   });
+
+  // ── Batch 13 load-side test: reload page, verify scene restored ──
+  // MUST run before ws.close() — we still need the CDP session.
+  console.log("[smoke] reloading via window.location to test persistence...");
+  await send("Runtime.evaluate", {
+    expression: `window.location.reload()`,
+  });
+  await new Promise((r) => setTimeout(r, 2500));
+  let afterReload = null;
+  try {
+    const afterReloadRes = await send("Runtime.evaluate", {
+      expression: `(() => {
+        const p = window.__sveltedrawProbe;
+        if (!p?.scene) return { error: 'no probe' };
+        const els = p.scene.getNonDeletedElements();
+        return {
+          count: els.length,
+          types: els.map(el => el.type).sort(),
+        };
+      })()`,
+      returnByValue: true,
+    });
+    afterReload = afterReloadRes?.result?.value;
+    console.log("[smoke] afterReload:", JSON.stringify(afterReload));
+  } catch (e) {
+    console.log("[smoke] reload probe failed:", e?.message);
+  }
 
   ws.close();
   cleanup();
@@ -667,6 +727,38 @@ async function main() {
     "freedraw-has-many-points",
     (probe?.afterShapes?.freedrawPointCount ?? 0) >= 5,
     `points=${probe?.afterShapes?.freedrawPointCount}`,
+  );
+
+  // Batch 13: persistence + clear canvas.
+  pass(
+    "localStorage-save-exists",
+    probe?.afterSaveCheck?.hasKey === true,
+    `hasKey=${probe?.afterSaveCheck?.hasKey}`,
+  );
+  pass(
+    "localStorage-save-has-elements",
+    (probe?.afterSaveCheck?.elementCount ?? 0) === 6,
+    `elementCount=${probe?.afterSaveCheck?.elementCount} (expected 6)`,
+  );
+  pass(
+    "localStorage-save-has-viewport",
+    probe?.afterSaveCheck?.hasViewport === true,
+    `hasViewport=${probe?.afterSaveCheck?.hasViewport}`,
+  );
+  pass(
+    "ctrl-shift-delete-clears",
+    probe?.afterClearCanvas?.count === 0,
+    `count=${probe?.afterClearCanvas?.count}`,
+  );
+  pass(
+    "clear-is-undoable",
+    probe?.afterUndoClear?.count === 6,
+    `count=${probe?.afterUndoClear?.count} (expected 6)`,
+  );
+  pass(
+    "reload-restores-scene",
+    afterReload?.count === 6,
+    `count=${afterReload?.count} types=${JSON.stringify(afterReload?.types)}`,
   );
 
   console.log("\n=== Assertions ===");
