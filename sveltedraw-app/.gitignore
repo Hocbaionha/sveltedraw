@@ -1,3 +1,5 @@
 node_modules/
 dist/
 .svelte-kit/
+scripts/cdp-screenshots/
+vite.*.log

@@ -56,11 +56,30 @@
       onCloseRequest();
     }
   }
+
+  // Auto-focus the modal on mount so keydown (incl. ESC) reaches us even
+  // when the caller didn't focus anything inside. Also listen at the document
+  // level as a safety net if focus escapes.
+  let modalEl: HTMLDivElement | null = $state(null);
+  $effect(() => {
+    if (modalEl && !modalEl.contains(document.activeElement)) {
+      modalEl.focus();
+    }
+    const onDocKeyDown = (event: KeyboardEvent) => {
+      if (event.key === KEYS.ESCAPE) {
+        event.stopPropagation();
+        onCloseRequest();
+      }
+    };
+    document.addEventListener("keydown", onDocKeyDown);
+    return () => document.removeEventListener("keydown", onDocKeyDown);
+  });
 </script>
 
 <Portal to="body">
   <div class={containerClass}>
     <div
+      bind:this={modalEl}
       class={clsx('Modal', className, { 'animations-disabled': animationsDisabled })}
       role="dialog"
       aria-modal="true"
