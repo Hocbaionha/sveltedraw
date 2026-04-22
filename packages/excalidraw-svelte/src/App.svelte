@@ -1711,6 +1711,23 @@
   let panStart: { x: number; y: number; scrollX: number; scrollY: number } | null = null;
   let spaceHeld = false;
 
+  // ── Touch / pinch gesture state ─────────────────────────────────
+  // Tracks every active finger by pointerId. When ≥2 touches are
+  // simultaneous, we engage pinch-mode: zoom on distance ratio and
+  // pan on midpoint delta. Single-touch routes normally through the
+  // selection / tool pipeline.
+  const activeTouches = new Map<number, { x: number; y: number }>();
+  let pinchGesture: {
+    startDist: number;
+    startZoom: number;
+    startMidX: number;
+    startMidY: number;
+    startScrollX: number;
+    startScrollY: number;
+  } | null = null;
+
+  const isPinchActive = () => pinchGesture !== null;
+
   const startPan = (clientX: number, clientY: number) => {
     isPanning = true;
     panStart = {
@@ -2702,6 +2719,41 @@
   };
 
   const onInteractivePointerDown = (event: PointerEvent) => {
+    // ── Touch tracking (for pinch-zoom + two-finger pan) ─────────────
+    // Record every active touch. When a second finger lands, engage
+    // pinch-mode and drop any in-flight single-touch gesture so we
+    // don't accidentally draw a 2-point line while pinching.
+    if (event.pointerType === "touch") {
+      activeTouches.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY,
+      });
+      if (activeTouches.size === 2) {
+        const [a, b] = Array.from(activeTouches.values());
+        pinchGesture = {
+          startDist: Math.hypot(a.x - b.x, a.y - b.y),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          startZoom: (appState.zoom as any).value,
+          startMidX: (a.x + b.x) / 2,
+          startMidY: (a.y + b.y) / 2,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          startScrollX: (appState as any).scrollX,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          startScrollY: (appState as any).scrollY,
+        };
+        // Cancel any in-flight single-touch gesture.
+        dragStart = null;
+        dragOrigins = [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (appState as any).newElement = null;
+        resizeGesture = null;
+        rotateGesture = null;
+        event.preventDefault();
+        return;
+      }
+      // First finger: fall through to the normal pointerdown handler.
+    }
+
     // ── Pan gesture (middle mouse OR space held OR left+Alt via upstream)
     //    takes precedence over any tool's pointerdown. ────────────────
     if (event.button === 1 || spaceHeld) {
@@ -2983,6 +3035,55 @@
   };
 
   const onInteractivePointerMove = (event: PointerEvent) => {
+    // ── Pinch update: when 2+ touches are active, compute new
+    //    distance & midpoint relative to the gesture's start. ──────
+    //
+    // Anchor math: the SCENE point that was under the fingers'
+    // midpoint at gesture-start should remain under the fingers'
+    // midpoint throughout the gesture. This lets the user pinch-
+    // zoom AND drag at the same time with natural feel.
+    //
+    //   sceneAnchor.x = (startMidX - offsetLeft) / startZoom - startScrollX
+    //   nextZoom       = startZoom × (currentDist / startDist)
+    //   // solve: (currentMidX - offsetLeft) / nextZoom - newScrollX == sceneAnchor.x
+    //   newScrollX     = (currentMidX - offsetLeft) / nextZoom - sceneAnchor.x
+    if (event.pointerType === "touch" && activeTouches.has(event.pointerId)) {
+      activeTouches.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY,
+      });
+      if (pinchGesture && activeTouches.size >= 2) {
+        const [a, b] = Array.from(activeTouches.values());
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        const midX = (a.x + b.x) / 2;
+        const midY = (a.y + b.y) / 2;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const offL = (appState.offsetLeft as any) ?? 0;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const offT = (appState.offsetTop as any) ?? 0;
+        const sceneAnchorX =
+          (pinchGesture.startMidX - offL) / pinchGesture.startZoom -
+          pinchGesture.startScrollX;
+        const sceneAnchorY =
+          (pinchGesture.startMidY - offT) / pinchGesture.startZoom -
+          pinchGesture.startScrollY;
+        const zoomFactor = dist / pinchGesture.startDist;
+        // Clamp next zoom to sane bounds (matches applyZoom's range).
+        const nextZoom = Math.min(
+          30,
+          Math.max(0.1, pinchGesture.startZoom * zoomFactor),
+        );
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (appState as any).zoom = { value: nextZoom };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (appState as any).scrollX = (midX - offL) / nextZoom - sceneAnchorX;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (appState as any).scrollY = (midY - offT) / nextZoom - sceneAnchorY;
+        event.preventDefault();
+        return;
+      }
+    }
+
     if (isPanning) {
       updatePan(event.clientX, event.clientY);
       return;
@@ -3151,6 +3252,19 @@
   };
 
   const onInteractivePointerUp = (event: PointerEvent) => {
+    // Touch bookkeeping: drop the finger and, if we fall below 2
+    // simultaneous touches, end the pinch gesture.
+    if (event.pointerType === "touch") {
+      activeTouches.delete(event.pointerId);
+      if (pinchGesture && activeTouches.size < 2) {
+        pinchGesture = null;
+        // Persist zoom/scroll changes to localStorage.
+        scheduleSave();
+        tryRelease(event.currentTarget as HTMLElement | null, event.pointerId);
+        return;
+      }
+    }
+
     if (isPanning) {
       endPan();
       tryRelease(event.currentTarget as HTMLElement | null, event.pointerId);
@@ -3897,6 +4011,10 @@
     width: 100%;
     height: 100%;
     overflow: hidden;
+    /* Disable the browser's native pinch-zoom and scroll-via-touch
+       so our own PointerEvent handlers own the gesture. Without this,
+       iOS/Android hijacks 2-finger gestures. */
+    touch-action: none;
   }
 
   /* Style panel — floats top-left below the layer-ui menu row. Absolute

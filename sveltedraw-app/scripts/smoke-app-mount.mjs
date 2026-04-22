@@ -1666,6 +1666,53 @@ async function main() {
         polylineEscape = { err: String(err) };
       }
 
+      // ── Pinch-zoom gesture (kept LAST — touch events leak state
+      // into subsequent tests since the first finger flows through
+      // the normal pointerdown pipeline before pinch engages).
+      let pinchZoom = null;
+      try {
+        // Stash zoom to restore after.
+        const zoomBefore = p.appState.zoom.value;
+        // eslint-disable-next-line
+        const scrollBefore = { x: p.appState.scrollX, y: p.appState.scrollY };
+        // Clear selection + switch to selection tool so first-touch
+        // fall-through doesn't create an element.
+        p.appState.selectedElementIds = {};
+        p.appState.activeTool = { ...(p.appState.activeTool || {}), type: 'selection' };
+        // Move cursor to empty space far from any existing element.
+        const cx = 800, cy = 50;
+        const startDist = 200;
+        const mkTouch = (type, id, clientX, clientY) => new PointerEvent(type, {
+          pointerType: 'touch', pointerId: id,
+          clientX, clientY,
+          isPrimary: id === 1, bubbles: true, cancelable: true,
+        });
+        iv.dispatchEvent(mkTouch('pointerdown', 1, cx - startDist/2, cy));
+        await new Promise(r => setTimeout(r, 20));
+        iv.dispatchEvent(mkTouch('pointerdown', 2, cx + startDist/2, cy));
+        await new Promise(r => setTimeout(r, 30));
+        // Pinch to half the distance → zoom halves.
+        iv.dispatchEvent(mkTouch('pointermove', 1, cx - 50, cy));
+        iv.dispatchEvent(mkTouch('pointermove', 2, cx + 50, cy));
+        await new Promise(r => setTimeout(r, 30));
+        const zoomMid = p.appState.zoom.value;
+        iv.dispatchEvent(mkTouch('pointerup', 1, cx - 50, cy));
+        iv.dispatchEvent(mkTouch('pointerup', 2, cx + 50, cy));
+        await new Promise(r => setTimeout(r, 30));
+        pinchZoom = {
+          zoomBefore,
+          zoomMid,
+          halvedApprox: Math.abs(zoomMid - zoomBefore * 0.5) < 0.05,
+        };
+        // Restore zoom + scroll.
+        p.appState.zoom = { value: zoomBefore };
+        p.appState.scrollX = scrollBefore.x;
+        p.appState.scrollY = scrollBefore.y;
+        await new Promise(r => setTimeout(r, 20));
+      } catch (err) {
+        pinchZoom = { err: String(err) };
+      }
+
       // ── Deep-review probes (targeted risk verification) ─────────────
       //
       // 1) Rotated-bbox resize: rotate a rect to 45°, drag the NW handle,
@@ -1822,7 +1869,7 @@ async function main() {
         fontPicker, styleExt,
         rotatedTextOverlay,
         zOrderForward, zOrderBackward, altDragDup,
-        altClickNoDrag, historyCap, groupFlow,
+        altClickNoDrag, historyCap, groupFlow, pinchZoom,
         ctxMenuDup, ctxMenuClose,
         arrowheadPicker, textAlignPicker,
         themeToggle, i18nSwap,
@@ -2526,6 +2573,13 @@ async function main() {
     "alt-click-no-drag-is-undoable",
     probe?.altClickNoDrag?.healthy === true,
     `before=${probe?.altClickNoDrag?.beforeCount} afterClick=${probe?.altClickNoDrag?.afterClickCount} afterUndo=${probe?.altClickNoDrag?.afterUndoCount}`,
+  );
+
+  // Pinch-zoom halves zoom when fingers close from 200px to 100px.
+  pass(
+    "pinch-zoom-halves-zoom",
+    probe?.pinchZoom?.halvedApprox === true,
+    `before=${probe?.pinchZoom?.zoomBefore} mid=${probe?.pinchZoom?.zoomMid}`,
   );
 
   // Group flow: shift-select → Ctrl+G → click one → both selected → Ctrl+Shift+G.
