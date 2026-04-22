@@ -527,6 +527,38 @@ async function main() {
         h: rectAfterUndoResize?.height ?? 0,
       };
 
+      // ── Batch 18: image paste ─────────────────────────────────────
+      // Build a 1×1 red PNG blob and dispatch a paste event. Verify the
+      // scene gains an image element with a matching fileId in the
+      // imageCache (exposed via the probe's scene reference; the cache
+      // isn't directly accessible but we can check element.status).
+      const PNG_1x1_RED_B64 =
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
+      const pngBytes = Uint8Array.from(atob(PNG_1x1_RED_B64), c => c.charCodeAt(0));
+      const pngBlob = new Blob([pngBytes], { type: 'image/png' });
+      // DataTransfer is read-only in dispatched events, but we can construct
+      // a DataTransfer, add the file, and stuff it into ClipboardEvent.
+      const dt = new DataTransfer();
+      const pngFile = new File([pngBlob], 'red.png', { type: 'image/png' });
+      dt.items.add(pngFile);
+      const pasteEvent = new ClipboardEvent('paste', {
+        clipboardData: dt,
+        bubbles: true,
+        cancelable: true,
+      });
+      document.dispatchEvent(pasteEvent);
+      // Paste handler is async (reads blob → dataURL → Image.onload) — wait.
+      await new Promise(r => setTimeout(r, 300));
+
+      const imgEls = (p.scene?.getNonDeletedElements?.() ?? []).filter(el => el.type === 'image');
+      var afterImagePaste = {
+        count: imgEls.length,
+        firstStatus: imgEls[0]?.status ?? null,
+        firstHasFileId: !!imgEls[0]?.fileId,
+        firstWidth: imgEls[0]?.width ?? 0,
+        firstHeight: imgEls[0]?.height ?? 0,
+      };
+
       // ── Batch 17: style panel ────────────────────────────────────
       // Select a rectangle, click red stroke preset, verify color.
       const rectForStyle = p.scene?.getNonDeletedElements?.()?.find(el => el.type === 'rectangle');
@@ -809,6 +841,7 @@ async function main() {
         afterVnText, fontCanRenderVn,
         afterRotation, afterUndoRotation,
         afterStyleStroke, afterStyleWidth, afterStyleUndo,
+        afterImagePaste,
         exportPng, exportSvg,
       };
     })()`,
@@ -1188,6 +1221,29 @@ async function main() {
     `after-2x-undo=${probe?.afterStyleUndo?.strokeColor} orig=${probe?.afterStyleStroke?.origStroke}`,
   );
 
+  // Batch 18: image paste.
+  pass(
+    "image-paste-creates-element",
+    probe?.afterImagePaste?.count === 1,
+    `count=${probe?.afterImagePaste?.count}`,
+  );
+  pass(
+    "image-paste-has-fileid",
+    probe?.afterImagePaste?.firstHasFileId === true,
+    `hasFileId=${probe?.afterImagePaste?.firstHasFileId}`,
+  );
+  pass(
+    "image-paste-saved-status",
+    probe?.afterImagePaste?.firstStatus === "saved",
+    `status=${probe?.afterImagePaste?.firstStatus}`,
+  );
+  pass(
+    "image-paste-has-size",
+    (probe?.afterImagePaste?.firstWidth ?? 0) > 0 &&
+      (probe?.afterImagePaste?.firstHeight ?? 0) > 0,
+    `${probe?.afterImagePaste?.firstWidth}x${probe?.afterImagePaste?.firstHeight}`,
+  );
+
   // Batch 11: shift-click + marquee.
   pass(
     "shift-click-selects-one",
@@ -1283,8 +1339,11 @@ async function main() {
 
   pass(
     "reload-restores-scene",
-    // 6 shapes from batch 5 + 2 text (English + Vietnamese) from batch 9.
-    afterReload?.count === 8,
+    // 6 shapes + 2 text + 1 image = 9.
+    // Image element persists (localStorage) but the binary blob isn't
+    // persisted in this PoC — the element renders as a placeholder
+    // until re-pasted.
+    afterReload?.count === 9,
     `count=${afterReload?.count} types=${JSON.stringify(afterReload?.types)}`,
   );
 

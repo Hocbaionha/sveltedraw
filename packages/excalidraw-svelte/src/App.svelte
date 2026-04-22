@@ -64,7 +64,7 @@
   // prettier-ignore
   import { getFormFactor, createUserAgentDescriptor, MQ_RIGHT_SIDEBAR_MIN_WIDTH, supportsResizeObserver, POINTER_EVENTS, randomId, viewportCoordsToSceneCoords, DEFAULT_ELEMENT_PROPS, DEFAULT_FONT_FAMILY } from "@excalidraw/common";
   // @ts-ignore — upstream
-  import { newElement, newLinearElement, newArrowElement, newFreeDrawElement, newTextElement, hitElementItself, duplicateElements, deepCopyElement } from "@excalidraw/element";
+  import { newElement, newLinearElement, newArrowElement, newFreeDrawElement, newTextElement, newImageElement, hitElementItself, duplicateElements, deepCopyElement } from "@excalidraw/element";
   // @ts-ignore — upstream
   import { DEFAULT_FONT_SIZE, getFontFamilyString } from "@excalidraw/common";
   // @ts-ignore — upstream, resolved via Vite alias
@@ -257,7 +257,8 @@
         renderConfig: {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           canvasBackgroundColor: appState.viewBackgroundColor as any,
-          imageCache: new Map(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          imageCache: imageCacheMap as any,
           renderGrid: !!appState.gridModeEnabled,
           isExporting: false,
           embedsValidationStatus: new Map(),
@@ -286,7 +287,10 @@
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const makeStaticRenderConfig = (): any => ({
     canvasBackgroundColor: appState.viewBackgroundColor,
-    imageCache: new Map(),
+    // Persistent imageCache — populated by insertImageFromBlob. Renderer
+    // reads HTMLImage per FileId; if missing (e.g. after reload before
+    // re-paste), element draws as a placeholder per upstream behavior.
+    imageCache: imageCacheMap,
     renderGrid: !!appState.gridModeEnabled,
     isExporting: false,
     embedsValidationStatus: new Map(),
@@ -553,6 +557,13 @@
     // Svelte's `onwheel` prop attaches passively by default, so we go
     // through addEventListener.
     containerEl?.addEventListener("wheel", onContainerWheel, { passive: false });
+
+    // Image paste + drop listeners. Paste goes on document because
+    // ClipboardEvent doesn't fire on non-focused divs in all browsers.
+    // Drop is on the container to restrict to the editor surface.
+    document.addEventListener("paste", onContainerPaste);
+    containerEl?.addEventListener("dragover", onContainerDragOver);
+    containerEl?.addEventListener("drop", onContainerDrop);
     // Auto-focus the container on mount so hotkeys work without requiring
     // the user to click first. Matches upstream UX.
     containerEl?.focus({ preventScroll: true });
@@ -583,6 +594,9 @@
       containerEl?.removeEventListener("keydown", onContainerKeyDown);
       containerEl?.removeEventListener("keyup", onContainerKeyUp);
       containerEl?.removeEventListener("wheel", onContainerWheel);
+      document.removeEventListener("paste", onContainerPaste);
+      containerEl?.removeEventListener("dragover", onContainerDragOver);
+      containerEl?.removeEventListener("drop", onContainerDrop);
       // Flush the pending save synchronously on unmount too.
       if (saveTimer) {
         clearTimeout(saveTimer);
@@ -960,6 +974,155 @@
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const name = (appState as any).name || "sveltedraw";
     triggerDownload(blob, `${name}.svg`);
+  };
+
+  // ── Image paste / drop ───────────────────────────────────────────────
+  //
+  // Two entry points:
+  // - Clipboard paste (Ctrl/Cmd+V or right-click paste) of an image blob
+  // - Drag-drop of an image file onto the container
+  //
+  // Both convert the blob to a dataURL, store it in `binaryFiles` by a
+  // freshly-generated FileId, load an HTMLImage into `imageCacheMap` for
+  // the renderer, and insert a newImageElement at a sensible scene
+  // position (center of viewport, or drop location for drop).
+  //
+  // Upstream has a much richer pipeline (async progressive load, image
+  // metadata stripping, IndexedDB persistence). PoC skips persistence
+  // of the binary blob itself — the element survives reload but the
+  // image shows as a placeholder until re-pasted. Real persistence
+  // requires writing dataURL into localStorage or IndexedDB; deferred
+  // (localStorage has size quota issues with large images; the saved
+  // JSON would bloat quickly).
+
+  // FileId → {image, mimeType}. Persistent across renders so the static
+  // renderer's $effect sees a stable Map and doesn't rebuild per frame.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const imageCacheMap = new Map<string, { image: HTMLImageElement; mimeType: string }>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const binaryFiles: Record<string, any> = {};
+
+  const blobToDataURL = (blob: Blob): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+
+  const loadImage = (dataURL: string): Promise<HTMLImageElement> =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("image load failed"));
+      img.src = dataURL;
+    });
+
+  // Insert an image at scene coords. If sceneX/Y omitted, center of viewport.
+  const insertImageFromBlob = async (
+    blob: Blob,
+    sceneX?: number,
+    sceneY?: number,
+  ) => {
+    if (!scene) return;
+    const dataURL = await blobToDataURL(blob);
+    const img = await loadImage(dataURL);
+
+    const fileId = randomId();
+    const mimeType = blob.type || "image/png";
+    imageCacheMap.set(fileId, { image: img, mimeType });
+    binaryFiles[fileId] = {
+      id: fileId,
+      mimeType,
+      dataURL,
+      created: Date.now(),
+    };
+
+    // Scale down if large — fit within 600px max side at 100% zoom.
+    const MAX_SIDE = 600;
+    let w = img.naturalWidth;
+    let h = img.naturalHeight;
+    if (Math.max(w, h) > MAX_SIDE) {
+      const k = MAX_SIDE / Math.max(w, h);
+      w *= k;
+      h *= k;
+    }
+
+    // Default position: scene-viewport center.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const zoomV = (appState.zoom as any).value || 1;
+    const cx =
+      sceneX ??
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (appState.width / 2 / zoomV - ((appState as any).scrollX ?? 0));
+    const cy =
+      sceneY ??
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (appState.height / 2 / zoomV - ((appState as any).scrollY ?? 0));
+
+    const el = newImageElement({
+      type: "image",
+      x: cx - w / 2,
+      y: cy - h / 2,
+      width: w,
+      height: h,
+      fileId,
+      status: "saved",
+      strokeColor: DEFAULT_ELEMENT_PROPS.strokeColor,
+      backgroundColor: DEFAULT_ELEMENT_PROPS.backgroundColor,
+      fillStyle: DEFAULT_ELEMENT_PROPS.fillStyle,
+      strokeWidth: DEFAULT_ELEMENT_PROPS.strokeWidth,
+      strokeStyle: DEFAULT_ELEMENT_PROPS.strokeStyle,
+      roughness: DEFAULT_ELEMENT_PROPS.roughness,
+      opacity: DEFAULT_ELEMENT_PROPS.opacity,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    const existing = scene.getElementsIncludingDeleted();
+    scene.replaceAllElements([...existing, el], { skipValidation: true });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).selectedElementIds = { [el.id]: true };
+    pushHistory();
+    bumpSceneRepaint();
+  };
+
+  const onContainerPaste = async (event: ClipboardEvent) => {
+    // Ignore paste inside the text editor.
+    if (textEditor) return;
+    const items = event.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith("image/")) {
+        const blob = item.getAsFile();
+        if (blob) {
+          event.preventDefault();
+          await insertImageFromBlob(blob);
+          return;
+        }
+      }
+    }
+    // Not an image paste — let browser handle.
+  };
+
+  const onContainerDragOver = (event: DragEvent) => {
+    // Must preventDefault or the drop event won't fire.
+    if (event.dataTransfer && Array.from(event.dataTransfer.items).some(
+      (it) => it.kind === "file",
+    )) {
+      event.preventDefault();
+    }
+  };
+
+  const onContainerDrop = async (event: DragEvent) => {
+    if (!event.dataTransfer) return;
+    const files = Array.from(event.dataTransfer.files).filter((f) =>
+      f.type.startsWith("image/"),
+    );
+    if (files.length === 0) return;
+    event.preventDefault();
+    const { x, y } = toSceneCoords(event.clientX, event.clientY);
+    for (const file of files) {
+      await insertImageFromBlob(file, x, y);
+    }
   };
 
   // ── Style editor ────────────────────────────────────────────────────
