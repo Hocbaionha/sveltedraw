@@ -89,6 +89,12 @@
     createTunnelsContext,
     TUNNELS_KEY,
   } from "./state/index.js";
+  import {
+    t,
+    setLanguage,
+    getCurrentLangCode,
+    availableLanguages,
+  } from "./state/i18n.svelte.js";
   import ColorPicker from "./components/color-picker/ColorPicker.svelte";
   import FontPicker from "./components/font-picker/FontPicker.svelte";
   import type { FontDescriptor } from "./components/font-picker/types.js";
@@ -3250,6 +3256,8 @@
       "excalidraw",
       "excalidraw-container",
       "notranslate",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (appState as any).theme === "dark" ? "theme--dark" : "",
       appState.viewModeEnabled ||
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (appState.openDialog as any)?.name === "elementLinkSelector"
@@ -3260,6 +3268,23 @@
       .filter(Boolean)
       .join(" "),
   );
+
+  // Language picker state — select element reads/writes via
+  // setLanguage(). `currentLangCode` is a $derived that forwards the
+  // store value so the select stays in sync after async load.
+  const currentLangCode = $derived(getCurrentLangCode());
+
+  // Toggle theme. Matches upstream's semantic: appState.theme is
+  // "light" | "dark", and `exportWithDarkMode` mirrors it by default.
+  const toggleTheme = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const next = (appState as any).theme === "dark" ? "light" : "dark";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).theme = next;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).exportWithDarkMode = next === "dark";
+    scheduleSave();
+  };
 
   // `--ui-pointerEvents` mirrors React: disabled while dragging so UI chrome
   // doesn't eat pointer events mid-gesture. Batch 3 keeps it always enabled
@@ -3288,11 +3313,35 @@
   <div class="excalidraw-contextMenuContainer"></div>
   <div class="excalidraw-eye-dropper-container"></div>
 
+  <!-- Top-right utility bar: theme toggle + language picker. Kept
+       minimal; upstream-style MainMenu is a Phase 7 concern. -->
+  <div class="sveltedraw-utility-bar">
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
+      aria-label="Toggle dark mode"
+      title="Toggle dark mode"
+      onclick={toggleTheme}
+    >
+      {#if (appState as any).theme === "dark"}☀{:else}☾{/if}
+    </button>
+    <select
+      class="sveltedraw-util-btn sveltedraw-lang-select"
+      aria-label="Language"
+      value={currentLangCode}
+      onchange={(e) => setLanguage((e.currentTarget as HTMLSelectElement).value)}
+    >
+      {#each availableLanguages as lang (lang.code)}
+        <option value={lang.code}>{lang.label}</option>
+      {/each}
+    </select>
+  </div>
+
   <!-- Style panel. Shown whenever the editor is mounted; changes apply
        to the current selection OR to currentItem* defaults if none. -->
   <div class="sveltedraw-style-panel">
     <div class="sp-row">
-      <div class="sp-label">Stroke</div>
+      <div class="sp-label">{t("labels.stroke")}</div>
       <div class="sp-picker">
         <ColorPicker
           type="elementStroke"
@@ -3314,7 +3363,7 @@
     </div>
 
     <div class="sp-row">
-      <div class="sp-label">Fill</div>
+      <div class="sp-label">{t("labels.background")}</div>
       <div class="sp-picker">
         <ColorPicker
           type="elementBackground"
@@ -3336,7 +3385,7 @@
     </div>
 
     <div class="sp-row">
-      <div class="sp-label">Width</div>
+      <div class="sp-label">{t("labels.strokeWidth")}</div>
       <div class="sp-swatches">
         {#each STROKE_WIDTHS as w}
           <button
@@ -3355,7 +3404,7 @@
     </div>
 
     <div class="sp-row">
-      <div class="sp-label">Stroke style</div>
+      <div class="sp-label">{t("labels.strokeStyle")}</div>
       <div class="sp-swatches">
         {#each STROKE_STYLES as s}
           <button
@@ -3378,7 +3427,7 @@
     </div>
 
     <div class="sp-row">
-      <div class="sp-label">Fill style</div>
+      <div class="sp-label">{t("labels.fill")}</div>
       <div class="sp-swatches">
         {#each FILL_STYLES as f}
           <button
@@ -3397,7 +3446,7 @@
     </div>
 
     <div class="sp-row">
-      <div class="sp-label">Sloppiness</div>
+      <div class="sp-label">{t("labels.sloppiness")}</div>
       <div class="sp-swatches">
         {#each ROUGHNESS_PRESETS as r}
           <button
@@ -3478,7 +3527,7 @@
         {/if}
       {/snippet}
       <div class="sp-row">
-        <div class="sp-label">Text align</div>
+        <div class="sp-label">{t("labels.textAlign")}</div>
         <div class="sp-swatches">
           {#each TEXT_ALIGN_PRESETS as t}
             <button
@@ -3516,7 +3565,7 @@
     {/if}
 
     <div class="sp-row">
-      <div class="sp-label">Opacity</div>
+      <div class="sp-label">{t("labels.opacity")}</div>
       <div class="sp-swatches">
         {#each OPACITY_PRESETS as o}
           <button
@@ -3533,7 +3582,7 @@
     </div>
 
     <div class="sp-row">
-      <div class="sp-label">Font</div>
+      <div class="sp-label">{t("labels.fontFamily")}</div>
       <div class="sp-picker sp-font-picker">
         {#snippet handDrawnIcon()}<Icon name="FreedrawIcon" />{/snippet}
         {#snippet normalIcon()}<Icon name="FontFamilyNormalIcon" />{/snippet}
@@ -3698,12 +3747,12 @@
       onpointerdown={(e) => e.stopPropagation()}
     >
       {#if contextMenu.hasSelection}
-        <button type="button" class="ctx-item" onclick={() => { copySelectedToBuffer(); closeContextMenu(); }}>Copy</button>
+        <button type="button" class="ctx-item" onclick={() => { copySelectedToBuffer(); closeContextMenu(); }}>{t("labels.copy")}</button>
         <button type="button" class="ctx-item" onclick={() => {
           copySelectedToBuffer();
           deleteSelected();
           closeContextMenu();
-        }}>Cut</button>
+        }}>{t("labels.cut")}</button>
       {/if}
       <button type="button" class="ctx-item" disabled={clipboardBuffer.length === 0} onclick={() => {
         if (contextMenu) {
@@ -3714,16 +3763,16 @@
           pasteFromBuffer(x, y);
         }
         closeContextMenu();
-      }}>Paste</button>
+      }}>{t("labels.paste")}</button>
       {#if contextMenu.hasSelection}
         <div class="ctx-sep"></div>
-        <button type="button" class="ctx-item" onclick={() => { duplicateSelected(); closeContextMenu(); }}>Duplicate</button>
-        <button type="button" class="ctx-item" onclick={() => { reorderSelected("forward"); closeContextMenu(); }}>Bring forward</button>
-        <button type="button" class="ctx-item" onclick={() => { reorderSelected("front"); closeContextMenu(); }}>Bring to front</button>
-        <button type="button" class="ctx-item" onclick={() => { reorderSelected("backward"); closeContextMenu(); }}>Send backward</button>
-        <button type="button" class="ctx-item" onclick={() => { reorderSelected("back"); closeContextMenu(); }}>Send to back</button>
+        <button type="button" class="ctx-item" onclick={() => { duplicateSelected(); closeContextMenu(); }}>{t("labels.duplicateSelection")}</button>
+        <button type="button" class="ctx-item" onclick={() => { reorderSelected("forward"); closeContextMenu(); }}>{t("labels.bringForward")}</button>
+        <button type="button" class="ctx-item" onclick={() => { reorderSelected("front"); closeContextMenu(); }}>{t("labels.bringToFront")}</button>
+        <button type="button" class="ctx-item" onclick={() => { reorderSelected("backward"); closeContextMenu(); }}>{t("labels.sendBackward")}</button>
+        <button type="button" class="ctx-item" onclick={() => { reorderSelected("back"); closeContextMenu(); }}>{t("labels.sendToBack")}</button>
         <div class="ctx-sep"></div>
-        <button type="button" class="ctx-item ctx-item--danger" onclick={() => { deleteSelected(); closeContextMenu(); }}>Delete</button>
+        <button type="button" class="ctx-item ctx-item--danger" onclick={() => { deleteSelected(); closeContextMenu(); }}>{t("labels.delete")}</button>
       {/if}
     </div>
   {/if}
@@ -3858,6 +3907,42 @@
   .sveltedraw-ctx-menu .ctx-item--danger {
     color: #e03131;
   }
+  .sveltedraw-utility-bar {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    gap: 6px;
+    z-index: 50;
+  }
+  .sveltedraw-utility-bar .sveltedraw-util-btn {
+    height: 30px;
+    padding: 0 10px;
+    background: #fff;
+    border: 1px solid #d1d4da;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #1e1e1e;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sveltedraw-utility-bar .sveltedraw-util-btn:hover {
+    background: #f1f3f5;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-utility-bar .sveltedraw-util-btn {
+    background: #232329;
+    border-color: #363636;
+    color: #e5e7ea;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-utility-bar .sveltedraw-util-btn:hover {
+    background: #2e2e36;
+  }
+  .sveltedraw-utility-bar .sveltedraw-lang-select {
+    min-width: 120px;
+  }
+
   .sveltedraw-ctx-menu .ctx-sep {
     height: 1px;
     background: #e5e7ea;

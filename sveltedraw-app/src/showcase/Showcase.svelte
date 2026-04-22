@@ -455,7 +455,7 @@
         <RadioGroup
           name="rg-demo"
           value={radioValue}
-          onChange={(v) => (radioValue = v)}
+          onChange={(v) => (radioValue = v as "a" | "b" | "c")}
           choices={[
             { value: "a", label: "Option A" },
             { value: "b", label: "Option B" },

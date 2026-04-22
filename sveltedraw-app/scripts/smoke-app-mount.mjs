@@ -1033,6 +1033,79 @@ async function main() {
         exportSvg = { err: String(err) };
       }
 
+      // ── Phase-7 polish: theme toggle flips container class ──
+      let themeToggle = null;
+      try {
+        const before = p.appState?.theme ?? 'light';
+        const btn = document.querySelector('.sveltedraw-utility-bar button');
+        const beforeClass = document.querySelector('.excalidraw')?.classList?.contains('theme--dark') ?? false;
+        if (btn) btn.click();
+        await new Promise(r => setTimeout(r, 40));
+        const after = p.appState?.theme ?? 'light';
+        const afterClass = document.querySelector('.excalidraw')?.classList?.contains('theme--dark') ?? false;
+        // Toggle back so later tests see the original theme.
+        if (btn) btn.click();
+        await new Promise(r => setTimeout(r, 40));
+        themeToggle = {
+          foundBtn: !!btn,
+          before,
+          after,
+          beforeClass,
+          afterClass,
+        };
+      } catch (err) {
+        themeToggle = { err: String(err) };
+      }
+
+      // ── Phase-7 polish: i18n changes context-menu text ──
+      let i18nSwap = null;
+      try {
+        // Pre-check EN text on the Copy button via context menu.
+        const rec = p.scene?.getNonDeletedElements?.()?.find(el => el.type === 'rectangle');
+        if (!rec) throw new Error('no rect');
+        p.appState.selectedElementIds = { [rec.id]: true };
+        await new Promise(r => setTimeout(r, 20));
+        const ctr = sceneToVp(rec.x + rec.width / 2, rec.y + rec.height / 2);
+        iv.dispatchEvent(new MouseEvent('contextmenu', { clientX: ctr.x, clientY: ctr.y, button: 2, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 40));
+        const enMenu = document.querySelector('.sveltedraw-ctx-menu');
+        const enCopyText = enMenu ? Array.from(enMenu.querySelectorAll('.ctx-item')).find(b => /copy/i.test(b.textContent))?.textContent?.trim() : null;
+        // Close menu.
+        window.dispatchEvent(new PointerEvent('pointerdown', { clientX: 10, clientY: 10, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+
+        // Swap to VN via the lang select.
+        const sel = document.querySelector('.sveltedraw-lang-select');
+        if (sel) {
+          sel.value = 'vi-VN';
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+          await new Promise(r => setTimeout(r, 200)); // await JSON lazy-load
+        }
+        // Re-open and check.
+        p.appState.selectedElementIds = { [rec.id]: true };
+        await new Promise(r => setTimeout(r, 20));
+        iv.dispatchEvent(new MouseEvent('contextmenu', { clientX: ctr.x, clientY: ctr.y, button: 2, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 40));
+        const viMenu = document.querySelector('.sveltedraw-ctx-menu');
+        const viCopyText = viMenu ? Array.from(viMenu.querySelectorAll('.ctx-item')).find(b => b.textContent.trim().length > 0)?.textContent?.trim() : null;
+        window.dispatchEvent(new PointerEvent('pointerdown', { clientX: 10, clientY: 10, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+        // Revert to EN.
+        if (sel) {
+          sel.value = 'en';
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+          await new Promise(r => setTimeout(r, 60));
+        }
+        i18nSwap = {
+          foundSel: !!sel,
+          enCopyText,
+          viCopyText,
+          differs: enCopyText !== viCopyText && viCopyText && viCopyText.length > 0,
+        };
+      } catch (err) {
+        i18nSwap = { err: String(err) };
+      }
+
       // ── Text alignment picker (text-only rows) ──
       let textAlignPicker = null;
       try {
@@ -1686,6 +1759,7 @@ async function main() {
         altClickNoDrag, historyCap,
         ctxMenuDup, ctxMenuClose,
         arrowheadPicker, textAlignPicker,
+        themeToggle, i18nSwap,
       };
     })()`,
     returnByValue: true,
@@ -2286,6 +2360,23 @@ async function main() {
       (probe?.undoFloor?.atFloor ?? -1) >= 0 &&
       (probe?.undoFloor?.final ?? -1) === (probe?.undoFloor?.before ?? -2),
     `before=${probe?.undoFloor?.before} atFloor=${probe?.undoFloor?.atFloor} afterRedo=${probe?.undoFloor?.afterRedo} final=${probe?.undoFloor?.final} alive=${probe?.undoFloor?.appStateAlive}`,
+  );
+
+  // Phase-7 polish: theme toggle flips container class + appState.theme.
+  pass(
+    "theme-toggle-flips-class",
+    probe?.themeToggle?.foundBtn === true &&
+      probe?.themeToggle?.after !== probe?.themeToggle?.before &&
+      probe?.themeToggle?.afterClass !== probe?.themeToggle?.beforeClass,
+    `before=${probe?.themeToggle?.before} after=${probe?.themeToggle?.after} beforeClass=${probe?.themeToggle?.beforeClass} afterClass=${probe?.themeToggle?.afterClass}`,
+  );
+
+  // Phase-7 polish: i18n picks a Vietnamese string for context-menu Copy.
+  pass(
+    "i18n-swaps-context-menu-labels",
+    probe?.i18nSwap?.foundSel === true &&
+      probe?.i18nSwap?.differs === true,
+    `enCopy=${JSON.stringify(probe?.i18nSwap?.enCopyText)} viCopy=${JSON.stringify(probe?.i18nSwap?.viCopyText)}`,
   );
 
   // Text alignment (text-only).

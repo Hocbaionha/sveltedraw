@@ -15,6 +15,19 @@
     "paths": {
       "@sveltedraw/excalidraw": ["../packages/excalidraw-svelte/src/index.ts"]
     }
+    // Why NO path mappings for upstream `@excalidraw/*`:
+    //   Vite handles runtime resolution via vite.config.ts aliases.
+    //   Adding TS path mappings here pulls the transitive import graph
+    //   into svelte-check's scope — which includes React .tsx files
+    //   (actions/manager.tsx, components/App.tsx, types.ts→actions/
+    //   types.ts chain, etc.). Those error under our non-JSX tsconfig
+    //   and snowball into 278+ errors.
+    //   Ambient `declare module` shims work for VALUE imports but break
+    //   `import type { X } from ...` ("cannot use namespace as type").
+    //   Shimming every type enumeratively is cat-and-mouse with upstream.
+    //   Net: we accept a baseline of ~31 "cannot find module" errors
+    //   in .svelte/.ts files that import upstream. Every such site
+    //   already `@ts-ignore`s at use-site, so no runtime impact.
   },
   "include": ["src/**/*", "../packages/excalidraw-svelte/src/**/*"]
 }
