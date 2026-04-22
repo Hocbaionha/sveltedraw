@@ -73,7 +73,11 @@ declare class Library {
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ContextMenuItems = any;
-import type { Spreadsheet } from "./charts";
+// Post-Phase-9: charts/ dir deleted — React PasteChartDialog was the
+// only runtime consumer. Type stubbed as `any` since it still appears
+// in one discriminated-union variant below.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Spreadsheet = any;
 import type { ClipboardData } from "./clipboard";
 import type { SnapLine } from "./snapping";
 import type { ImportedDataState } from "./data/types";
