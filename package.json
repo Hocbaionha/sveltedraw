@@ -19,13 +19,6 @@
     "vitest-canvas-mock": "0.3.3",
     "vite-plugin-pwa": "0.21.1"
   },
-  "// Transitive runtime deps": "The Svelte port at `packages/excalidraw-svelte/` is pure-Svelte, but it imports from `@excalidraw/excalidraw/{appState,scene,renderer,data,...}` which pulls `packages/excalidraw/clipboard.ts`, `types.ts` et al. into the bundle. A handful of those TS files still transitively import from `packages/excalidraw/editor-jotai.ts` (→ `jotai-scope` → `react/jsx-runtime`) through import chains Rollup resolves but never actually executes. Keeping these as dependencies satisfies module resolution until we do a proper Phase-9 deep-clean of `packages/excalidraw/` (delete components/, actions/, hooks/, engine/ — React-only code paths the Svelte port never touches).",
-  "dependencies": {
-    "react": "19.0.0",
-    "react-dom": "19.0.0",
-    "jotai": "2.11.0",
-    "jotai-scope": "0.7.2"
-  },
   "engines": {
     "node": ">=18.0.0"
   },

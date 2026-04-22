@@ -5,8 +5,7 @@
   import { untrack } from 'svelte';
   import clsx from 'clsx';
   import Spinner from './Spinner.svelte';
-  // @ts-ignore — resolved by Vite alias; no tsconfig path to avoid upstream cascade
-  import { t } from '@excalidraw/excalidraw/i18n';
+  import { t } from '../state/i18n.svelte.js';
 
   const THEME_DARK = 'dark'; // matches THEME.DARK from @excalidraw/common
 
