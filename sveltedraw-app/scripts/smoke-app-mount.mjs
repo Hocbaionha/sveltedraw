@@ -527,6 +527,51 @@ async function main() {
         h: rectAfterUndoResize?.height ?? 0,
       };
 
+      // ── Batch 17: style panel ────────────────────────────────────
+      // Select a rectangle, click red stroke preset, verify color.
+      const rectForStyle = p.scene?.getNonDeletedElements?.()?.find(el => el.type === 'rectangle');
+      if (rectForStyle) {
+        const rcCtr2 = sceneToVp(rectForStyle.x + rectForStyle.width / 2, rectForStyle.y + rectForStyle.height / 2);
+        iv.dispatchEvent(mk('pointerdown', rcCtr2.x, rcCtr2.y));
+        iv.dispatchEvent(mk('pointerup', rcCtr2.x, rcCtr2.y));
+        await new Promise(r => setTimeout(r, 30));
+
+        const origStroke = rectForStyle.strokeColor;
+        // Click the red stroke preset (2nd swatch in the stroke row).
+        const redStrokeBtn = document.querySelector('.sveltedraw-style-panel .sp-row:first-child .sp-sw:nth-child(2)');
+        if (redStrokeBtn) redStrokeBtn.click();
+        await new Promise(r => setTimeout(r, 30));
+        const afterRedEl = p.scene?.getNonDeletedElements?.()?.find(el => el.id === rectForStyle.id);
+        var afterStyleStroke = {
+          foundButton: !!redStrokeBtn,
+          origStroke,
+          newStroke: afterRedEl?.strokeColor ?? null,
+        };
+
+        // Click extrabold width (3rd button in width row).
+        const wBtn = document.querySelector('.sveltedraw-style-panel .sp-row:nth-child(3) .sp-width:nth-child(3)');
+        if (wBtn) wBtn.click();
+        await new Promise(r => setTimeout(r, 30));
+        const afterWEl = p.scene?.getNonDeletedElements?.()?.find(el => el.id === rectForStyle.id);
+        var afterStyleWidth = {
+          newWidth: afterWEl?.strokeWidth ?? null,
+        };
+
+        // Undo twice — should restore original stroke (width undone first).
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+        const restoredStyle = p.scene?.getNonDeletedElements?.()?.find(el => el.id === rectForStyle.id);
+        var afterStyleUndo = {
+          strokeColor: restoredStyle?.strokeColor ?? null,
+        };
+      } else {
+        var afterStyleStroke = { err: 'no rect' };
+        var afterStyleWidth = { err: 'no rect' };
+        var afterStyleUndo = { err: 'no rect' };
+      }
+
       // ── Batch 15: rotation handle ─────────────────────────────────
       // Select the first rectangle (fresh state after undo-of-resize),
       // grab its rotation handle, drag to 90°, verify element.angle.
@@ -763,6 +808,7 @@ async function main() {
         afterTextOpen, afterTextCommit,
         afterVnText, fontCanRenderVn,
         afterRotation, afterUndoRotation,
+        afterStyleStroke, afterStyleWidth, afterStyleUndo,
         exportPng, exportSvg,
       };
     })()`,
@@ -1118,6 +1164,28 @@ async function main() {
     "rotation-is-undoable",
     Math.abs(probe?.afterUndoRotation?.angle ?? 99) < 0.001,
     `angle=${probe?.afterUndoRotation?.angle} (expected ~0)`,
+  );
+
+  // Batch 17: style panel.
+  pass(
+    "style-panel-present",
+    probe?.afterStyleStroke?.foundButton === true,
+    `foundButton=${probe?.afterStyleStroke?.foundButton}`,
+  );
+  pass(
+    "style-stroke-changes",
+    probe?.afterStyleStroke?.newStroke === "#fa5252",
+    `newStroke=${probe?.afterStyleStroke?.newStroke} (expected red #fa5252)`,
+  );
+  pass(
+    "style-width-changes",
+    probe?.afterStyleWidth?.newWidth === 4,
+    `newWidth=${probe?.afterStyleWidth?.newWidth} (expected 4)`,
+  );
+  pass(
+    "style-change-undoable",
+    probe?.afterStyleUndo?.strokeColor === probe?.afterStyleStroke?.origStroke,
+    `after-2x-undo=${probe?.afterStyleUndo?.strokeColor} orig=${probe?.afterStyleStroke?.origStroke}`,
   );
 
   // Batch 11: shift-click + marquee.

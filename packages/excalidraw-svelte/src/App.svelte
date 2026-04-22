@@ -71,7 +71,7 @@
   import { exportToBlob, exportToSvg } from "@excalidraw/utils/export";
   // @ts-ignore — upstream, resolved via Vite alias
   // prettier-ignore
-  import { DEFAULT_COLLISION_THRESHOLD, ELEMENT_TRANSLATE_AMOUNT, ELEMENT_SHIFT_TRANSLATE_AMOUNT, ZOOM_STEP } from "@excalidraw/common";
+  import { DEFAULT_COLLISION_THRESHOLD, ELEMENT_TRANSLATE_AMOUNT, ELEMENT_SHIFT_TRANSLATE_AMOUNT, ZOOM_STEP, STROKE_WIDTH, COLOR_PALETTE } from "@excalidraw/common";
   // @ts-ignore — upstream
   import { getStateForZoom } from "@excalidraw/excalidraw/scene/zoom";
   // @ts-ignore — upstream
@@ -961,6 +961,95 @@
     const name = (appState as any).name || "sveltedraw";
     triggerDownload(blob, `${name}.svg`);
   };
+
+  // ── Style editor ────────────────────────────────────────────────────
+  //
+  // Changes `strokeColor` / `backgroundColor` / `strokeWidth` / `opacity`
+  // on either the current selection (all of them) or `currentItem*`
+  // (defaults for next-drawn). Single pushHistory per style click.
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const applyStyle = (patch: Record<string, any>) => {
+    const selected = getSelectedElements();
+    if (selected.length > 0 && scene) {
+      for (const el of selected) {
+        scene.mutateElement(el, patch, {
+          informMutation: false,
+          isDragging: false,
+        });
+      }
+      pushHistory();
+      bumpSceneRepaint();
+    } else {
+      // No selection → update currentItem* defaults. Map the raw style
+      // key to its currentItem* counterpart per upstream convention.
+      const currentItemKeyMap: Record<string, string> = {
+        strokeColor: "currentItemStrokeColor",
+        backgroundColor: "currentItemBackgroundColor",
+        strokeWidth: "currentItemStrokeWidth",
+        fillStyle: "currentItemFillStyle",
+        opacity: "currentItemOpacity",
+        roughness: "currentItemRoughness",
+      };
+      for (const [k, v] of Object.entries(patch)) {
+        const targetKey = currentItemKeyMap[k] ?? k;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (appState as any)[targetKey] = v;
+      }
+      scheduleSave();
+    }
+  };
+
+  // Style panel palette. Excerpts of upstream's default palettes —
+  // enough for a usable style picker without rebuilding the full 5×3
+  // color picker UI. Future batch can swap in the ported ColorPicker
+  // component for the full experience.
+  type StylePreset = { name: string; value: string };
+  const STROKE_PRESETS: StylePreset[] = [
+    { name: "black", value: COLOR_PALETTE.black },
+    { name: "red", value: COLOR_PALETTE.red[3] },
+    { name: "green", value: COLOR_PALETTE.green[3] },
+    { name: "blue", value: COLOR_PALETTE.blue[3] },
+    { name: "orange", value: COLOR_PALETTE.orange[3] },
+  ];
+  const BG_PRESETS: StylePreset[] = [
+    { name: "transparent", value: COLOR_PALETTE.transparent },
+    { name: "red", value: COLOR_PALETTE.red[1] },
+    { name: "green", value: COLOR_PALETTE.green[1] },
+    { name: "blue", value: COLOR_PALETTE.blue[1] },
+    { name: "yellow", value: COLOR_PALETTE.yellow[1] },
+  ];
+  const STROKE_WIDTHS = [
+    { name: "thin", value: STROKE_WIDTH.thin },
+    { name: "bold", value: STROKE_WIDTH.bold },
+    { name: "extrabold", value: STROKE_WIDTH.extraBold },
+  ];
+  const OPACITY_PRESETS = [25, 50, 75, 100];
+
+  // What to display in the panel — reflects either the last-selected
+  // element's style or the currentItem* defaults when no selection.
+  const panelStyle = $derived.by(() => {
+    const selected = getSelectedElements();
+    if (selected.length > 0) {
+      const el = selected[selected.length - 1];
+      return {
+        strokeColor: el.strokeColor,
+        backgroundColor: el.backgroundColor,
+        strokeWidth: el.strokeWidth,
+        opacity: el.opacity,
+      };
+    }
+    return {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      strokeColor: (appState as any).currentItemStrokeColor,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      backgroundColor: (appState as any).currentItemBackgroundColor,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      strokeWidth: (appState as any).currentItemStrokeWidth,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      opacity: (appState as any).currentItemOpacity,
+    };
+  });
 
   const clearCanvas = () => {
     if (!scene) return;
@@ -2161,6 +2250,82 @@
   <div class="excalidraw-contextMenuContainer"></div>
   <div class="excalidraw-eye-dropper-container"></div>
 
+  <!-- Style panel. Shown whenever the editor is mounted; changes apply
+       to the current selection OR to currentItem* defaults if none. -->
+  <div class="sveltedraw-style-panel">
+    <div class="sp-row">
+      <div class="sp-label">Stroke</div>
+      <div class="sp-swatches">
+        {#each STROKE_PRESETS as c}
+          <button
+            type="button"
+            class="sp-sw"
+            class:active={panelStyle.strokeColor === c.value}
+            data-preset="stroke"
+            data-value={c.value}
+            aria-label={`Stroke ${c.name}`}
+            style="background: {c.value === 'transparent' ? '#fff' : c.value}; {c.value === 'transparent' ? 'background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%); background-size: 8px 8px;' : ''}"
+            onclick={() => applyStyle({ strokeColor: c.value })}
+          ></button>
+        {/each}
+      </div>
+    </div>
+
+    <div class="sp-row">
+      <div class="sp-label">Fill</div>
+      <div class="sp-swatches">
+        {#each BG_PRESETS as c}
+          <button
+            type="button"
+            class="sp-sw"
+            class:active={panelStyle.backgroundColor === c.value}
+            data-preset="bg"
+            data-value={c.value}
+            aria-label={`Background ${c.name}`}
+            style="background: {c.value === 'transparent' ? '#fff' : c.value}; {c.value === 'transparent' ? 'background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%); background-size: 8px 8px;' : ''}"
+            onclick={() => applyStyle({ backgroundColor: c.value })}
+          ></button>
+        {/each}
+      </div>
+    </div>
+
+    <div class="sp-row">
+      <div class="sp-label">Width</div>
+      <div class="sp-swatches">
+        {#each STROKE_WIDTHS as w}
+          <button
+            type="button"
+            class="sp-width"
+            class:active={panelStyle.strokeWidth === w.value}
+            data-preset="width"
+            data-value={w.value}
+            aria-label={`Stroke width ${w.name}`}
+            onclick={() => applyStyle({ strokeWidth: w.value })}
+          >
+            <span style="display: inline-block; width: 18px; height: {w.value}px; background: #1e1e1e; border-radius: 1px;"></span>
+          </button>
+        {/each}
+      </div>
+    </div>
+
+    <div class="sp-row">
+      <div class="sp-label">Opacity</div>
+      <div class="sp-swatches">
+        {#each OPACITY_PRESETS as o}
+          <button
+            type="button"
+            class="sp-opacity"
+            class:active={panelStyle.opacity === o}
+            data-preset="opacity"
+            data-value={o}
+            aria-label={`Opacity ${o}%`}
+            onclick={() => applyStyle({ opacity: o })}
+          >{o}</button>
+        {/each}
+      </div>
+    </div>
+  </div>
+
   <StaticCanvas
     canvas={staticCanvas}
     {scale}
@@ -2293,5 +2458,70 @@
     width: 100%;
     height: 100%;
     overflow: hidden;
+  }
+
+  /* Style panel — floats top-left below the layer-ui menu row. Absolute
+     so it stays over the canvases. Low-profile design; batch 17 ships
+     functionality first, polish later. */
+  .sveltedraw-style-panel {
+    position: absolute;
+    top: 72px;
+    left: 12px;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid #e1e3e8;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    font: 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    user-select: none;
+  }
+  .sveltedraw-style-panel .sp-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sveltedraw-style-panel .sp-label {
+    width: 50px;
+    color: #5a5d66;
+    font-weight: 500;
+  }
+  .sveltedraw-style-panel .sp-swatches {
+    display: flex;
+    gap: 4px;
+  }
+  .sveltedraw-style-panel .sp-sw {
+    width: 22px;
+    height: 22px;
+    border: 1px solid #d1d4da;
+    border-radius: 4px;
+    padding: 0;
+    cursor: pointer;
+  }
+  .sveltedraw-style-panel .sp-sw.active {
+    border-color: #6965db;
+    box-shadow: 0 0 0 1px #6965db;
+  }
+  .sveltedraw-style-panel .sp-width,
+  .sveltedraw-style-panel .sp-opacity {
+    min-width: 30px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 6px;
+    background: #fff;
+    border: 1px solid #d1d4da;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #1e1e1e;
+  }
+  .sveltedraw-style-panel .sp-width.active,
+  .sveltedraw-style-panel .sp-opacity.active {
+    border-color: #6965db;
+    background: #eeedfa;
   }
 </style>
