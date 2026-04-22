@@ -6,7 +6,7 @@
   window.addEventListener('hashchange', () => { hash = window.location.hash; });
 </script>
 
-{#if hash === '#showcase'}
+{#if hash === '#showcase' || hash.startsWith('#showcase/')}
   <Showcase />
 {:else}
   <div class="app-container">
