@@ -1318,36 +1318,91 @@
       }
     | null = null;
 
-  // Hit-test a click against the 8 resize handles of any currently-selected
-  // element. Returns {dir, el} if a handle is hit, null otherwise.
+  // ── Rotation state ────────────────────────────────────────────────
+  // rotation handle hit → start a rotate gesture tracking the initial
+  // cursor-angle-from-center; each move computes the delta and sets
+  // element.angle. Shift held = snap to 15° steps (matches Excalidraw).
+  let rotateGesture:
+    | {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        el: any;
+        cx: number;
+        cy: number;
+        origAngle: number;
+        startCursorAngle: number;
+      }
+    | null = null;
+
+  // Rotation handle position in scene coords for a given element.
+  // Matches upstream: top-center, offset above by ROTATION_RESIZE_HANDLE_GAP /
+  // zoom. Applies the element's rotation around its center so the handle
+  // rotates with it.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getRotationHandlePos = (el: any): { x: number; y: number } => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const zoomV = (appState.zoom as any).value || 1;
+    const cx = el.x + el.width / 2;
+    const cy = el.y + el.height / 2;
+    // Unrotated handle position (top-center above bbox).
+    const ROT_GAP = 16; // matches upstream ROTATION_RESIZE_HANDLE_GAP
+    const localX = cx;
+    const localY = el.y - ROT_GAP / zoomV;
+    // Rotate around element center by `el.angle` (radians).
+    const angle = el.angle || 0;
+    const dx = localX - cx;
+    const dy = localY - cy;
+    const sin = Math.sin(angle);
+    const cos = Math.cos(angle);
+    return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos };
+  };
+
+  // Hit-test a click against transform handles of any currently-selected
+  // element. Returns {kind, el, dir?} where kind is "resize" or "rotate".
   // Tolerance scales inversely with zoom so handles stay clickable at small
   // zoom levels (their visual size is ~8px).
-  const hitResizeHandle = (
-    sceneX: number,
-    sceneY: number,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type HandleHit =
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ): { dir: HandleDir; el: any } | null => {
+    | { kind: "resize"; dir: HandleDir; el: any }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    | { kind: "rotate"; el: any };
+
+  const hitResizeHandle = (sceneX: number, sceneY: number): HandleHit | null => {
     if (!scene) return null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const selectedIds = (appState as any).selectedElementIds ?? {};
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const zoomV = (appState.zoom as any).value || 1;
-    const tol = 8 / zoomV; // scene-coord tolerance for handle squares
+    const tol = 8 / zoomV;
+    const rotTol = 10 / zoomV; // rotation handle is slightly more forgiving
 
-    // Only handle non-linear, non-freedraw elements for batch 14.
-    // Linear (line/arrow) and freedraw need their own per-point editors
-    // which is a separate batch.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const el of scene.getNonDeletedElements() as any[]) {
       if (!selectedIds[el.id]) continue;
       if (el.type === "line" || el.type === "arrow" || el.type === "freedraw")
         continue;
 
+      // Rotation handle first — it sits above the bbox so it's visually
+      // on top of the N edge handle but not overlapping unless very small.
+      const rot = getRotationHandlePos(el);
+      if (
+        Math.abs(sceneX - rot.x) <= rotTol &&
+        Math.abs(sceneY - rot.y) <= rotTol
+      ) {
+        return { kind: "rotate", el };
+      }
+
+      // Resize handles — axis-aligned bbox handles ignore element rotation
+      // for simplicity. Upstream rotates them too; for PoC we disable
+      // resize while rotated (angle !== 0) — user can still rotate and
+      // drag, just not resize post-rotation. Documented in memory.
+      if (el.angle && el.angle !== 0) continue;
+
       const { x, y, width: w, height: h } = el;
       const cx = x + w / 2;
       const cy = y + h / 2;
 
-      // Corner handles first (priority — they're visually on top of edges).
+      // Corner handles first (priority — visually on top of edges).
       const corners: Array<[HandleDir, number, number]> = [
         ["nw", x, y],
         ["ne", x + w, y],
@@ -1356,10 +1411,9 @@
       ];
       for (const [dir, hx, hy] of corners) {
         if (Math.abs(sceneX - hx) <= tol && Math.abs(sceneY - hy) <= tol) {
-          return { dir, el };
+          return { kind: "resize", dir, el };
         }
       }
-      // Edge handles (mid-points).
       const edges: Array<[HandleDir, number, number]> = [
         ["n", cx, y],
         ["e", x + w, cy],
@@ -1368,7 +1422,7 @@
       ];
       for (const [dir, hx, hy] of edges) {
         if (Math.abs(sceneX - hx) <= tol && Math.abs(sceneY - hy) <= tol) {
-          return { dir, el };
+          return { kind: "resize", dir, el };
         }
       }
     }
@@ -1673,14 +1727,26 @@
       // just start a drag on the element.
       const handleHit = hitResizeHandle(x, y);
       if (handleHit) {
-        resizeGesture = {
-          dir: handleHit.dir,
-          el: handleHit.el,
-          origX: handleHit.el.x,
-          origY: handleHit.el.y,
-          origW: handleHit.el.width,
-          origH: handleHit.el.height,
-        };
+        if (handleHit.kind === "rotate") {
+          const cx = handleHit.el.x + handleHit.el.width / 2;
+          const cy = handleHit.el.y + handleHit.el.height / 2;
+          rotateGesture = {
+            el: handleHit.el,
+            cx,
+            cy,
+            origAngle: handleHit.el.angle || 0,
+            startCursorAngle: Math.atan2(y - cy, x - cx),
+          };
+        } else {
+          resizeGesture = {
+            dir: handleHit.dir,
+            el: handleHit.el,
+            origX: handleHit.el.x,
+            origY: handleHit.el.y,
+            origW: handleHit.el.width,
+            origH: handleHit.el.height,
+          };
+        }
         dragStart = { x, y }; // used only as "drag active" sentinel
         tryCapture(event.currentTarget as HTMLElement | null, event.pointerId);
         event.preventDefault();
@@ -1825,6 +1891,29 @@
       return;
     }
 
+    // Rotation gesture.
+    if (rotateGesture) {
+      const { x, y } = toSceneCoords(event.clientX, event.clientY);
+      const cursorAngle = Math.atan2(y - rotateGesture.cy, x - rotateGesture.cx);
+      let delta = cursorAngle - rotateGesture.startCursorAngle;
+      let next = rotateGesture.origAngle + delta;
+      if (event.shiftKey) {
+        // Snap to 15° increments — matches upstream rotate-with-shift UX.
+        const STEP = (Math.PI / 180) * 15;
+        next = Math.round(next / STEP) * STEP;
+      }
+      // Normalize to (-π, π] to keep numbers bounded across full turns.
+      while (next > Math.PI) next -= 2 * Math.PI;
+      while (next <= -Math.PI) next += 2 * Math.PI;
+      scene.mutateElement(
+        rotateGesture.el,
+        { angle: next },
+        { informMutation: false, isDragging: true },
+      );
+      bumpSceneRepaint();
+      return;
+    }
+
     // Marquee: extend its moving corner; commit happens on pointerup.
     if (marquee) {
       const { x, y } = toSceneCoords(event.clientX, event.clientY);
@@ -1927,6 +2016,18 @@
     if (marquee) {
       commitMarquee();
       dragStart = null;
+      bumpSceneRepaint();
+      tryRelease(event.currentTarget as HTMLElement | null, event.pointerId);
+      return;
+    }
+
+    // Finalize rotate gesture.
+    if (rotateGesture) {
+      const changed =
+        (rotateGesture.el.angle || 0) !== rotateGesture.origAngle;
+      rotateGesture = null;
+      dragStart = null;
+      if (changed) pushHistory();
       bumpSceneRepaint();
       tryRelease(event.currentTarget as HTMLElement | null, event.pointerId);
       return;

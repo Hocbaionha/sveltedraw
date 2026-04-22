@@ -527,6 +527,57 @@ async function main() {
         h: rectAfterUndoResize?.height ?? 0,
       };
 
+      // ── Batch 15: rotation handle ─────────────────────────────────
+      // Select the first rectangle (fresh state after undo-of-resize),
+      // grab its rotation handle, drag to 90°, verify element.angle.
+      const rectForRot = p.scene?.getNonDeletedElements?.()?.find(el => el.type === 'rectangle');
+      if (rectForRot) {
+        // Click center to select (in case selection was cleared earlier).
+        const rcCtr = sceneToVp(rectForRot.x + rectForRot.width / 2, rectForRot.y + rectForRot.height / 2);
+        iv.dispatchEvent(mk('pointerdown', rcCtr.x, rcCtr.y));
+        iv.dispatchEvent(mk('pointerup', rcCtr.x, rcCtr.y));
+        await new Promise(r => setTimeout(r, 30));
+
+        // Rotation handle position in scene coords (matches getRotationHandlePos
+        // for an unrotated element: top-center, 16/zoom above bbox).
+        const origAngle = rectForRot.angle || 0;
+        const cxS = rectForRot.x + rectForRot.width / 2;
+        const cyS = rectForRot.y + rectForRot.height / 2;
+        const ROT_GAP = 16;
+        const handleS = { x: cxS, y: rectForRot.y - ROT_GAP / zoomR };
+        const handleVp = sceneToVp(handleS.x, handleS.y);
+
+        // Start on the handle, drag to the RIGHT of the center (east) =
+        // cursor angle 0, which when compared to start angle (-π/2, since
+        // handle was above center) produces a delta of +π/2 = 90° clockwise.
+        iv.dispatchEvent(mk('pointerdown', handleVp.x, handleVp.y));
+        await new Promise(r => setTimeout(r, 20));
+        const targetScene = { x: cxS + 80, y: cyS }; // east of center
+        const targetVp = sceneToVp(targetScene.x, targetScene.y);
+        iv.dispatchEvent(mk('pointermove', targetVp.x, targetVp.y));
+        await new Promise(r => setTimeout(r, 20));
+        iv.dispatchEvent(mk('pointerup', targetVp.x, targetVp.y));
+        await new Promise(r => setTimeout(r, 30));
+
+        const rotatedEl = p.scene?.getNonDeletedElements?.()?.find(el => el.id === rectForRot.id);
+        var afterRotation = {
+          origAngle,
+          newAngle: rotatedEl?.angle ?? 0,
+          deltaDeg: ((rotatedEl?.angle ?? 0) - origAngle) * 180 / Math.PI,
+        };
+
+        // Undo the rotation.
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+        const restoredEl = p.scene?.getNonDeletedElements?.()?.find(el => el.id === rectForRot.id);
+        var afterUndoRotation = {
+          angle: restoredEl?.angle ?? 0,
+        };
+      } else {
+        var afterRotation = { err: 'no rect for rotation test' };
+        var afterUndoRotation = { err: 'skipped' };
+      }
+
       // ── Batch 11: shift-click + marquee ───────────────────────────
       // Starting state: 6 shapes (after the batch 5 pass + subsequent
       // resize edits on the rectangle). Clear selection first.
@@ -711,6 +762,7 @@ async function main() {
         afterMarquee, afterShiftMarquee,
         afterTextOpen, afterTextCommit,
         afterVnText, fontCanRenderVn,
+        afterRotation, afterUndoRotation,
         exportPng, exportSvg,
       };
     })()`,
@@ -1053,6 +1105,19 @@ async function main() {
     "resize-is-undoable",
     (probe?.afterUndoResize?.w ?? 0) > 150 && (probe?.afterUndoResize?.w ?? 0) < 280,
     `w=${probe?.afterUndoResize?.w} h=${probe?.afterUndoResize?.h} (post-SE pre-NW bounds)`,
+  );
+
+  // Batch 15: rotation handle.
+  pass(
+    "rotation-handle-rotates-element",
+    // Drag from handle (above center) to east of center = +90° (±5°).
+    Math.abs((probe?.afterRotation?.deltaDeg ?? 0) - 90) < 5,
+    `deltaDeg=${probe?.afterRotation?.deltaDeg} (expected ~90)`,
+  );
+  pass(
+    "rotation-is-undoable",
+    Math.abs(probe?.afterUndoRotation?.angle ?? 99) < 0.001,
+    `angle=${probe?.afterUndoRotation?.angle} (expected ~0)`,
   );
 
   // Batch 11: shift-click + marquee.
