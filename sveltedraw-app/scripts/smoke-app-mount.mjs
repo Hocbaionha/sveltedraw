@@ -1033,6 +1033,46 @@ async function main() {
         exportSvg = { err: String(err) };
       }
 
+      // ── Arrowhead picker: shown only when linear selected ──
+      // Select an arrow element (known to exist from batch 7), verify the
+      // arrowhead rows render. Click the "triangle" end-arrow preset,
+      // check that endArrowhead updated. Then select a non-linear element
+      // and verify rows hide.
+      let arrowheadPicker = null;
+      try {
+        const arr = p.scene?.getNonDeletedElements?.()?.find(el => el.type === 'arrow');
+        if (!arr) throw new Error('no arrow');
+        p.appState.selectedElementIds = { [arr.id]: true };
+        // 2 rAFs + 60ms for $derived + DOM commit to settle.
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        await new Promise(r => setTimeout(r, 60));
+        const startRow = !!document.querySelector('.sveltedraw-style-panel [data-preset="startArrowhead"]');
+        const endRow = !!document.querySelector('.sveltedraw-style-panel [data-preset="endArrowhead"]');
+        const triEndBtn = document.querySelector('.sveltedraw-style-panel [data-preset="endArrowhead"][data-value="triangle"]');
+        if (triEndBtn) triEndBtn.click();
+        await new Promise(r => setTimeout(r, 30));
+        const afterArr = p.scene?.getNonDeletedElements?.()?.find(el => el.id === arr.id);
+
+        // Now select a rectangle — arrowhead rows should disappear.
+        const rec = p.scene?.getNonDeletedElements?.()?.find(el => el.type === 'rectangle');
+        if (rec) p.appState.selectedElementIds = { [rec.id]: true };
+        await new Promise(r => setTimeout(r, 40));
+        const startRowAfterRect = !!document.querySelector('.sveltedraw-style-panel [data-preset="startArrowhead"]');
+
+        arrowheadPicker = {
+          startRowVisible: startRow,
+          endRowVisible: endRow,
+          foundTriBtn: !!triEndBtn,
+          newEndArrowhead: afterArr?.endArrowhead ?? null,
+          rowHiddenForRect: !startRowAfterRect,
+        };
+        // Undo the end-arrowhead change so reload-scene count stays stable.
+        container.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+      } catch (err) {
+        arrowheadPicker = { err: String(err) };
+      }
+
       // ── Context menu: right-click opens menu with selection items ──
       // Right-click a rectangle. Assert menu appears with Delete item.
       // Click Duplicate. Verify scene element count increased. Then
@@ -1538,6 +1578,7 @@ async function main() {
         rotatedTextOverlay,
         zOrderForward, zOrderBackward, altDragDup,
         ctxMenuDup, ctxMenuClose,
+        arrowheadPicker,
       };
     })()`,
     returnByValue: true,
@@ -2136,6 +2177,25 @@ async function main() {
       (probe?.undoFloor?.atFloor ?? -1) >= 0 &&
       (probe?.undoFloor?.final ?? -1) === (probe?.undoFloor?.before ?? -2),
     `before=${probe?.undoFloor?.before} atFloor=${probe?.undoFloor?.atFloor} afterRedo=${probe?.undoFloor?.afterRedo} final=${probe?.undoFloor?.final} alive=${probe?.undoFloor?.appStateAlive}`,
+  );
+
+  // Arrowhead picker (linear-only).
+  pass(
+    "arrowhead-rows-visible-for-arrow",
+    probe?.arrowheadPicker?.startRowVisible === true &&
+      probe?.arrowheadPicker?.endRowVisible === true,
+    `startRow=${probe?.arrowheadPicker?.startRowVisible} endRow=${probe?.arrowheadPicker?.endRowVisible}`,
+  );
+  pass(
+    "arrowhead-triangle-applies",
+    probe?.arrowheadPicker?.foundTriBtn === true &&
+      probe?.arrowheadPicker?.newEndArrowhead === "triangle",
+    `btn=${probe?.arrowheadPicker?.foundTriBtn} newEnd=${probe?.arrowheadPicker?.newEndArrowhead}`,
+  );
+  pass(
+    "arrowhead-rows-hide-for-non-linear",
+    probe?.arrowheadPicker?.rowHiddenForRect === true,
+    `hidden=${probe?.arrowheadPicker?.rowHiddenForRect}`,
   );
 
   // Context menu.

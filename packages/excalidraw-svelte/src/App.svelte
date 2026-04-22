@@ -94,6 +94,11 @@
   import type { FontDescriptor } from "./components/font-picker/types.js";
   import Icon from "./icons/Icon.svelte";
   import StrokeStyleSolidIcon from "./icons/dynamic/StrokeStyleSolidIcon.svelte";
+  import ArrowheadNoneIcon from "./icons/dynamic/ArrowheadNoneIcon.svelte";
+  import ArrowheadArrowIcon from "./icons/dynamic/ArrowheadArrowIcon.svelte";
+  import ArrowheadTriangleIcon from "./icons/dynamic/ArrowheadTriangleIcon.svelte";
+  import ArrowheadCircleIcon from "./icons/dynamic/ArrowheadCircleIcon.svelte";
+  import ArrowheadBarIcon from "./icons/dynamic/ArrowheadBarIcon.svelte";
 
   import LayerUI from "./components/LayerUI.svelte";
   import StaticCanvas from "./components/canvases/StaticCanvas.svelte";
@@ -1313,6 +1318,17 @@
     { name: "cartoonist", value: ROUGHNESS.cartoonist, icon: "SloppinessCartoonistIcon" },
   ];
   const OPACITY_PRESETS = [25, 50, 75, 100];
+  // Arrowhead quick-picks: a subset of the full upstream Arrowhead type.
+  // Full set (triangle_outline, diamond*, cardinality_*) is overwhelming
+  // for a PoC side-panel; these five cover 95% of use.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ARROWHEAD_PRESETS = [
+    { name: "none", value: null },
+    { name: "arrow", value: "arrow" as const },
+    { name: "triangle", value: "triangle" as const },
+    { name: "circle", value: "circle" as const },
+    { name: "bar", value: "bar" as const },
+  ];
 
   // Open-state for the two picker popovers (controlled). Only one open at
   // a time; opening the other auto-closes the first.
@@ -1347,6 +1363,10 @@
         fillStyle: (el as any).fillStyle,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         roughness: (el as any).roughness,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        startArrowhead: (el as any).startArrowhead ?? null,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        endArrowhead: (el as any).endArrowhead ?? null,
       };
     }
     return {
@@ -1364,7 +1384,30 @@
       fillStyle: (appState as any).currentItemFillStyle,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       roughness: (appState as any).currentItemRoughness,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      startArrowhead: (appState as any).currentItemStartArrowhead ?? null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      endArrowhead: (appState as any).currentItemEndArrowhead ?? "arrow",
     };
+  });
+
+  // Linear-only: show arrowhead rows only when at least one selected
+  // element is a line or arrow. Reads selectedElementIds directly so
+  // Svelte 5's proxy reactivity tracks the change; reads `sceneReady`
+  // so scene mutations (e.g. element deletion) also invalidate.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const hasLinearSelected = $derived.by<boolean>(() => {
+    void sceneReady;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ids = (appState as any).selectedElementIds ?? {};
+    if (!scene) return false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const el of scene.getNonDeletedElements() as any[]) {
+      if (ids[el.id] && (el.type === "line" || el.type === "arrow")) {
+        return true;
+      }
+    }
+    return false;
   });
 
   // ── Font picker state ────────────────────────────────────────────
@@ -3308,6 +3351,58 @@
         {/each}
       </div>
     </div>
+
+    {#if hasLinearSelected}
+      {#snippet arrowheadIcon(value: string | null, flip: boolean)}
+        {#if value === null}
+          <ArrowheadNoneIcon {flip} />
+        {:else if value === "arrow"}
+          <ArrowheadArrowIcon {flip} />
+        {:else if value === "triangle"}
+          <ArrowheadTriangleIcon {flip} />
+        {:else if value === "circle"}
+          <ArrowheadCircleIcon {flip} />
+        {:else if value === "bar"}
+          <ArrowheadBarIcon {flip} />
+        {/if}
+      {/snippet}
+      <div class="sp-row">
+        <div class="sp-label">Start arrow</div>
+        <div class="sp-swatches">
+          {#each ARROWHEAD_PRESETS as a}
+            <button
+              type="button"
+              class="sp-icon-btn"
+              class:active={panelStyle.startArrowhead === a.value}
+              data-preset="startArrowhead"
+              data-value={a.value ?? "none"}
+              aria-label={`Start arrow ${a.name}`}
+              onclick={() => applyStyle({ startArrowhead: a.value })}
+            >
+              {@render arrowheadIcon(a.value, true)}
+            </button>
+          {/each}
+        </div>
+      </div>
+      <div class="sp-row">
+        <div class="sp-label">End arrow</div>
+        <div class="sp-swatches">
+          {#each ARROWHEAD_PRESETS as a}
+            <button
+              type="button"
+              class="sp-icon-btn"
+              class:active={panelStyle.endArrowhead === a.value}
+              data-preset="endArrowhead"
+              data-value={a.value ?? "none"}
+              aria-label={`End arrow ${a.name}`}
+              onclick={() => applyStyle({ endArrowhead: a.value })}
+            >
+              {@render arrowheadIcon(a.value, false)}
+            </button>
+          {/each}
+        </div>
+      </div>
+    {/if}
 
     <div class="sp-row">
       <div class="sp-label">Opacity</div>
