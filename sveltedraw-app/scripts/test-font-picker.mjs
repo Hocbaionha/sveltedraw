@@ -119,8 +119,71 @@ async function main() {
   });
   console.log(result.result.value);
 
+  // Take screenshot WHILE popover is still open.
+  const shotOpen = await send("Page.captureScreenshot", { format: "png" });
+  const absDir2 = "C:/Users/phank/workspace-win/sveltedraw/sveltedraw-app/scripts/cdp-screenshots";
+  writeFileSync(absDir2 + "/font-picker-while-open.png", Buffer.from(shotOpen.data, "base64"));
+  console.log("screenshot while open:", absDir2 + "/font-picker-while-open.png");
+
+  // Select Lilita One via probe, wait for fonts to load, screenshot.
+  await send("Runtime.evaluate", {
+    expression: `
+      (async () => {
+        const p = window.__sveltedrawProbe;
+        // Swap to Lilita One (fontFamily = 7).
+        const el = p.scene.getNonDeletedElements()[0];
+        p.scene.mutateElement(el, { fontFamily: 7 }, { informMutation: false });
+        // Give fonts 2 seconds to download + load.
+        await new Promise(r => setTimeout(r, 2500));
+        // Force a repaint via bumpSceneRepaint (window.__sveltedrawInteractiveTicks)
+        // Not exposed directly — use Fonts.loadElementsFonts workaround.
+        return true;
+      })()
+    `,
+    awaitPromise: true, returnByValue: true,
+  });
+  const shotAfter = await send("Page.captureScreenshot", { format: "png" });
+  writeFileSync(absDir2 + "/font-after-lilita.png", Buffer.from(shotAfter.data, "base64"));
+  console.log("screenshot after font change:", absDir2 + "/font-after-lilita.png");
+
+  // Inspect content of first font item + try clicking a real font.
+  const r2 = await send("Runtime.evaluate", {
+    expression: `
+      (async () => {
+        const p = window.__sveltedrawProbe;
+        const items = [...document.querySelectorAll('.dropdown-menu-item')];
+        const info = items.map(btn => ({
+          text: btn.textContent.trim(),
+          outerHTML: btn.outerHTML.slice(0, 300),
+          value: btn.value,
+        }));
+        // Click the first non-selected item.
+        const virgil = items.find(b => /Virgil/i.test(b.textContent));
+        const before = p.scene.getNonDeletedElements()[0].fontFamily;
+        if (virgil) {
+          virgil.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+          await new Promise(r => setTimeout(r, 150));
+        }
+        const after = p.scene.getNonDeletedElements()[0].fontFamily;
+        return { info, before, after, changed: before !== after };
+      })()
+    `,
+    awaitPromise: true, returnByValue: true,
+  });
+  console.log('\n=== Items detail ===');
+  const val = r2.result.value;
+  for (const item of val.info.slice(0, 3)) {
+    console.log('text:', JSON.stringify(item.text));
+    console.log('value:', item.value);
+    console.log('html:', item.outerHTML);
+    console.log('---');
+  }
+  console.log('\n=== Click Virgil ===');
+  console.log('before fontFamily:', val.before, '→ after:', val.after, 'changed:', val.changed);
+
   const shot = await send("Page.captureScreenshot", { format: "png" });
-  const path = join(process.cwd(), "scripts", "cdp-screenshots", "font-picker-open.png");
+  const absDir = "C:/Users/phank/workspace-win/sveltedraw/sveltedraw-app/scripts/cdp-screenshots";
+  const path = absDir + "/font-picker-open.png";
   writeFileSync(path, Buffer.from(shot.data, "base64"));
   console.log("screenshot:", path);
   ws.close();

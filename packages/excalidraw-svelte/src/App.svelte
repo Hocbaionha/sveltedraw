@@ -60,6 +60,8 @@
   const INTERACTIVE_SCENE_ANIMATION_KEY = "animateInteractiveScene";
   // @ts-ignore — upstream
   import rough from "roughjs/bin/rough";
+  // @ts-ignore — upstream
+  import { Fonts } from "@excalidraw/excalidraw/fonts/Fonts";
   // @ts-ignore — upstream, resolved via Vite alias
   // prettier-ignore
   import { getFormFactor, createUserAgentDescriptor, MQ_RIGHT_SIDEBAR_MIN_WIDTH, supportsResizeObserver, POINTER_EVENTS, randomId, viewportCoordsToSceneCoords, DEFAULT_ELEMENT_PROPS, DEFAULT_FONT_FAMILY, FONT_FAMILY } from "@excalidraw/common";
@@ -513,6 +515,25 @@
     tryLoad();
     loadLibrary();
     sceneReady++; // triggers the first static paint
+
+    // Initialize the upstream Fonts loader. It takes a scene object
+    // with getNonDeletedElements + triggerUpdate(). Scene from
+    // @excalidraw/element already has both. After construction,
+    // kick off a load for the current scene so text elements that
+    // were restored from localStorage get their woff2 downloaded
+    // and rendered on top of the fallback.
+    try {
+      // Fonts constructor takes a Scene directly. Our Scene instance
+      // already satisfies the shape (getNonDeletedElements +
+      // triggerUpdate) — just pass it through.
+      fontsInstance = new Fonts(scene);
+      // Fire-and-forget — fonts download in background; repaint
+      // triggers when ready via the scene ticker.
+      reloadSceneFonts();
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn("sveltedraw: Fonts init failed", err);
+    }
 
     // Seed history with the CURRENT state (empty or restored).
     // IMPORTANT: pushHistory schedules a save. When loaded from localStorage
@@ -1444,6 +1465,26 @@
     }
   };
 
+  // ── Font loading ────────────────────────────────────────────────
+  // Upstream Excalidraw uses a Fonts class instance tied to the
+  // scene. It scans text elements, loads the woff2 files from the
+  // registry, and re-renders once document.fonts.ready resolves.
+  // Without this, picking Virgil / Nunito / etc. from the popover
+  // changes element.fontFamily but the canvas keeps rendering in
+  // the fallback (usually blank-looking because metrics differ).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let fontsInstance: any = null;
+  const reloadSceneFonts = async () => {
+    if (!fontsInstance) return;
+    try {
+      await fontsInstance.loadSceneFonts();
+      bumpSceneRepaint();
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn("sveltedraw: loadSceneFonts failed", err);
+    }
+  };
+
   // Walk the scene's image elements and pull binaries from IndexedDB
   // into imageCacheMap + binaryFiles. Called on mount after tryLoad().
   const rehydrateImagesFromIdb = async () => {
@@ -1637,6 +1678,13 @@
       }
       pushHistory();
       bumpSceneRepaint();
+      // If a fontFamily or fontSize changed, make sure the browser
+      // has the woff2 for the new family+glyphs loaded and the
+      // canvas re-rendered once fonts are ready. Without this, the
+      // text element paints with a fallback until the page reloads.
+      if (patch.fontFamily !== undefined || patch.fontSize !== undefined) {
+        reloadSceneFonts();
+      }
     } else {
       // No selection → update currentItem* defaults. Map the raw style
       // key to its currentItem* counterpart per upstream convention.
