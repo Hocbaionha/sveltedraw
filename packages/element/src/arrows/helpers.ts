@@ -33,7 +33,8 @@ export const maybeHandleArrowPointlikeDrag = ({
     ) {
       LinearElementEditor.handlePointDragging(
         app.lastPointerMoveEvent,
-        app,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        app as any, // post-Phase-9 App type is a stub
         app.lastPointerMoveCoords.x,
         app.lastPointerMoveCoords.y,
         appState.selectedLinearElement,

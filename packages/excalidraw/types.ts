@@ -49,12 +49,32 @@ import type {
 } from "@excalidraw/element";
 import type { GlobalPoint } from "@excalidraw/math";
 
-import type { Action } from "./actions/types";
+// Post-Phase-9: actions/, components/, data/library, i18n (React
+// version) were deleted. `App` is still referenced as both a type
+// AND a value (via `InstanceType<typeof App>`) in this file, so we
+// declare it as a class with optional members — the declared shape
+// is wide enough to satisfy all call-site usages.
+//
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare class App {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onStateChange(...args: any[]): void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onEvent(...args: any[]): void;
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Action = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare class Library {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ContextMenuItems = any;
 import type { Spreadsheet } from "./charts";
 import type { ClipboardData } from "./clipboard";
-import type App from "./components/App";
-import type Library from "./data/library";
-import type { ContextMenuItems } from "./components/ContextMenu";
 import type { SnapLine } from "./snapping";
 import type { ImportedDataState } from "./data/types";
 

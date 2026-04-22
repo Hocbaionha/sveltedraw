@@ -8,7 +8,9 @@ import {
   toIterable,
 } from "@excalidraw/common";
 
-import type App from "@excalidraw/excalidraw/components/App";
+// Post-Phase-9: components/App deleted; this was a type-only import.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type App = any;
 
 import type { DTO, ValueOf } from "@excalidraw/common/utility-types";
 

@@ -432,7 +432,8 @@ export const createPlaceholderEmbeddableLabel = (
     text: wrapText(text, fontString, element.width - 20),
     textAlign: "center",
     verticalAlign: VERTICAL_ALIGN.MIDDLE,
-    angle: element.angle ?? 0,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    angle: (element.angle ?? 0) as any,
   });
 };
 

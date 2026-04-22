@@ -338,8 +338,10 @@ export const duplicateElements = (
     if (isBoundToContainer(element)) {
       const container = getContainerElement(element, elementsMap);
 
-      const targetIndex = findLastIndex(elementsWithDuplicates, (el) => {
-        return el.id === element.id || el.id === container?.id;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const anyElement = element as any;
+      const targetIndex = findLastIndex(elementsWithDuplicates, (el: ExcalidrawElement) => {
+        return el.id === anyElement.id || el.id === container?.id;
       });
 
       if (container) {

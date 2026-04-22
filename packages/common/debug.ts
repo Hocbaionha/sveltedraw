@@ -116,7 +116,8 @@ export class Debug {
     const now = performance.now();
     const { t, times } = (Debug.TIMES_AVG[name] = Debug.TIMES_AVG[name] || {
       t: 0,
-      times: [],
+      times: [] as number[],
+      avg: 0,
     });
     if (t) {
       times.push(time != null ? time : now - t);

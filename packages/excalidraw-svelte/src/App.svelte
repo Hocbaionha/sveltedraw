@@ -2468,7 +2468,7 @@
   // PoC PoC we keep it local to the editor instance. Deep-cloned so
   // subsequent scene mutations don't affect the copy.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let clipboardBuffer: any[] = [];
+  let clipboardBuffer: any[] = $state([]);
 
   const copySelectedToBuffer = () => {
     const selected = getSelectedElements();
@@ -3744,6 +3744,7 @@
              top: {contextMenu.vpY}px;
              z-index: 100;"
       role="menu"
+      tabindex="-1"
       onpointerdown={(e) => e.stopPropagation()}
     >
       {#if contextMenu.hasSelection}

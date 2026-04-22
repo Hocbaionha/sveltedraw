@@ -58,7 +58,7 @@ export const validateFractionalIndices = (
   },
 ) => {
   const errorMessages = [];
-  const stringifyElement = (element: ExcalidrawElement | void) =>
+  const stringifyElement = (element: ExcalidrawElement | undefined) =>
     `${element?.index}:${element?.id}:${element?.type}:${element?.isDeleted}:${element?.version}:${element?.versionNonce}`;
 
   const indices = elements.map((x) => x.index);
