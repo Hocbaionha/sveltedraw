@@ -228,7 +228,68 @@ async function main() {
         selectedIds: Object.keys(p.appState?.selectedElementIds ?? {}),
       };
 
-      return { ...afterDraw, afterSelect, afterDrag, afterClickEmpty };
+      // ── Batch 7: keyboard shortcuts ──────────────────────────────────
+      // Draw a second rectangle for select-all testing.
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'r', bubbles: true }));
+      await new Promise(r => setTimeout(r, 30));
+      const r2StartX = rect.left + 500;
+      const r2StartY = rect.top + 300;
+      iv.dispatchEvent(mk('pointerdown', r2StartX, r2StartY));
+      await new Promise(r => setTimeout(r, 20));
+      iv.dispatchEvent(mk('pointermove', r2StartX + 80, r2StartY + 60));
+      await new Promise(r => setTimeout(r, 20));
+      iv.dispatchEvent(mk('pointerup', r2StartX + 80, r2StartY + 60));
+      await new Promise(r => setTimeout(r, 50));
+      const afterSecondDraw = {
+        count: p.scene?.getNonDeletedElements?.()?.length ?? 0,
+      };
+
+      // Ctrl+A select all
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 30));
+      const afterSelectAll = {
+        selectedCount: Object.keys(p.appState?.selectedElementIds ?? {}).length,
+      };
+
+      // Arrow-right (no shift) → nudge both by 1px
+      const el2BeforeNudge = p.scene?.getNonDeletedElements?.()?.[0];
+      const xBeforeNudge = el2BeforeNudge?.x ?? 0;
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 30));
+      const afterNudge1 = {
+        dx: ((p.scene?.getNonDeletedElements?.()?.[0]?.x ?? 0) - xBeforeNudge),
+      };
+
+      // Shift+ArrowRight → nudge by 5
+      const xBeforeShiftNudge = p.scene?.getNonDeletedElements?.()?.[0]?.x ?? 0;
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 30));
+      const afterShiftNudge = {
+        dx: ((p.scene?.getNonDeletedElements?.()?.[0]?.x ?? 0) - xBeforeShiftNudge),
+      };
+
+      // Ctrl+D duplicate (both selected)
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', ctrlKey: true, bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 30));
+      const afterDuplicate = {
+        count: p.scene?.getNonDeletedElements?.()?.length ?? 0,
+        selectedCount: Object.keys(p.appState?.selectedElementIds ?? {}).length,
+      };
+
+      // Delete — selection is now the duplicates; should remove those.
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true }));
+      await new Promise(r => setTimeout(r, 30));
+      const afterDelete = {
+        count: p.scene?.getNonDeletedElements?.()?.length ?? 0,
+        selectedCount: Object.keys(p.appState?.selectedElementIds ?? {}).length,
+      };
+
+      return {
+        ...afterDraw,
+        afterSelect, afterDrag, afterClickEmpty,
+        afterSecondDraw, afterSelectAll, afterNudge1, afterShiftNudge,
+        afterDuplicate, afterDelete,
+      };
     })()`,
     returnByValue: true,
     awaitPromise: true,
@@ -375,6 +436,38 @@ async function main() {
     "click-empty-clears-selection",
     (probe?.afterClickEmpty?.selectedIds?.length ?? -1) === 0,
     `selectedIds=${JSON.stringify(probe?.afterClickEmpty?.selectedIds)}`,
+  );
+
+  // Batch 7: keyboard shortcuts.
+  pass(
+    "second-rect-drawn",
+    probe?.afterSecondDraw?.count === 2,
+    `count=${probe?.afterSecondDraw?.count}`,
+  );
+  pass(
+    "ctrl-a-selects-all",
+    probe?.afterSelectAll?.selectedCount === 2,
+    `selectedCount=${probe?.afterSelectAll?.selectedCount}`,
+  );
+  pass(
+    "arrow-right-nudges-by-1",
+    probe?.afterNudge1?.dx === 1,
+    `dx=${probe?.afterNudge1?.dx}`,
+  );
+  pass(
+    "shift-arrow-right-nudges-by-5",
+    probe?.afterShiftNudge?.dx === 5,
+    `dx=${probe?.afterShiftNudge?.dx}`,
+  );
+  pass(
+    "ctrl-d-duplicates",
+    probe?.afterDuplicate?.count === 4 && probe?.afterDuplicate?.selectedCount === 2,
+    `count=${probe?.afterDuplicate?.count} sel=${probe?.afterDuplicate?.selectedCount}`,
+  );
+  pass(
+    "delete-removes-selection",
+    probe?.afterDelete?.count === 2 && probe?.afterDelete?.selectedCount === 0,
+    `count=${probe?.afterDelete?.count} sel=${probe?.afterDelete?.selectedCount}`,
   );
 
   console.log("\n=== Assertions ===");

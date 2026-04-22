@@ -64,9 +64,10 @@
   // prettier-ignore
   import { getFormFactor, createUserAgentDescriptor, MQ_RIGHT_SIDEBAR_MIN_WIDTH, supportsResizeObserver, POINTER_EVENTS, randomId, viewportCoordsToSceneCoords, DEFAULT_ELEMENT_PROPS, DEFAULT_FONT_FAMILY } from "@excalidraw/common";
   // @ts-ignore — upstream
-  import { newElement, hitElementItself } from "@excalidraw/element";
-  // @ts-ignore — upstream
-  import { DEFAULT_COLLISION_THRESHOLD } from "@excalidraw/common";
+  import { newElement, hitElementItself, duplicateElements } from "@excalidraw/element";
+  // @ts-ignore — upstream, resolved via Vite alias
+  // prettier-ignore
+  import { DEFAULT_COLLISION_THRESHOLD, ELEMENT_TRANSLATE_AMOUNT, ELEMENT_SHIFT_TRANSLATE_AMOUNT } from "@excalidraw/common";
   // @ts-ignore — upstream
   import { pointFrom } from "@excalidraw/math";
 
@@ -570,6 +571,96 @@
     };
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getSelectedElements = (): any[] => {
+    if (!scene) return [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const selectedIds = (appState as any).selectedElementIds ?? {};
+    return scene
+      .getNonDeletedElements()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .filter((el: any) => selectedIds[el.id]);
+  };
+
+  const deleteSelected = () => {
+    if (!scene) return;
+    const selected = getSelectedElements();
+    if (selected.length === 0) return;
+    const selectedSet = new Set(selected.map((el) => el.id));
+    const remaining = scene
+      .getElementsIncludingDeleted()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .filter((el: any) => !selectedSet.has(el.id));
+    scene.replaceAllElements(remaining, { skipValidation: true });
+    clearSelection();
+    bumpSceneRepaint();
+  };
+
+  const selectAll = () => {
+    if (!scene) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const next: Record<string, true> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const el of scene.getNonDeletedElements()) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (!(el as any).locked) next[(el as any).id] = true;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).selectedElementIds = next;
+    bumpSceneRepaint();
+  };
+
+  const duplicateSelected = () => {
+    if (!scene) return;
+    const selected = getSelectedElements();
+    if (selected.length === 0) return;
+
+    // `duplicateElements({type: "in-place", idsOfElementsToDuplicate})` —
+    // upstream utility handles fractional indices + group id rewriting +
+    // bound-element reconciliation. We offset the duplicates slightly so
+    // they don't land exactly on top of the originals.
+    const elements = scene.getElementsIncludingDeleted();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const idsMap = new Map<string, any>(selected.map((el) => [el.id, el]));
+    const { elementsWithDuplicates, origIdToDuplicateId } = duplicateElements({
+      type: "in-place",
+      elements,
+      idsOfElementsToDuplicate: idsMap,
+      appState: { editingGroupId: null, selectedGroupIds: {} },
+      overrides: () => ({ x: 0, y: 0 }), // placeholder; we offset below
+    });
+
+    // Offset duplicates by (+10, +10) for visual distinction.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const duplicateIds = new Set<string>(origIdToDuplicateId.values() as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const shifted = elementsWithDuplicates.map((el: any) =>
+      duplicateIds.has(el.id) ? { ...el, x: el.x + 10, y: el.y + 10 } : el,
+    );
+    scene.replaceAllElements(shifted, { skipValidation: true });
+
+    // Select the duplicates.
+    const nextSel: Record<string, true> = {};
+    for (const id of duplicateIds) nextSel[id] = true;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).selectedElementIds = nextSel;
+    bumpSceneRepaint();
+  };
+
+  const nudgeSelected = (dx: number, dy: number) => {
+    if (!scene) return;
+    const selected = getSelectedElements();
+    if (selected.length === 0) return;
+    for (const el of selected) {
+      scene.mutateElement(
+        el,
+        { x: el.x + dx, y: el.y + dy },
+        { informMutation: false, isDragging: false },
+      );
+    }
+    bumpSceneRepaint();
+  };
+
   const onContainerKeyDown = (event: KeyboardEvent) => {
     // Ignore while typing in inputs / textareas / contenteditable.
     const target = event.target as HTMLElement | null;
@@ -582,11 +673,56 @@
       return;
     }
 
-    // Escape → clear in-progress element + back to selection.
+    const mod = event.ctrlKey || event.metaKey;
+
+    // ── Ctrl/Cmd shortcuts ────────────────────────────────────────────
+    if (mod && !event.shiftKey && !event.altKey) {
+      if (event.key === "a" || event.key === "A") {
+        selectAll();
+        event.preventDefault();
+        return;
+      }
+      if (event.key === "d" || event.key === "D") {
+        duplicateSelected();
+        event.preventDefault();
+        return;
+      }
+    }
+
+    // ── Delete / Backspace ────────────────────────────────────────────
+    if (event.key === "Delete" || event.key === "Backspace") {
+      if (getSelectedElements().length > 0) {
+        deleteSelected();
+        event.preventDefault();
+      }
+      return;
+    }
+
+    // ── Arrow-key nudge (only when selection exists) ──────────────────
+    if (
+      event.key === "ArrowLeft" ||
+      event.key === "ArrowRight" ||
+      event.key === "ArrowUp" ||
+      event.key === "ArrowDown"
+    ) {
+      if (getSelectedElements().length === 0) return;
+      const step = event.shiftKey
+        ? ELEMENT_SHIFT_TRANSLATE_AMOUNT
+        : ELEMENT_TRANSLATE_AMOUNT;
+      const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
+      const dy = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
+      nudgeSelected(dx, dy);
+      event.preventDefault();
+      return;
+    }
+
+    // Escape → clear in-progress element + selection + back to selection tool.
     if (event.key === "Escape") {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (appState as any).newElement = null;
+      clearSelection();
       setActiveTool("selection");
+      bumpSceneRepaint();
       return;
     }
 
