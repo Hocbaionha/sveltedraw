@@ -2350,7 +2350,9 @@
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     | { kind: "rotate"; el: any }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    | { kind: "endpoint"; el: any; pointIndex: number };
+    | { kind: "endpoint"; el: any; pointIndex: number }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    | { kind: "midpoint"; el: any; afterIndex: number; sceneX: number; sceneY: number };
 
   const hitResizeHandle = (sceneX: number, sceneY: number): HandleHit | null => {
     if (!scene) return null;
@@ -2361,10 +2363,9 @@
     const tol = 8 / zoomV;
     const rotTol = 10 / zoomV; // rotation handle is slightly more forgiving
 
-    // ── Linear endpoint editor (line / arrow only) ─────────────────
-    // For each selected linear element, test the cursor against each
-    // `points[i]` mapped to scene coords (el.x + point, el.y + point).
-    // Returns a pseudo-handle with kind "endpoint" + point index.
+    // ── Linear endpoint + midpoint editor (line / arrow only) ─────
+    // First pass — test every points[i] against the cursor. These
+    // are the "anchored" handles at actual vertices.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const el of scene.getNonDeletedElements() as any[]) {
       if (!selectedIds[el.id]) continue;
@@ -2376,6 +2377,32 @@
         const py = el.y + ly;
         if (Math.abs(sceneX - px) <= tol && Math.abs(sceneY - py) <= tol) {
           return { kind: "endpoint", el, pointIndex: i };
+        }
+      }
+    }
+    // Second pass — midpoints between consecutive vertices. These
+    // are the "bend" handles: dragging creates a new intermediate
+    // point at that position. Smaller tolerance so midpoints don't
+    // compete with resize handles / adjacent anchored points.
+    const midTol = 6 / zoomV;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const el of scene.getNonDeletedElements() as any[]) {
+      if (!selectedIds[el.id]) continue;
+      if (el.type !== "line" && el.type !== "arrow") continue;
+      const pts = el.points ?? [];
+      for (let i = 0; i < pts.length - 1; i++) {
+        const [ax, ay] = pts[i];
+        const [bx, by] = pts[i + 1];
+        const mx = el.x + (ax + bx) / 2;
+        const my = el.y + (ay + by) / 2;
+        if (Math.abs(sceneX - mx) <= midTol && Math.abs(sceneY - my) <= midTol) {
+          return {
+            kind: "midpoint",
+            el,
+            afterIndex: i,
+            sceneX: mx,
+            sceneY: my,
+          };
         }
       }
     }
@@ -3032,6 +3059,35 @@
             origX: el.x,
             origY: el.y,
           };
+        } else if (handleHit.kind === "midpoint") {
+          // Insert a new point at the midpoint position, then drag it
+          // just like an endpoint. The user feels like they "bent"
+          // the line at that spot.
+          const el = handleHit.el;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const origPoints = (el.points as number[][]).map((p) => [p[0], p[1]]);
+          const newPointIndex = handleHit.afterIndex + 1;
+          const localX = handleHit.sceneX - el.x;
+          const localY = handleHit.sceneY - el.y;
+          const nextPoints = [
+            ...origPoints.slice(0, newPointIndex),
+            [localX, localY],
+            ...origPoints.slice(newPointIndex),
+          ];
+          scene.mutateElement(
+            el,
+            { points: nextPoints },
+            { informMutation: false, isDragging: true },
+          );
+          endpointGesture = {
+            el,
+            pointIndex: newPointIndex,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            origPoints: nextPoints.map((p: any) => [p[0], p[1]]),
+            origX: el.x,
+            origY: el.y,
+          };
+          bumpSceneRepaint();
         } else {
           const el = handleHit.el;
           const angle = el.angle || 0;
@@ -4489,6 +4545,46 @@
              z-index: 10;"
     ></div>
   {/if}
+
+  <!-- Linear handle overlay: for each selected line/arrow, draw a
+       vertex dot at every points[i] and a smaller midpoint dot
+       between consecutive points. The dots are visual only — the
+       actual hit-testing happens in hitResizeHandle(). Picker dot
+       on vertex = grab to move; dot on midpoint = grab to bend. -->
+  {#if scene}
+    {@const zoomV = (appState.zoom as any).value || 1}
+    {@const sX = ((appState as any).scrollX ?? 0)}
+    {@const sY = ((appState as any).scrollY ?? 0)}
+    {@const oL = (appState.offsetLeft as number) ?? 0}
+    {@const oT = (appState.offsetTop as number) ?? 0}
+    {#each scene.getNonDeletedElements() as el (el.id)}
+      {#if (el.type === "line" || el.type === "arrow") && (appState as any).selectedElementIds?.[el.id]}
+        {@const pts = el.points ?? []}
+        {#each pts as pt, i}
+          {@const vpX = (el.x + pt[0] + sX) * zoomV + oL - (appState.offsetLeft as number)}
+          {@const vpY = (el.y + pt[1] + sY) * zoomV + oT - (appState.offsetTop as number)}
+          <div
+            class="sveltedraw-line-handle sveltedraw-line-handle--vertex"
+            style="left: {vpX - 5}px; top: {vpY - 5}px;"
+            aria-hidden="true"
+          ></div>
+        {/each}
+        {#each pts.slice(0, -1) as _pt, i}
+          {@const ax = pts[i][0]}
+          {@const ay = pts[i][1]}
+          {@const bx = pts[i + 1][0]}
+          {@const by = pts[i + 1][1]}
+          {@const mxVp = (el.x + (ax + bx) / 2 + sX) * zoomV + oL - (appState.offsetLeft as number)}
+          {@const myVp = (el.y + (ay + by) / 2 + sY) * zoomV + oT - (appState.offsetTop as number)}
+          <div
+            class="sveltedraw-line-handle sveltedraw-line-handle--mid"
+            style="left: {mxVp - 3}px; top: {myVp - 3}px;"
+            aria-hidden="true"
+          ></div>
+        {/each}
+      {/if}
+    {/each}
+  {/if}
 </div>
 
 <style>
@@ -4946,6 +5042,26 @@
     font-size: 12px;
     pointer-events: none;
     z-index: 30;
+  }
+
+  .sveltedraw-line-handle {
+    position: absolute;
+    pointer-events: none;
+    z-index: 15;
+    border-radius: 50%;
+    background: #fff;
+    border: 1.5px solid #6965db;
+    box-sizing: border-box;
+  }
+  .sveltedraw-line-handle--vertex {
+    width: 10px;
+    height: 10px;
+  }
+  .sveltedraw-line-handle--mid {
+    width: 6px;
+    height: 6px;
+    border-color: #a6a0f0;
+    opacity: 0.85;
   }
 
   .sveltedraw-utility-bar {
