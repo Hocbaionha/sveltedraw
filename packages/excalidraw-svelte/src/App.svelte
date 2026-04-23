@@ -142,6 +142,7 @@
   import ShadowPresetsRow from "./components/ShadowPresetsRow.svelte";
   import ActionsRow from "./components/ActionsRow.svelte";
   import StyleSliderRow from "./components/StyleSliderRow.svelte";
+  import PresetIconRow from "./components/PresetIconRow.svelte";
   import LayerPanel from "./components/LayerPanel.svelte";
   import HistoryPanel from "./components/HistoryPanel.svelte";
   import ShapeLibraryPanel from "./components/ShapeLibraryPanel.svelte";
@@ -7319,70 +7320,44 @@
         </div>
       </div>
 
-      <div class="sp-row">
-        <div class="sp-label">{t("labels.strokeStyle")}</div>
-        <div class="sp-swatches">
-          {#each STROKE_STYLES as s}
-            <button
-              type="button"
-              class="sp-icon-btn"
-              class:active={panelStyle.strokeStyle === s.value}
-              data-preset="strokeStyle"
-              data-value={s.value}
-              aria-label={`Stroke style ${s.name}`}
-              onclick={() => applyStyle({ strokeStyle: s.value })}
-            >
-              {#if s.value === "solid"}
-                <StrokeStyleSolidIcon />
-              {:else}
-                <Icon name={s.icon} />
-              {/if}
-            </button>
-          {/each}
-        </div>
-      </div>
+      <PresetIconRow
+        label={t("labels.strokeStyle")}
+        presets={STROKE_STYLES}
+        current={panelStyle.strokeStyle}
+        dataPreset="strokeStyle"
+        ariaLabelPrefix="Stroke style"
+        onSelect={(v) => applyStyle({ strokeStyle: v })}
+      >
+        {#snippet iconFor(s)}
+          {#if s.value === "solid"}
+            <StrokeStyleSolidIcon />
+          {:else}
+            <Icon name={s.icon} />
+          {/if}
+        {/snippet}
+      </PresetIconRow>
     {/if}
 
     {#if !allSelectedAreText && !allSelectedAreLinear}
-      <div class="sp-row">
-        <div class="sp-label">{t("labels.fill")}</div>
-        <div class="sp-swatches">
-          {#each FILL_STYLES as f}
-            <button
-              type="button"
-              class="sp-icon-btn"
-              class:active={panelStyle.fillStyle === f.value}
-              data-preset="fillStyle"
-              data-value={f.value}
-              aria-label={`Fill style ${f.name}`}
-              onclick={() => applyStyle({ fillStyle: f.value })}
-            >
-              <Icon name={f.icon} />
-            </button>
-          {/each}
-        </div>
-      </div>
+      <PresetIconRow
+        label={t("labels.fill")}
+        presets={FILL_STYLES}
+        current={panelStyle.fillStyle}
+        dataPreset="fillStyle"
+        ariaLabelPrefix="Fill style"
+        onSelect={(v) => applyStyle({ fillStyle: v })}
+      />
     {/if}
 
     {#if !allSelectedAreText}
-      <div class="sp-row">
-        <div class="sp-label">{t("labels.sloppiness")}</div>
-        <div class="sp-swatches">
-          {#each ROUGHNESS_PRESETS as r}
-            <button
-              type="button"
-              class="sp-icon-btn"
-              class:active={panelStyle.roughness === r.value}
-              data-preset="roughness"
-              data-value={r.value}
-              aria-label={`Roughness ${r.name}`}
-              onclick={() => applyStyle({ roughness: r.value })}
-            >
-              <Icon name={r.icon} />
-            </button>
-          {/each}
-        </div>
-      </div>
+      <PresetIconRow
+        label={t("labels.sloppiness")}
+        presets={ROUGHNESS_PRESETS}
+        current={panelStyle.roughness}
+        dataPreset="roughness"
+        ariaLabelPrefix="Roughness"
+        onSelect={(v) => applyStyle({ roughness: v })}
+      />
     {/if}
 
     {#if hasRoundableSelected}
@@ -7560,42 +7535,26 @@
         </div>
       </div>
 
-      <div class="sp-row">
-        <div class="sp-label">{t("labels.textAlign")}</div>
-        <div class="sp-swatches">
-          {#each TEXT_ALIGN_PRESETS as t}
-            <button
-              type="button"
-              class="sp-icon-btn"
-              class:active={panelStyle.textAlign === t.value}
-              data-preset="textAlign"
-              data-value={t.value}
-              aria-label={`Text align ${t.name}`}
-              onclick={() => applyStyle({ textAlign: t.value })}
-            >
-              <Icon name={t.icon} />
-            </button>
-          {/each}
-        </div>
-      </div>
-      <div class="sp-row">
-        <div class="sp-label">Vertical</div>
-        <div class="sp-swatches">
-          {#each VERTICAL_ALIGN_PRESETS as v}
-            <button
-              type="button"
-              class="sp-icon-btn"
-              class:active={panelStyle.verticalAlign === v.value}
-              data-preset="verticalAlign"
-              data-value={v.value}
-              aria-label={`Vertical align ${v.name}`}
-              onclick={() => applyStyle({ verticalAlign: v.value })}
-            >
-              {@render verticalAlignIcon(v.value)}
-            </button>
-          {/each}
-        </div>
-      </div>
+      <PresetIconRow
+        label={t("labels.textAlign")}
+        presets={TEXT_ALIGN_PRESETS}
+        current={panelStyle.textAlign}
+        dataPreset="textAlign"
+        ariaLabelPrefix="Text align"
+        onSelect={(v) => applyStyle({ textAlign: v })}
+      />
+      <PresetIconRow
+        label="Vertical"
+        presets={VERTICAL_ALIGN_PRESETS}
+        current={panelStyle.verticalAlign}
+        dataPreset="verticalAlign"
+        ariaLabelPrefix="Vertical align"
+        onSelect={(v) => applyStyle({ verticalAlign: v })}
+      >
+        {#snippet iconFor(v)}
+          {@render verticalAlignIcon(v.value)}
+        {/snippet}
+      </PresetIconRow>
     {/if}
 
     <div class="sp-row">
@@ -7617,28 +7576,15 @@
 
     {#if hasTextSelected}
       <!-- Font size — Small / Medium / Large / Extra large.
-           Upstream's canonical values are 16 / 20 / 28 / 36. Applies
-           via applyStyle so it flows through currentItemFontSize
-           when no text is selected (defaults for next-drawn). -->
-      <div class="sp-row">
-        <div class="sp-label">{t("labels.fontSize")}</div>
-        <div class="sp-swatches">
-          {#each FONT_SIZE_PRESETS as fs}
-            <button
-              type="button"
-              class="sp-icon-btn"
-              class:active={panelStyle.fontSize === fs.value}
-              data-preset="fontSize"
-              data-value={fs.value}
-              aria-label={fs.name}
-              title={fs.name}
-              onclick={() => applyStyle({ fontSize: fs.value })}
-            >
-              <Icon name={fs.icon} />
-            </button>
-          {/each}
-        </div>
-      </div>
+           Upstream's canonical values are 16 / 20 / 28 / 36. -->
+      <PresetIconRow
+        label={t("labels.fontSize")}
+        presets={FONT_SIZE_PRESETS}
+        current={panelStyle.fontSize}
+        dataPreset="fontSize"
+        ariaLabelPrefix=""
+        onSelect={(v) => applyStyle({ fontSize: v })}
+      />
       <div class="sp-row">
         <div class="sp-label">{t("labels.fontFamily")}</div>
         <div class="sp-picker sp-font-picker">
