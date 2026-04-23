@@ -313,6 +313,131 @@ const PORT = 3005;
     }, beforeInsert);
     log('Inserted elements have finite coordinates', insertedAtCenter);
 
+    // ── TEXT STYLING (renderer + UI) ────────────────────────────────────
+    console.log('\n--- Text styling renderer + UI ---');
+
+    // Seed a text element
+    await page.evaluate(() => {
+      const p = (window).__sveltedrawProbe;
+      const el = {
+        id: 't_style', type: 'text', x: 100, y: 100, width: 300, height: 60,
+        angle: 0, strokeColor: '#111', backgroundColor: 'transparent',
+        fillStyle: 'solid', strokeWidth: 1, strokeStyle: 'solid', roughness: 0,
+        opacity: 100, seed: 1, versionNonce: 1, version: 1, isDeleted: false,
+        groupIds: [], frameId: null, boundElements: null, updated: Date.now(),
+        link: null, locked: false, roundness: null,
+        text: 'Hello', fontSize: 32, fontFamily: 2, textAlign: 'left',
+        verticalAlign: 'top', baseline: 28, containerId: null, originalText: 'Hello',
+      };
+      p.scene.replaceAllElements([el], { skipValidation: true });
+      p.appState.selectedElementIds = { t_style: true };
+      p.pushHistory();
+    });
+    await delay(300);
+
+    // Format row visible for text
+    const formatRowVisible = await page.evaluate(() => {
+      const rows = document.querySelectorAll('.sveltedraw-style-panel .sp-row');
+      for (const r of rows) {
+        const l = r.querySelector('.sp-label');
+        if (l && l.textContent.trim() === 'Format') return true;
+      }
+      return false;
+    });
+    log('Format row visible when text is selected', formatRowVisible);
+
+    // Click Bold → element fontWeight = "bold"
+    await page.evaluate(() => {
+      document.querySelector('[data-preset="fontWeight"][data-value="bold"]').click();
+    });
+    await delay(200);
+    const bold = await page.evaluate(() =>
+      (window).__sveltedrawProbe.scene.getNonDeletedElements()[0].fontWeight);
+    log('Click Bold → fontWeight="bold"', bold === 'bold');
+
+    // SVG export reflects bold
+    const svgBold = await page.evaluate(async () => {
+      const svg = await (window).__sveltedrawProbe.exportAsSvg();
+      return svg ? svg.outerHTML : '';
+    });
+    log('SVG export honors bold (font-weight="bold" in <text>)',
+      /font-weight=["']bold["']/.test(svgBold));
+
+    // Click Italic
+    await page.evaluate(() => {
+      document.querySelector('[data-preset="fontStyle"][data-value="italic"]').click();
+    });
+    await delay(200);
+    const svgItalic = await page.evaluate(async () => {
+      const svg = await (window).__sveltedrawProbe.exportAsSvg();
+      return svg ? svg.outerHTML : '';
+    });
+    log('SVG export honors italic (font-style="italic")',
+      /font-style=["']italic["']/.test(svgItalic));
+
+    // Click Underline
+    await page.evaluate(() => {
+      document.querySelector('[data-preset="textDecoration"][data-value="underline"]').click();
+    });
+    await delay(200);
+    const svgUnder = await page.evaluate(async () => {
+      const svg = await (window).__sveltedrawProbe.exportAsSvg();
+      return svg ? svg.outerHTML : '';
+    });
+    log('SVG export honors underline (text-decoration="underline")',
+      /text-decoration=["']underline["']/.test(svgUnder));
+
+    // PNG bytes differ between styled and plain (canvas honored the props)
+    const pngBytes = async () => await page.evaluate(async () => {
+      const blob = await (window).__sveltedrawProbe.exportAsPng();
+      const arr = new Uint8Array(await blob.arrayBuffer());
+      return Array.from(arr);
+    });
+    const pngStyled = await pngBytes();
+
+    // Clear all text styles
+    await page.evaluate(() => {
+      const p = (window).__sveltedrawProbe;
+      const el = p.scene.getNonDeletedElements()[0];
+      p.scene.mutateElement(el, { fontWeight: 'normal', fontStyle: 'normal', textDecoration: 'none' }, { informMutation: false, isDragging: false });
+      p.pushHistory();
+    });
+    await delay(200);
+    const pngPlain = await pngBytes();
+    const bytesDiffer = pngStyled.length !== pngPlain.length ||
+      pngStyled.some((b, i) => b !== pngPlain[i]);
+    log('PNG bytes differ between styled and plain text (canvas honored props)',
+      bytesDiffer, `styled=${pngStyled.length}b plain=${pngPlain.length}b`);
+
+    // Clean up text element so subsequent tests see a clean slate
+    await page.evaluate(() => {
+      const p = (window).__sveltedrawProbe;
+      p.scene.replaceAllElements([], { skipValidation: true });
+      p.appState.selectedElementIds = {};
+      p.pushHistory();
+    });
+    await delay(150);
+
+    // Re-seed base scene for the rest of the suite (rect + ellipse)
+    await page.evaluate(() => {
+      const p = (window).__sveltedrawProbe;
+      const mk = (o) => ({
+        id: 'e_' + Math.random().toString(36).slice(2),
+        type: 'rectangle', x: 200, y: 200, width: 160, height: 100, angle: 0,
+        strokeColor: '#1e1e1e', backgroundColor: '#ffc9c9', fillStyle: 'solid',
+        strokeWidth: 2, strokeStyle: 'solid', roughness: 1, opacity: 100,
+        seed: Math.floor(Math.random() * 2 ** 31), versionNonce: 1, version: 1,
+        isDeleted: false, groupIds: [], frameId: null, boundElements: null,
+        updated: Date.now(), link: null, locked: false, roundness: null, ...o,
+      });
+      p.scene.replaceAllElements([
+        mk({ x: 300, y: 300 }),
+        mk({ x: 600, y: 400, type: 'ellipse', backgroundColor: '#a5d8ff' }),
+      ], { skipValidation: true });
+      p.pushHistory();
+    });
+    await delay(200);
+
     // ── 5. EXPORT: JSON, SVG, PNG, PDF ──────────────────────────────────
     console.log('\n--- Export JSON ---');
     await page.evaluate(() => ((window).__downloads = []));

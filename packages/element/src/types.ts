@@ -254,6 +254,14 @@ export type ExcalidrawTextElement = _ExcalidrawElementBase &
      *  with font size (using `getLineHeightInPx` helper).
      */
     lineHeight: number & { _brand: "unitlessLineHeight" };
+    /** sveltedraw: bold toggle. Flows through getFontString + SVG export. */
+    fontWeight?: "normal" | "bold";
+    /** sveltedraw: italic toggle. */
+    fontStyle?: "normal" | "italic";
+    /** sveltedraw: underline / strikethrough. */
+    textDecoration?: "none" | "underline" | "line-through";
+    /** sveltedraw: overrides strokeColor for text fill when set. */
+    textColor?: string;
   }>;
 
 export type ExcalidrawBindableElement =

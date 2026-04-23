@@ -555,10 +555,13 @@ const drawElementOnCanvas = (
         context.canvas.setAttribute("dir", rtl ? "rtl" : "ltr");
         context.save();
         context.font = getFontString(element);
+        // sveltedraw: textColor overrides strokeColor when set; strokeColor
+        // remains the legacy path for upstream-style text.
+        const textFill = (element as any).textColor || element.strokeColor;
         context.fillStyle =
           renderConfig.theme === THEME.DARK
-            ? applyDarkModeFilter(element.strokeColor)
-            : element.strokeColor;
+            ? applyDarkModeFilter(textFill)
+            : textFill;
         context.textAlign = element.textAlign as CanvasTextAlign;
 
         // Canvas does not support multiline text by default
@@ -582,12 +585,36 @@ const drawElementOnCanvas = (
           lineHeightPx,
         );
 
+        // Canvas 2D has no built-in text-decoration, so we draw the line
+        // manually after fillText. Thickness scales with font size.
+        const decoration = (element as any).textDecoration as
+          | "none"
+          | "underline"
+          | "line-through"
+          | undefined;
+        const decorationThickness = Math.max(1, Math.round(element.fontSize / 16));
+
         for (let index = 0; index < lines.length; index++) {
-          context.fillText(
-            lines[index],
-            horizontalOffset,
-            index * lineHeightPx + verticalOffset,
-          );
+          const line = lines[index];
+          const baseline = index * lineHeightPx + verticalOffset;
+          context.fillText(line, horizontalOffset, baseline);
+
+          if (decoration && decoration !== "none") {
+            const lineWidth = context.measureText(line).width;
+            const lineX =
+              element.textAlign === "center"
+                ? horizontalOffset - lineWidth / 2
+                : element.textAlign === "right"
+                ? horizontalOffset - lineWidth
+                : horizontalOffset;
+            // underline sits just below the baseline; line-through crosses
+            // the x-height (roughly 0.3 × fontSize above the baseline).
+            const y =
+              decoration === "underline"
+                ? baseline + element.fontSize * 0.12
+                : baseline - element.fontSize * 0.3;
+            context.fillRect(lineX, y, lineWidth, decorationThickness);
+          }
         }
         context.restore();
         if (shouldTemporarilyAttach) {

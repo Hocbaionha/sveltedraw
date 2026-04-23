@@ -3239,6 +3239,10 @@
         fillStyle: "currentItemFillStyle",
         opacity: "currentItemOpacity",
         roughness: "currentItemRoughness",
+        fontWeight: "currentItemFontWeight",
+        fontStyle: "currentItemFontStyle",
+        textDecoration: "currentItemTextDecoration",
+        textColor: "currentItemTextColor",
       };
       for (const [k, v] of Object.entries(patch)) {
         const targetKey = currentItemKeyMap[k] ?? k;
@@ -3325,6 +3329,8 @@
   // What to display in the panel — reflects either the last-selected
   // element's style or the currentItem* defaults when no selection.
   const panelStyle = $derived.by(() => {
+    // Re-run on scene mutations so toggles reflect the new element state.
+    void sceneReady;
     const selected = getSelectedElements();
     if (selected.length > 0) {
       const el = selected[selected.length - 1];
@@ -3351,6 +3357,14 @@
         fontSize: (el as any).fontSize,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         roundness: (el as any).roundness,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        fontWeight: (el as any).fontWeight ?? "normal",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        fontStyle: (el as any).fontStyle ?? "normal",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        textDecoration: (el as any).textDecoration ?? "none",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        textColor: (el as any).textColor ?? null,
       };
     }
     return {
@@ -3378,6 +3392,14 @@
       verticalAlign: (appState as any).currentItemVerticalAlign,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       fontSize: (appState as any).currentItemFontSize ?? DEFAULT_FONT_SIZE,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      fontWeight: (appState as any).currentItemFontWeight ?? "normal",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      fontStyle: (appState as any).currentItemFontStyle ?? "normal",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      textDecoration: (appState as any).currentItemTextDecoration ?? "none",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      textColor: (appState as any).currentItemTextColor ?? null,
     };
   });
 
@@ -6645,6 +6667,72 @@
           <TextAlignBottomIcon />
         {/if}
       {/snippet}
+
+      <!-- Bold / Italic / Underline / Strikethrough — each applies the
+           corresponding field on the text element. Toggle on second click.
+           Renderer (canvas + SVG) honors all four; pixel-verified. -->
+      <div class="sp-row">
+        <div class="sp-label">Format</div>
+        <div class="sp-swatches">
+          <button
+            type="button"
+            class="sp-icon-btn sp-format-btn"
+            class:active={panelStyle.fontWeight === "bold"}
+            data-preset="fontWeight"
+            data-value="bold"
+            aria-label="Bold"
+            title="Bold"
+            onclick={() => applyStyle({
+              fontWeight: panelStyle.fontWeight === "bold" ? "normal" : "bold",
+            })}
+          >
+            <strong>B</strong>
+          </button>
+          <button
+            type="button"
+            class="sp-icon-btn sp-format-btn"
+            class:active={panelStyle.fontStyle === "italic"}
+            data-preset="fontStyle"
+            data-value="italic"
+            aria-label="Italic"
+            title="Italic"
+            onclick={() => applyStyle({
+              fontStyle: panelStyle.fontStyle === "italic" ? "normal" : "italic",
+            })}
+          >
+            <em>I</em>
+          </button>
+          <button
+            type="button"
+            class="sp-icon-btn sp-format-btn"
+            class:active={panelStyle.textDecoration === "underline"}
+            data-preset="textDecoration"
+            data-value="underline"
+            aria-label="Underline"
+            title="Underline"
+            onclick={() => applyStyle({
+              textDecoration: panelStyle.textDecoration === "underline" ? "none" : "underline",
+            })}
+          >
+            <span style="text-decoration: underline">U</span>
+          </button>
+          <button
+            type="button"
+            class="sp-icon-btn sp-format-btn"
+            class:active={panelStyle.textDecoration === "line-through"}
+            data-preset="textDecoration"
+            data-value="line-through"
+            aria-label="Strikethrough"
+            title="Strikethrough"
+            onclick={() => applyStyle({
+              textDecoration: panelStyle.textDecoration === "line-through" ? "none" : "line-through",
+            })}
+          >
+            <span style="text-decoration: line-through">S</span>
+          </button>
+        </div>
+      </div>
+
       <div class="sp-row">
         <div class="sp-label">{t("labels.textAlign")}</div>
         <div class="sp-swatches">

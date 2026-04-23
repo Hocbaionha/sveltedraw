@@ -668,6 +668,13 @@ const renderElementToSvg = (
             : element.textAlign === "right" || direction === "rtl"
             ? "end"
             : "start";
+        // sveltedraw: optional text formatting fields (bold/italic/decoration/
+        // textColor). Default to upstream behavior when absent.
+        const fontWeight = (element as any).fontWeight;
+        const fontStyle = (element as any).fontStyle;
+        const textDecoration = (element as any).textDecoration;
+        const textColor =
+          (element as any).textColor || element.strokeColor;
         for (let i = 0; i < lines.length; i++) {
           const text = svgRoot.ownerDocument.createElementNS(SVG_NS, "text");
           text.textContent = lines[i];
@@ -675,11 +682,20 @@ const renderElementToSvg = (
           text.setAttribute("y", `${i * lineHeightPx + verticalOffset}`);
           text.setAttribute("font-family", getFontFamilyString(element));
           text.setAttribute("font-size", `${element.fontSize}px`);
+          if (fontWeight === "bold") {
+            text.setAttribute("font-weight", "bold");
+          }
+          if (fontStyle === "italic") {
+            text.setAttribute("font-style", "italic");
+          }
+          if (textDecoration && textDecoration !== "none") {
+            text.setAttribute("text-decoration", textDecoration);
+          }
           text.setAttribute(
             "fill",
             renderConfig.theme === THEME.DARK
-              ? applyDarkModeFilter(element.strokeColor)
-              : element.strokeColor,
+              ? applyDarkModeFilter(textColor)
+              : textColor,
           );
           text.setAttribute("text-anchor", textAnchor);
           text.setAttribute("style", "white-space: pre;");

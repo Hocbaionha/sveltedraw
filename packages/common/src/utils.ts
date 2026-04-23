@@ -106,15 +106,27 @@ export const getFontFamilyString = ({
   return WINDOWS_EMOJI_FALLBACK_FONT;
 };
 
-/** returns fontSize+fontFamily string for assignment to DOM elements */
+/** returns fontSize+fontFamily string for assignment to DOM elements.
+ * Optional fontWeight/fontStyle let callers pass a full text element so
+ * bold/italic flow through to Canvas 2D `.font` and text measurement.
+ * CSS font shorthand order: [style] [variant] [weight] [size] [family]
+ */
 export const getFontString = ({
   fontSize,
   fontFamily,
+  fontWeight,
+  fontStyle,
 }: {
   fontSize: number;
   fontFamily: FontFamilyValues;
+  fontWeight?: string;
+  fontStyle?: string;
 }) => {
-  return `${fontSize}px ${getFontFamilyString({ fontFamily })}` as FontString;
+  const stylePrefix = fontStyle === "italic" ? "italic " : "";
+  const weightPrefix = fontWeight === "bold" ? "bold " : "";
+  return `${stylePrefix}${weightPrefix}${fontSize}px ${getFontFamilyString({
+    fontFamily,
+  })}` as FontString;
 };
 
 /** executes callback in the frame that's after the current one */
