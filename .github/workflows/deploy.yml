@@ -1,0 +1,75 @@
+name: Deploy to draw.hodion.com
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'packages/**'
+      - 'sveltedraw-app/**'
+      - '.github/workflows/deploy.yml'
+  pull_request:
+    branches: [master]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Type check
+        run: cd sveltedraw-app && npm run check
+
+      - name: Build
+        run: cd sveltedraw-app && npm run build
+
+      - name: Upload build artifacts
+        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: sveltedraw-app/dist/
+          retention-days: 1
+
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: sveltedraw-app/dist/
+
+      - uses: vercel/action@v6
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          production: true
+          working-directory: sveltedraw-app
+        env:
+          VITE_COLLAB_SERVER: ${{ secrets.VITE_COLLAB_SERVER }}
+
+  notify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Deployment status
+        run: |
+          if [ "${{ needs.deploy.result }}" == "success" ]; then
+            echo "✅ Deployment successful to draw.hodion.com"
+          else
+            echo "❌ Deployment failed"
+            exit 1
+          fi
