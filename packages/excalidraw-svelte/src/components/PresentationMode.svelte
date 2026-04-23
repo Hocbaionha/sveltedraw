@@ -4,6 +4,7 @@
 
   type Props = {
     slides: PresentationSlide[];
+    slideSvgs?: string[];
     currentSlideIndex: number;
     isPlaying: boolean;
     showSlideNumbers: boolean;
@@ -17,6 +18,7 @@
 
   let {
     slides = [],
+    slideSvgs = [],
     currentSlideIndex = 0,
     isPlaying = false,
     showSlideNumbers = true,
@@ -29,6 +31,7 @@
   } = $props() as Props;
 
   let currentSlide = $derived(slides[currentSlideIndex]);
+  let currentSlideSvg = $derived(slideSvgs[currentSlideIndex] ?? "");
   let progress = $derived(getSlideProgress(currentSlideIndex, slides.length));
 
   const handleKeydown = (e: KeyboardEvent) => {
@@ -53,16 +56,22 @@
   <div class="pm-slide-area">
     {#if currentSlide}
       <div class="pm-slide {getTransitionClass(currentSlide.transition)}">
-        <!-- Slide content area -->
-        <div class="pm-slide-content">
+        <!-- Slide title strip (top) -->
+        <div class="pm-slide-header">
           <div class="pm-slide-title">{currentSlide.title}</div>
           {#if showNotes && currentSlide.description}
             <div class="pm-slide-description">{currentSlide.description}</div>
           {/if}
-          {#if currentSlide.thumbnail}
-            <div class="pm-slide-preview">
-              <img src={currentSlide.thumbnail} alt={currentSlide.title} />
-            </div>
+        </div>
+
+        <!-- Actual drawing content: pre-rendered SVG of the slide's elements -->
+        <div class="pm-slide-canvas">
+          {#if currentSlideSvg}
+            {@html currentSlideSvg}
+          {:else if currentSlide.thumbnail}
+            <img src={currentSlide.thumbnail} alt={currentSlide.title} />
+          {:else}
+            <div class="pm-slide-empty">Empty slide</div>
           {/if}
         </div>
       </div>
@@ -170,26 +179,26 @@
     width: 100%;
     height: 100%;
     display: flex;
-    align-items: center;
-    justify-content: center;
+    flex-direction: column;
     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
     border-radius: 12px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-    padding: 60px;
+    padding: 24px 32px;
+    gap: 16px;
+    box-sizing: border-box;
   }
 
-  .pm-slide-content {
+  .pm-slide-header {
     text-align: center;
-    max-width: 800px;
-    width: 100%;
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 30px;
+    gap: 8px;
   }
 
   .pm-slide-title {
-    font-size: 48px;
+    font-size: 28px;
     font-weight: 700;
     color: #fff;
     text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
@@ -197,25 +206,40 @@
   }
 
   .pm-slide-description {
-    font-size: 20px;
+    font-size: 14px;
     color: #ccc;
-    line-height: 1.6;
-    max-width: 600px;
+    line-height: 1.4;
+    max-width: 800px;
   }
 
-  .pm-slide-preview {
-    width: 400px;
-    height: 300px;
+  .pm-slide-canvas {
+    flex: 1;
+    min-height: 0;
+    background: white;
     border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     overflow: hidden;
-    background: rgba(255, 255, 255, 0.1);
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    padding: 16px;
   }
 
-  .pm-slide-preview img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+  .pm-slide-canvas :global(svg) {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+  }
+
+  .pm-slide-canvas img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  .pm-slide-empty {
+    color: #888;
+    font-size: 16px;
   }
 
   /* Transition animations */

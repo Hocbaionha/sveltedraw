@@ -157,6 +157,7 @@
   import type { GridConfig, SnapConfig } from "./snap/types.js";
   import type { SnapGuide } from "./snap/guides.js";
   import type { LayerItem } from "./layers/types.js";
+  import { getLayerName } from "./layers/types.js";
 
   let {
     viewModeEnabled = false,
@@ -619,6 +620,24 @@
         insertLibraryItem: (item: LibraryItem) => insertLibraryItem(item),
         deleteLibraryItem: (id: string) => deleteLibraryItem(id),
         getLibraryItems: () => libraryItems,
+        // Phase 16 test helpers — honest integration hooks.
+        toggleSidePanel: (name: SidePanelId) => toggleSidePanel(name),
+        closeAllSidePanels: () => closeAllSidePanels(),
+        isSidePanelOpen: (name: SidePanelId) => isSidePanelOpen(name),
+        handleExport: (opts: ExportOptions) => handleExport(opts),
+        startPresentation: () => handleStartPresentation(),
+        exitPresentation: () => handlePresentationExit(),
+        getPresentationSlides: () => presentationSlides,
+        getPresentationSlideSvgs: () => presentationSlideSvgs,
+        isPresentationActive: () => presentationActive,
+        getLibraryComponents: () => libraryComponents,
+        saveComponentToLibrary: () => handleSaveComponentToLibrary(),
+        insertLibraryComponent: (c: LibraryComponent) => handleLibraryComponentSelect(c),
+        getEditorHistory: () => editorHistory,
+        getHistoryCurrentIndex: () => historyCurrentIndex,
+        jumpHistory: (i: number) => handleHistoryJump(i),
+        clearHistory: () => handleHistoryClear(),
+        pushHistory: () => pushHistory(),
       };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__sveltedrawHistoryLen = () => history.length;
@@ -1204,6 +1223,43 @@
       ymap.set("elements", elements);
     }
     scheduleSave();
+    syncHistoryUI();
+  };
+
+  // Sync the reactive HistoryPanel view from the non-reactive history[] array.
+  // Called wherever history mutates (push/undo/redo/jump/clear) so the UI
+  // reflects the real undo stack. elementCount is approximated as the latest
+  // known count — exact per-snapshot counts would require delta replay.
+  const syncHistoryUI = () => {
+    let lastCount = 0;
+    editorHistory = history.map((snap, i) => {
+      let count = lastCount;
+      if (snap.full) {
+        count = snap.full.elements.length;
+      } else if (snap.delta) {
+        count = lastCount + snap.delta.added.length - snap.delta.removed.length;
+      }
+      lastCount = count;
+      let description = "Change";
+      if (i === 0) description = "Initial state";
+      else if (snap.full) description = "Snapshot";
+      else if (snap.delta) {
+        const d = snap.delta;
+        const parts: string[] = [];
+        if (d.added.length) parts.push(`+${d.added.length}`);
+        if (d.removed.length) parts.push(`-${d.removed.length}`);
+        if (d.modified.length) parts.push(`~${d.modified.length}`);
+        description = parts.join(" ") || "Change";
+      }
+      return {
+        id: `h-${i}-${snap.timestamp}`,
+        timestamp: snap.timestamp,
+        description,
+        elementCount: count,
+        previewDataUrl: undefined,
+      };
+    });
+    historyCurrentIndex = historyIndex;
   };
 
   const applySnapshot = (snap: HistorySnapshot) => {
@@ -1271,12 +1327,14 @@
     if (historyIndex <= 0) return;
     historyIndex--;
     applySnapshot(history[historyIndex]);
+    syncHistoryUI();
   };
 
   const redo = () => {
     if (historyIndex >= history.length - 1) return;
     historyIndex++;
     applySnapshot(history[historyIndex]);
+    syncHistoryUI();
   };
 
   // ── Frame management (Phase 11) ──────────────────────────────────────────
@@ -1625,6 +1683,7 @@
   const presentationConfig = getDefaultPresentationConfig();
   let presentationActive = $state(false);
   let presentationSlides = $state<PresentationSlide[]>([]);
+  let presentationSlideSvgs = $state<string[]>([]);
   let presentationCurrentIndex = $state(0);
   let presentationIsPlaying = $state(false);
 
@@ -1633,6 +1692,59 @@
   let exportOptions = $state<ExportOptions>(getDefaultExportOptions());
   let exportPresets = $state<ExportPreset[]>(EXPORT_PRESETS);
   let batchExportConfig = $state(getDefaultBatchExportConfig());
+
+  // Unified side-panel toggle: mutually exclusive. Opening one closes
+  // the others so they don't stack/overlap off-screen. Keep connector
+  // tool out of this group — it's tied to a drawing tool, not a panel.
+  type SidePanelId =
+    | "alignment"
+    | "measurement"
+    | "autolayout"
+    | "texteditor"
+    | "grid"
+    | "layer"
+    | "history"
+    | "library";
+
+  const isSidePanelOpen = (name: SidePanelId): boolean => {
+    switch (name) {
+      case "alignment": return alignmentPanelActive;
+      case "measurement": return measurementPanelActive;
+      case "autolayout": return autoLayoutPanelActive;
+      case "texteditor": return textEditorPanelActive;
+      case "grid": return gridPanelActive;
+      case "layer": return layerPanelActive;
+      case "history": return historyPanelActive;
+      case "library": return libraryPanelActive;
+    }
+  };
+
+  const closeAllSidePanels = () => {
+    alignmentPanelActive = false;
+    measurementPanelActive = false;
+    autoLayoutPanelActive = false;
+    textEditorPanelActive = false;
+    gridPanelActive = false;
+    layerPanelActive = false;
+    historyPanelActive = false;
+    libraryPanelActive = false;
+  };
+
+  const toggleSidePanel = (name: SidePanelId) => {
+    const wasOpen = isSidePanelOpen(name);
+    closeAllSidePanels();
+    if (wasOpen) return;
+    switch (name) {
+      case "alignment": alignmentPanelActive = true; break;
+      case "measurement": measurementPanelActive = true; break;
+      case "autolayout": autoLayoutPanelActive = true; break;
+      case "texteditor": textEditorPanelActive = true; break;
+      case "grid": gridPanelActive = true; break;
+      case "layer": layerPanelActive = true; break;
+      case "history": historyPanelActive = true; break;
+      case "library": libraryPanelActive = true; break;
+    }
+  };
 
   const loadLibrary = () => {
     try {
@@ -2250,15 +2362,21 @@
 
   // ── Phase 16: History Management ──────────────────────────────────
   const handleHistoryJump = (index: number) => {
-    if (index < 0 || index >= editorHistory.length) return;
-    // In a real implementation, we'd restore the scene state from editorHistory[index]
-    // For now, we track which history state we're at
-    historyCurrentIndex = index;
+    if (index < 0 || index >= history.length) return;
+    historyIndex = index;
+    applySnapshot(history[index]);
+    syncHistoryUI();
   };
 
+  // Clear wipes the undo stack but preserves the current state so the user
+  // doesn't lose their drawing. The new history starts with a single full
+  // snapshot of what's on the canvas right now.
   const handleHistoryClear = () => {
-    editorHistory = [];
-    historyCurrentIndex = 0;
+    const current = captureSnapshot();
+    history.length = 0;
+    history.push(current);
+    historyIndex = 0;
+    syncHistoryUI();
   };
 
   // ── Phase 16 Feature 2: Library Management ─────────────────────────
@@ -2276,12 +2394,81 @@
 
   const handleLibraryComponentSelect = (component: LibraryComponent) => {
     if (!scene) return;
-    // In a real implementation, we'd insert the component elements at viewport center
-    // For now, just increment usage count
-    const index = libraryComponents.findIndex(c => c.id === component.id);
+    if (!Array.isArray(component.elements) || component.elements.length === 0) {
+      return;
+    }
+
+    // Translate to viewport center: compute min(x,y) of the component's
+    // bbox and shift so the component lands where the user is looking.
+    let minX = Infinity;
+    let minY = Infinity;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const el of component.elements as any[]) {
+      if (typeof el.x === "number" && el.x < minX) minX = el.x;
+      if (typeof el.y === "number" && el.y < minY) minY = el.y;
+    }
+    if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
+      minX = 0;
+      minY = 0;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const zoomV = (appState.zoom as any)?.value || 1;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const scrollX = (appState as any).scrollX ?? 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const scrollY = (appState as any).scrollY ?? 0;
+    const targetSceneX = appState.width / 2 / zoomV - scrollX;
+    const targetSceneY = appState.height / 2 / zoomV - scrollY;
+    const tx = targetSceneX - minX;
+    const ty = targetSceneY - minY;
+
+    // Fresh ids so repeat inserts don't collide. Preserve intra-component
+    // group relations by remapping groupIds consistently within this insert.
+    const idRemap = new Map<string, string>();
+    const groupRemap = new Map<string, string>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const el of component.elements as any[]) {
+      idRemap.set(el.id, randomId());
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const gid of (el.groupIds as string[]) ?? []) {
+        if (!groupRemap.has(gid)) groupRemap.set(gid, randomId());
+      }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fresh = component.elements.map((el: any) => ({
+      ...deepCopyElement(el),
+      id: idRemap.get(el.id)!,
+      x: (el.x ?? 0) + tx,
+      y: (el.y ?? 0) + ty,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      groupIds: ((el.groupIds as string[]) ?? []).map((g) =>
+        groupRemap.get(g) ?? g,
+      ),
+      // Re-index so fractionalIndices regenerate fresh on replaceAllElements.
+      index: null,
+      version: 1,
+      versionNonce: Math.floor(Math.random() * 2 ** 31),
+      updated: Date.now(),
+    }));
+
+    const existing = scene.getElementsIncludingDeleted();
+    scene.replaceAllElements([...existing, ...fresh], {
+      skipValidation: true,
+    });
+    const nextSel: Record<string, true> = {};
+    for (const el of fresh) nextSel[el.id] = true;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).selectedElementIds = nextSel;
+
+    // Bump usage + persist.
+    const index = libraryComponents.findIndex((c) => c.id === component.id);
     if (index !== -1) {
       libraryComponents[index].usage += 1;
     }
+
+    pushHistory();
+    bumpSceneRepaint();
   };
 
   const handleLibraryComponentDelete = (componentId: string) => {
@@ -2323,18 +2510,76 @@
   };
 
   // ── Phase 16 Feature 3: Presentation Mode ──────────────────────────
-  const handleStartPresentation = () => {
-    // Create slides from scene snapshots
+  // If the scene has frames, each frame becomes a slide (its elements only).
+  // Otherwise a single slide with every element. Each slide is pre-rendered
+  // to SVG so PresentationMode can display actual drawing content, not just
+  // a title card.
+  const handleStartPresentation = async () => {
     if (!scene) return;
-    // In a full implementation, we'd segment the scene into logical slides
-    // For now, create a single slide from all elements
-    const slide = createPresentationSlide(
-      'Presentation',
-      scene.getNonDeletedElements(),
-      0,
-      'Press right arrow or space to navigate',
+    const allElements = scene.getNonDeletedElements();
+    if (allElements.length === 0) {
+      window.alert("Draw something first, then start the presentation.");
+      return;
+    }
+
+    const frameList = Array.from(frames.values());
+    let slides: PresentationSlide[];
+    if (frameList.length > 0) {
+      slides = frameList.map((frame, i) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const frameElements = allElements.filter((el: any) =>
+          frame.elementIds.has(el.id),
+        );
+        return createPresentationSlide(
+          frame.name,
+          frameElements,
+          i,
+          `${frameElements.length} element${frameElements.length === 1 ? "" : "s"}`,
+        );
+      });
+    } else {
+      slides = [
+        createPresentationSlide(
+          "Drawing",
+          allElements,
+          0,
+          `${allElements.length} element${allElements.length === 1 ? "" : "s"}`,
+        ),
+      ];
+    }
+
+    // Pre-render each slide to an SVG string. Strip width/height so the
+    // SVG scales to fit the presentation container.
+    const svgs = await Promise.all(
+      slides.map(async (slide) => {
+        if (slide.elements.length === 0) return "";
+        try {
+          const svg = await exportToSvg({
+            elements: slide.elements,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            appState: appState as any,
+            files: binaryFiles,
+            exportPadding: 40,
+          });
+          svg.removeAttribute("width");
+          svg.removeAttribute("height");
+          svg.setAttribute(
+            "style",
+            "max-width: 100%; max-height: 100%; width: auto; height: auto; display: block; margin: 0 auto;",
+          );
+          return svg.outerHTML;
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error("sveltedraw: slide svg failed", err);
+          return "";
+        }
+      }),
     );
-    presentationSlides = [slide];
+
+    presentationSlides = slides;
+    presentationSlideSvgs = svgs;
+    presentationCurrentIndex = 0;
+    presentationIsPlaying = false;
     presentationActive = true;
   };
 
@@ -2369,37 +2614,119 @@
   };
 
   // ── Phase 16 Feature 4: Export Enhancements ──────────────────────────
-  const handleExport = (options: ExportOptions) => {
+  // buildExportAppState overrides a few appState fields the export helpers
+  // read. exportScale is the scene→pixel ratio; exportBackground toggles the
+  // viewBackgroundColor rect.
+  const buildExportAppState = (options: ExportOptions) => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ...(appState as any),
+    exportScale: options.scale,
+    exportBackground: options.includeBackground,
+  });
+
+  const handleExport = async (options: ExportOptions) => {
     if (!scene) return;
 
     const elements = scene.getNonDeletedElements();
-    let content = '';
+    const padding = options.includeBorder ? options.borderWidth : 10;
 
-    switch (options.format) {
-      case 'json':
-        // Export as JSON data
-        content = JSON.stringify(elements, null, 2);
-        const jsonBlob = new Blob([content], { type: 'application/json' });
-        downloadFile(jsonBlob, options.fileName + '.json');
-        break;
+    try {
+      switch (options.format) {
+        case "json": {
+          const json = JSON.stringify(
+            {
+              type: "excalidraw",
+              version: 2,
+              source: window.location.origin,
+              elements,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              appState: { viewBackgroundColor: (appState as any).viewBackgroundColor },
+              files: binaryFiles,
+            },
+            null,
+            2,
+          );
+          const blob = new Blob([json], { type: "application/json" });
+          downloadFile(blob, options.fileName + ".json");
+          break;
+        }
 
-      case 'svg':
-        // Export as SVG
-        content = generateSVG(elements, options);
-        const svgBlob = new Blob([content], { type: 'image/svg+xml' });
-        downloadFile(svgBlob, options.fileName + '.svg');
-        break;
+        case "svg": {
+          const svg = await exportToSvg({
+            elements,
+            appState: buildExportAppState(options),
+            files: binaryFiles,
+            exportPadding: padding,
+          });
+          // Force target width/height attributes on the SVG root. The viewBox
+          // (set by upstream from the content bbox) stays, so vectors scale.
+          svg.setAttribute("width", String(options.width * options.scale));
+          svg.setAttribute("height", String(options.height * options.scale));
+          if (options.includeBorder) {
+            const vb = (svg.getAttribute("viewBox") ?? "0 0 0 0")
+              .split(/\s+/)
+              .map(Number);
+            if (vb.length === 4 && vb.every(Number.isFinite)) {
+              const [vx, vy, vw, vh] = vb;
+              const bw = options.borderWidth;
+              const ns = "http://www.w3.org/2000/svg";
+              const rect = document.createElementNS(ns, "rect");
+              rect.setAttribute("x", String(vx + bw / 2));
+              rect.setAttribute("y", String(vy + bw / 2));
+              rect.setAttribute("width", String(Math.max(0, vw - bw)));
+              rect.setAttribute("height", String(Math.max(0, vh - bw)));
+              rect.setAttribute("fill", "none");
+              rect.setAttribute("stroke", options.borderColor);
+              rect.setAttribute("stroke-width", String(bw));
+              svg.appendChild(rect);
+            }
+          }
+          const blob = new Blob([svg.outerHTML], { type: "image/svg+xml" });
+          downloadFile(blob, options.fileName + ".svg");
+          break;
+        }
 
-      case 'png':
-        // Export as PNG (requires canvas rendering)
-        exportCanvasAsPNG(options);
-        break;
+        case "png": {
+          const targetW = Math.max(1, options.width);
+          const targetH = Math.max(1, options.height);
+          const densityScale = Math.max(0.01, options.scale);
+          const blob = await exportToBlob({
+            elements,
+            appState: buildExportAppState(options),
+            files: binaryFiles,
+            mimeType: "image/png",
+            quality: options.quality,
+            exportPadding: padding,
+            // Fit natural bbox into target w×h with preserved aspect, then
+            // apply densityScale as a pixel-density multiplier. Canvas ends
+            // up exactly (targetW * scale) × (targetH * scale) pixels.
+            getDimensions: (naturalW: number, naturalH: number) => {
+              const fit = Math.min(targetW / naturalW, targetH / naturalH);
+              return {
+                width: Math.round(targetW * densityScale),
+                height: Math.round(targetH * densityScale),
+                scale: fit * densityScale,
+              };
+            },
+          });
+          downloadFile(blob, options.fileName + ".png");
+          break;
+        }
 
-      case 'pdf':
-        // Export as PDF
-        content = 'PDF export requires PDF library integration';
-        console.log('PDF export:', content);
-        break;
+        case "pdf": {
+          // PDF requires a separate PDF lib (jsPDF etc.) not bundled here.
+          // Tell the user honestly rather than writing a broken file.
+          window.alert(
+            "PDF export is not yet supported.\n\nUse SVG (vector, prints at any size) or PNG (raster) instead.",
+          );
+          return; // don't close the panel so user can re-pick
+        }
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("sveltedraw: export failed", err);
+      window.alert(`Export failed: ${(err as Error).message ?? err}`);
+      return;
     }
 
     exportPanelActive = false;
@@ -2407,42 +2734,13 @@
 
   const downloadFile = (blob: Blob, fileName: string) => {
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = fileName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  };
-
-  const generateSVG = (elements: any[], options: ExportOptions): string => {
-    // Basic SVG generation
-    let svg = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-    svg += `<svg xmlns="http://www.w3.org/2000/svg" width="${options.width}" height="${options.height}" viewBox="0 0 ${options.width} ${options.height}">\n`;
-
-    if (options.includeBackground) {
-      svg += `  <rect width="${options.width}" height="${options.height}" fill="white"/>\n`;
-    }
-
-    // Add border if requested
-    if (options.includeBorder) {
-      svg += `  <rect x="${options.borderWidth / 2}" y="${options.borderWidth / 2}" `;
-      svg += `width="${options.width - options.borderWidth}" height="${options.height - options.borderWidth}" `;
-      svg += `stroke="${options.borderColor}" stroke-width="${options.borderWidth}" fill="none"/>\n`;
-    }
-
-    // Simple placeholder for elements
-    svg += `  <!-- ${elements.length} elements -->\n`;
-    svg += `</svg>`;
-    return svg;
-  };
-
-  const exportCanvasAsPNG = (options: ExportOptions) => {
-    // In a real implementation, this would render to canvas and export as PNG
-    console.log('PNG export:', options.fileName + '.png');
-    const blob = new Blob(['PNG export not yet implemented'], { type: 'image/png' });
-    downloadFile(blob, options.fileName + '.png');
   };
 
   // ── Z-order: bring forward / send backward / to front / to back ─────
@@ -3489,21 +3787,21 @@
 
       // Phase 13: Measurement panel: Ctrl+M
       if (!event.shiftKey && (event.key === "m" || event.key === "M")) {
-        measurementPanelActive = !measurementPanelActive;
+        toggleSidePanel("measurement");
         event.preventDefault();
         return;
       }
 
       // Phase 13: Auto-Layout panel: Ctrl+L
       if (!event.shiftKey && (event.key === "l" || event.key === "L")) {
-        autoLayoutPanelActive = !autoLayoutPanelActive;
+        toggleSidePanel("autolayout");
         event.preventDefault();
         return;
       }
 
       // Phase 13: Text Editor panel: Ctrl+T
       if (!event.shiftKey && (event.key === "t" || event.key === "T")) {
-        textEditorPanelActive = !textEditorPanelActive;
+        toggleSidePanel("texteditor");
         event.preventDefault();
         return;
       }
@@ -5689,7 +5987,7 @@
       class:active={alignmentPanelActive}
       aria-label="Alignment tool"
       title="Alignment & Distribution (Ctrl+Alt+L, etc)"
-      onclick={() => (alignmentPanelActive = !alignmentPanelActive)}
+      onclick={() => toggleSidePanel("alignment")}
     >
       ◫
     </button>
@@ -5699,7 +5997,7 @@
       class:active={measurementPanelActive}
       aria-label="Measurements"
       title="Measurements & Dimensions (Ctrl+M)"
-      onclick={() => (measurementPanelActive = !measurementPanelActive)}
+      onclick={() => toggleSidePanel("measurement")}
     >
       📏
     </button>
@@ -5709,7 +6007,7 @@
       class:active={autoLayoutPanelActive}
       aria-label="Auto Layout"
       title="Auto Layout (Ctrl+L)"
-      onclick={() => (autoLayoutPanelActive = !autoLayoutPanelActive)}
+      onclick={() => toggleSidePanel("autolayout")}
     >
       🎯
     </button>
@@ -5719,7 +6017,7 @@
       class:active={textEditorPanelActive}
       aria-label="Text Editor"
       title="Text Properties (Ctrl+T)"
-      onclick={() => (textEditorPanelActive = !textEditorPanelActive)}
+      onclick={() => toggleSidePanel("texteditor")}
     >
       ✏️
     </button>
@@ -5729,7 +6027,7 @@
       class:active={gridPanelActive}
       aria-label="Grid & Snap"
       title="Grid & Snap Settings"
-      onclick={() => (gridPanelActive = !gridPanelActive)}
+      onclick={() => toggleSidePanel("grid")}
     >
       ⊞
     </button>
@@ -5739,7 +6037,7 @@
       class:active={layerPanelActive}
       aria-label="Layers"
       title="Layer Management"
-      onclick={() => (layerPanelActive = !layerPanelActive)}
+      onclick={() => toggleSidePanel("layer")}
     >
       📑
     </button>
@@ -5749,7 +6047,7 @@
       class:active={historyPanelActive}
       aria-label="History"
       title="Undo/Redo History"
-      onclick={() => (historyPanelActive = !historyPanelActive)}
+      onclick={() => toggleSidePanel("history")}
     >
       ⏮
     </button>
@@ -5759,7 +6057,7 @@
       class:active={libraryPanelActive}
       aria-label="Shape Library"
       title="Shape Library & Components"
-      onclick={() => (libraryPanelActive = !libraryPanelActive)}
+      onclick={() => toggleSidePanel("library")}
     >
       📚
     </button>
@@ -5944,6 +6242,7 @@
   {#if presentationActive}
     <PresentationMode
       slides={presentationSlides}
+      slideSvgs={presentationSlideSvgs}
       currentSlideIndex={presentationCurrentIndex}
       isPlaying={presentationIsPlaying}
       showSlideNumbers={presentationConfig.showSlideNumbers}
@@ -7344,7 +7643,7 @@
   .sveltedraw-alignment-panel {
     position: absolute;
     bottom: 16px;
-    right: 320px;
+    right: 16px;
     width: 320px;
     max-height: 60vh;
     background: #fff;
@@ -7361,7 +7660,7 @@
   .sveltedraw-measurement-panel {
     position: absolute;
     bottom: 16px;
-    right: 620px;
+    right: 16px;
     width: 280px;
     max-height: 60vh;
     background: #fff;
@@ -7378,7 +7677,7 @@
   .sveltedraw-autolayout-panel {
     position: absolute;
     bottom: 16px;
-    right: 920px;
+    right: 16px;
     width: 280px;
     max-height: 70vh;
     background: #fff;
@@ -7395,7 +7694,7 @@
   .sveltedraw-texteditor-panel {
     position: absolute;
     bottom: 16px;
-    right: 1220px;
+    right: 16px;
     width: 280px;
     max-height: 70vh;
     background: #fff;
@@ -7412,7 +7711,7 @@
   .sveltedraw-grid-panel {
     position: absolute;
     bottom: 16px;
-    right: 1520px;
+    right: 16px;
     width: 280px;
     max-height: 60vh;
     background: #fff;
@@ -7429,7 +7728,10 @@
   .sveltedraw-layer-panel {
     position: absolute;
     bottom: 16px;
-    right: 1820px;
+    right: 16px;
+    width: 280px;
+    max-height: 70vh;
+    overflow-y: auto;
     background: #fff;
     border: 1px solid #d1d4da;
     border-radius: 8px;
@@ -7444,7 +7746,10 @@
   .sveltedraw-history-panel {
     position: absolute;
     bottom: 16px;
-    right: 2120px;
+    right: 16px;
+    width: 280px;
+    max-height: 70vh;
+    overflow-y: auto;
     background: #fff;
     border: 1px solid #d1d4da;
     border-radius: 8px;
@@ -7459,7 +7764,10 @@
   .sveltedraw-shape-library-panel {
     position: absolute;
     bottom: 16px;
-    right: 2420px;
+    right: 16px;
+    width: 280px;
+    max-height: 70vh;
+    overflow-y: auto;
     background: #fff;
     border: 1px solid #d1d4da;
     border-radius: 8px;
