@@ -139,6 +139,9 @@
   import LaserOverlay from "./components/LaserOverlay.svelte";
   import MeasurementOverlay from "./components/MeasurementOverlay.svelte";
   import LinkChip from "./components/LinkChip.svelte";
+  import ShadowPresetsRow from "./components/ShadowPresetsRow.svelte";
+  import ActionsRow from "./components/ActionsRow.svelte";
+  import StyleSliderRow from "./components/StyleSliderRow.svelte";
   import LayerPanel from "./components/LayerPanel.svelte";
   import HistoryPanel from "./components/HistoryPanel.svelte";
   import ShapeLibraryPanel from "./components/ShapeLibraryPanel.svelte";
@@ -7670,103 +7673,47 @@
       </div>
     {/if}
 
-    <!-- C1: drop shadow — one-click presets. None / Soft / Hard. Applied
-         on every selected element. Uses applyStyle so the value flows
-         through scene.mutateElement + history. -->
+    <!-- C1: drop shadow — extracted to ShadowPresetsRow.svelte. -->
     {#if Object.keys((appState as any).selectedElementIds ?? {}).length > 0}
-      <div class="sp-row">
-        <div class="sp-label">Shadow</div>
-        <div class="sp-swatches">
-          <button
-            type="button"
-            class="sp-icon-btn"
-            class:active={!panelStyle.shadow}
-            title="None"
-            aria-label="Shadow none"
-            onclick={() => applyStyle({ shadow: null })}
-          >∅</button>
-          <button
-            type="button"
-            class="sp-icon-btn"
-            title="Soft"
-            aria-label="Shadow soft"
-            onclick={() => applyStyle({ shadow: { color: "rgba(0,0,0,0.25)", offsetX: 4, offsetY: 4, blur: 8 } })}
-          >◌</button>
-          <button
-            type="button"
-            class="sp-icon-btn"
-            title="Hard"
-            aria-label="Shadow hard"
-            onclick={() => applyStyle({ shadow: { color: "#000", offsetX: 6, offsetY: 6, blur: 0 } })}
-          >●</button>
-        </div>
-      </div>
+      <ShadowPresetsRow
+        current={panelStyle.shadow}
+        onApply={(shadow) => applyStyle({ shadow })}
+      />
     {/if}
 
     <!-- A9: line-height slider (text-only). Migrated from TextEditorPanel.
          Upstream stores lineHeight as a float multiplier (≈1.25 default). -->
+    <!-- A9: line-height (text only) + rotation sliders — reuse StyleSliderRow. -->
     {#if hasTextSelected}
-      <div class="sp-row">
-        <div class="sp-label">Line height</div>
-        <div class="sp-swatches sp-slider">
-          <input
-            type="range" min="1" max="3" step="0.05"
-            value={panelStyle.lineHeight}
-            oninput={(e) => applyStyle({ lineHeight: parseFloat((e.currentTarget as HTMLInputElement).value) })}
-            aria-label="Line height"
-          />
-          <span class="sp-slider-value">{Number(panelStyle.lineHeight ?? 1.25).toFixed(2)}</span>
-        </div>
-      </div>
+      <StyleSliderRow
+        label="Line height"
+        ariaLabel="Line height"
+        min={1} max={3} step={0.05}
+        value={panelStyle.lineHeight ?? 1.25}
+        display={Number(panelStyle.lineHeight ?? 1.25).toFixed(2)}
+        onInput={(v) => applyStyle({ lineHeight: v })}
+      />
+    {/if}
+    {#if selectedElementsReactive.length === 1}
+      {@const deg = Math.round(((panelStyle.angle ?? 0) * 180) / Math.PI)}
+      <StyleSliderRow
+        label="Rotation"
+        ariaLabel="Rotation angle"
+        min={0} max={360} step={1}
+        value={deg}
+        display={`${deg}°`}
+        onInput={(v) => applyStyle({ angle: (v * Math.PI) / 180 })}
+      />
     {/if}
 
-    <!-- A9: rotation slider. Any element. Also migrated from TextEditorPanel.
-         Rotation handles still work; this is just a precise numeric input. -->
-    {#if Object.keys((appState as any).selectedElementIds ?? {}).length === 1}
-      <div class="sp-row">
-        <div class="sp-label">Rotation</div>
-        <div class="sp-swatches sp-slider">
-          <input
-            type="range" min="0" max="360" step="1"
-            value={Math.round(((panelStyle.angle ?? 0) * 180) / Math.PI)}
-            oninput={(e) => applyStyle({ angle: (parseInt((e.currentTarget as HTMLInputElement).value, 10) * Math.PI) / 180 })}
-            aria-label="Rotation angle"
-          />
-          <span class="sp-slider-value">{Math.round(((panelStyle.angle ?? 0) * 180) / Math.PI)}°</span>
-        </div>
-      </div>
-    {/if}
-
-    <!-- Lock/unlock + C2 flip (H/V). Actions row. -->
-    {#if Object.keys((appState as any).selectedElementIds ?? {}).length > 0}
-      <div class="sp-row">
-        <div class="sp-label">Actions</div>
-        <div class="sp-swatches">
-          <button
-            type="button"
-            class="sp-icon-btn"
-            aria-label="Toggle lock"
-            title="Lock/unlock (Ctrl+Shift+L)"
-            onclick={toggleLockSelected}
-          >
-            {getSelectedElements().some((el) => el.locked) ? "🔒" : "🔓"}
-          </button>
-          <button
-            type="button"
-            class="sp-icon-btn"
-            aria-label="Flip horizontal"
-            title="Flip horizontal"
-            onclick={() => flipSelected("horizontal")}
-          >⇔</button>
-          <button
-            type="button"
-            class="sp-icon-btn"
-            aria-label="Flip vertical"
-            title="Flip vertical"
-            onclick={() => flipSelected("vertical")}
-          >⇕</button>
-        </div>
-      </div>
+    <!-- Lock + flip — extracted to ActionsRow.svelte. anyLocked reads
+         via the reactive selection so the lock glyph stays in sync. -->
+    {#if selectedElementsReactive.length > 0}
+      <ActionsRow
+        anyLocked={selectedElementsReactive.some((el: any) => el.locked)}
+        onToggleLock={toggleLockSelected}
+        onFlip={flipSelected}
+      />
     {/if}
   </div>
 
