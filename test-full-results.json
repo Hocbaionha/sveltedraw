@@ -1,0 +1,120 @@
+{
+  "timestamp": "2026-04-22T22:35:50.460Z",
+  "environment": {
+    "url": "http://localhost:5173/",
+    "title": "Home — Ignovia",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/147.0.0.0 Safari/537.36"
+  },
+  "results": [
+    {
+      "name": "Page title is set",
+      "status": "✅"
+    },
+    {
+      "name": "Can navigate to showcase",
+      "status": "✅"
+    },
+    {
+      "name": "Can navigate back to home",
+      "status": "✅"
+    },
+    {
+      "name": "Navigation links are functional",
+      "status": "✅"
+    },
+    {
+      "name": "Page has visible content",
+      "status": "✅"
+    },
+    {
+      "name": "Page header/heading exists",
+      "status": "✅"
+    },
+    {
+      "name": "Interactive elements are present",
+      "status": "✅"
+    },
+    {
+      "name": "Buttons can be clicked without error",
+      "status": "✅"
+    },
+    {
+      "name": "Form inputs are functional",
+      "status": "✅"
+    },
+    {
+      "name": "Scrolling works",
+      "status": "✅"
+    },
+    {
+      "name": "Keyboard shortcuts work",
+      "status": "✅"
+    },
+    {
+      "name": "Text selection works",
+      "status": "✅"
+    },
+    {
+      "name": "Mouse hover detection",
+      "status": "✅"
+    },
+    {
+      "name": "Double click works",
+      "status": "✅"
+    },
+    {
+      "name": "Images load correctly",
+      "status": "✅"
+    },
+    {
+      "name": "Styles are applied",
+      "status": "✅"
+    },
+    {
+      "name": "No critical console errors",
+      "status": "✅"
+    },
+    {
+      "name": "Memory is stable",
+      "status": "✅"
+    },
+    {
+      "name": "No page crashes during interactions",
+      "status": "✅"
+    },
+    {
+      "name": "Responsive to viewport changes",
+      "status": "✅"
+    },
+    {
+      "name": "Semantic HTML is used",
+      "status": "✅"
+    },
+    {
+      "name": "Focus management works",
+      "status": "✅"
+    },
+    {
+      "name": "Page load performance",
+      "status": "✅"
+    },
+    {
+      "name": "Paint timing",
+      "status": "✅"
+    },
+    {
+      "name": "Capture final state screenshot",
+      "status": "✅"
+    }
+  ],
+  "summary": {
+    "passed": 25,
+    "failed": 0,
+    "total": 25,
+    "passRate": "100.00%"
+  },
+  "metrics": {
+    "consoleErrors": 0,
+    "consoleWarnings": 0
+  }
+}

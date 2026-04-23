@@ -943,12 +943,27 @@
   const selectAll = () => {
     if (!scene) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cur = (appState as any).selectedElementIds ?? {};
     const next: Record<string, true> = {};
+    let changed = false;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const el of scene.getNonDeletedElements()) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (!(el as any).locked) next[(el as any).id] = true;
+      if (!(el as any).locked) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        next[(el as any).id] = true;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (!cur[(el as any).id]) changed = true;
+      }
     }
+
+    // Check if any were deselected
+    if (!changed && Object.keys(cur).length === Object.keys(next).length) {
+      // All selected elements are the same, no change needed
+      return;
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (appState as any).selectedElementIds = next;
     bumpSceneRepaint();
@@ -2769,12 +2784,20 @@
 
   const clearSelection = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (appState as any).selectedElementIds = {};
+    const cur = (appState as any).selectedElementIds ?? {};
+    // Only update if there are actually selected elements to clear
+    if (Object.keys(cur).length > 0) {
+      (appState as any).selectedElementIds = {};
+    }
   };
 
   const selectOnly = (id: string) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (appState as any).selectedElementIds = { [id]: true };
+    const cur = (appState as any).selectedElementIds ?? {};
+    // Only update if selection actually changed
+    if (Object.keys(cur).length !== 1 || !cur[id]) {
+      (appState as any).selectedElementIds = { [id]: true };
+    }
   };
 
   const toggleInSelection = (id: string) => {
