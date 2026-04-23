@@ -16,6 +16,7 @@
     ariaLabelPrefix,
     onSelect,
     iconFor,
+    btnClass = "sp-icon-btn",
   }: {
     label: string;
     presets: ReadonlyArray<T>;
@@ -28,6 +29,9 @@
     onSelect: (value: T["value"]) => void;
     /** Optional custom icon renderer; receives the preset object. */
     iconFor?: Snippet<[T]>;
+    /** CSS class for the button. Defaults to sp-icon-btn; stroke-width uses
+     *  sp-width, opacity uses sp-opacity — same structure, different sizing. */
+    btnClass?: string;
   } = $props();
 </script>
 
@@ -37,7 +41,7 @@
     {#each presets as p}
       <button
         type="button"
-        class="sp-icon-btn"
+        class={btnClass}
         class:active={current === p.value}
         data-preset={dataPreset}
         data-value={p.value}

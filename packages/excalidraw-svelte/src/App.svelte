@@ -143,6 +143,7 @@
   import ActionsRow from "./components/ActionsRow.svelte";
   import StyleSliderRow from "./components/StyleSliderRow.svelte";
   import PresetIconRow from "./components/PresetIconRow.svelte";
+  import FormatRow from "./components/FormatRow.svelte";
   import LayerPanel from "./components/LayerPanel.svelte";
   import HistoryPanel from "./components/HistoryPanel.svelte";
   import ShapeLibraryPanel from "./components/ShapeLibraryPanel.svelte";
@@ -3731,7 +3732,10 @@
     { name: "artist", value: ROUGHNESS.artist, icon: "SloppinessArtistIcon" },
     { name: "cartoonist", value: ROUGHNESS.cartoonist, icon: "SloppinessCartoonistIcon" },
   ];
-  const OPACITY_PRESETS = [25, 50, 75, 100];
+  // PresetIconRow expects {value, name} — inline numbers get wrapped once here.
+  const OPACITY_PRESETS = [25, 50, 75, 100].map((n) => ({
+    value: n, name: String(n),
+  }));
   // Font size quick-picks — matches upstream Excalidraw's 4 canonical
   // sizes. DEFAULT_FONT_SIZE = 20 (Medium).
   const FONT_SIZE_PRESETS = [
@@ -7301,24 +7305,19 @@
     {/if}
 
     {#if !allSelectedAreText}
-      <div class="sp-row">
-        <div class="sp-label">{t("labels.strokeWidth")}</div>
-        <div class="sp-swatches">
-          {#each STROKE_WIDTHS as w}
-            <button
-              type="button"
-              class="sp-width"
-              class:active={panelStyle.strokeWidth === w.value}
-              data-preset="width"
-              data-value={w.value}
-              aria-label={`Stroke width ${w.name}`}
-              onclick={() => applyStyle({ strokeWidth: w.value })}
-            >
-              <span style="display: inline-block; width: 18px; height: {w.value}px; background: #1e1e1e; border-radius: 1px;"></span>
-            </button>
-          {/each}
-        </div>
-      </div>
+      <PresetIconRow
+        label={t("labels.strokeWidth")}
+        presets={STROKE_WIDTHS}
+        current={panelStyle.strokeWidth}
+        btnClass="sp-width"
+        dataPreset="width"
+        ariaLabelPrefix="Stroke width"
+        onSelect={(v) => applyStyle({ strokeWidth: v })}
+      >
+        {#snippet iconFor(w)}
+          <span style="display: inline-block; width: 18px; height: {w.value}px; background: #1e1e1e; border-radius: 1px;"></span>
+        {/snippet}
+      </PresetIconRow>
 
       <PresetIconRow
         label={t("labels.strokeStyle")}
@@ -7470,70 +7469,12 @@
         {/if}
       {/snippet}
 
-      <!-- Bold / Italic / Underline / Strikethrough — each applies the
-           corresponding field on the text element. Toggle on second click.
-           Renderer (canvas + SVG) honors all four; pixel-verified. -->
-      <div class="sp-row">
-        <div class="sp-label">Format</div>
-        <div class="sp-swatches">
-          <button
-            type="button"
-            class="sp-icon-btn sp-format-btn"
-            class:active={panelStyle.fontWeight === "bold"}
-            data-preset="fontWeight"
-            data-value="bold"
-            aria-label="Bold"
-            title="Bold"
-            onclick={() => applyStyle({
-              fontWeight: panelStyle.fontWeight === "bold" ? "normal" : "bold",
-            })}
-          >
-            <strong>B</strong>
-          </button>
-          <button
-            type="button"
-            class="sp-icon-btn sp-format-btn"
-            class:active={panelStyle.fontStyle === "italic"}
-            data-preset="fontStyle"
-            data-value="italic"
-            aria-label="Italic"
-            title="Italic"
-            onclick={() => applyStyle({
-              fontStyle: panelStyle.fontStyle === "italic" ? "normal" : "italic",
-            })}
-          >
-            <em>I</em>
-          </button>
-          <button
-            type="button"
-            class="sp-icon-btn sp-format-btn"
-            class:active={panelStyle.textDecoration === "underline"}
-            data-preset="textDecoration"
-            data-value="underline"
-            aria-label="Underline"
-            title="Underline"
-            onclick={() => applyStyle({
-              textDecoration: panelStyle.textDecoration === "underline" ? "none" : "underline",
-            })}
-          >
-            <span style="text-decoration: underline">U</span>
-          </button>
-          <button
-            type="button"
-            class="sp-icon-btn sp-format-btn"
-            class:active={panelStyle.textDecoration === "line-through"}
-            data-preset="textDecoration"
-            data-value="line-through"
-            aria-label="Strikethrough"
-            title="Strikethrough"
-            onclick={() => applyStyle({
-              textDecoration: panelStyle.textDecoration === "line-through" ? "none" : "line-through",
-            })}
-          >
-            <span style="text-decoration: line-through">S</span>
-          </button>
-        </div>
-      </div>
+      <FormatRow
+        fontWeight={panelStyle.fontWeight}
+        fontStyle={panelStyle.fontStyle}
+        textDecoration={panelStyle.textDecoration}
+        onApply={applyStyle}
+      />
 
       <PresetIconRow
         label={t("labels.textAlign")}
@@ -7557,22 +7498,17 @@
       </PresetIconRow>
     {/if}
 
-    <div class="sp-row">
-      <div class="sp-label">{t("labels.opacity")}</div>
-      <div class="sp-swatches">
-        {#each OPACITY_PRESETS as o}
-          <button
-            type="button"
-            class="sp-opacity"
-            class:active={panelStyle.opacity === o}
-            data-preset="opacity"
-            data-value={o}
-            aria-label={`Opacity ${o}%`}
-            onclick={() => applyStyle({ opacity: o })}
-          >{o}</button>
-        {/each}
-      </div>
-    </div>
+    <PresetIconRow
+      label={t("labels.opacity")}
+      presets={OPACITY_PRESETS}
+      current={panelStyle.opacity}
+      btnClass="sp-opacity"
+      dataPreset="opacity"
+      ariaLabelPrefix="Opacity"
+      onSelect={(v) => applyStyle({ opacity: v })}
+    >
+      {#snippet iconFor(o)}{o.value}{/snippet}
+    </PresetIconRow>
 
     {#if hasTextSelected}
       <!-- Font size — Small / Medium / Large / Extra large.
