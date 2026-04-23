@@ -121,6 +121,31 @@
   import StaticCanvas from "./components/canvases/StaticCanvas.svelte";
   import InteractiveCanvas from "./components/canvases/InteractiveCanvas.svelte";
   import NewElementCanvas from "./components/canvases/NewElementCanvas.svelte";
+  import TemplateSelector from "./components/TemplateSelector.svelte";
+  import RecentFilesPanel from "./components/RecentFilesPanel.svelte";
+  import SettingsPanel from "./components/SettingsPanel.svelte";
+  import HelpPanel from "./components/HelpPanel.svelte";
+  import ConnectorTool from "./components/ConnectorTool.svelte";
+  import AlignmentPanel from "./components/AlignmentPanel.svelte";
+  import MeasurementPanel from "./components/MeasurementPanel.svelte";
+  import AutoLayoutPanel from "./components/AutoLayoutPanel.svelte";
+  import TextEditorPanel from "./components/TextEditorPanel.svelte";
+  import GridPanel from "./components/GridPanel.svelte";
+  import GridRenderer from "./components/GridRenderer.svelte";
+  import SnapGuideRenderer from "./components/SnapGuideRenderer.svelte";
+  import LayerPanel from "./components/LayerPanel.svelte";
+  import type { Template } from "./templates/index.js";
+  import type { Connector, RoutingStyle } from "./connectors/types.js";
+  import { generateConnectorPath } from "./connectors/types.js";
+  import type { AlignmentType, DistributionType, AlignmentGuide } from "./alignment/types.js";
+  import { calculateAlignmentGuides, alignElements, distributeElements } from "./alignment/types.js";
+  import type { MeasurementConfig } from "./measurements/types.js";
+  import type { LayoutConfig } from "./autolayout/types.js";
+  import { calculateLayout, applyLayout } from "./autolayout/types.js";
+  import type { TextProperties } from "./texteditor/types.js";
+  import type { GridConfig, SnapConfig } from "./snap/types.js";
+  import type { SnapGuide } from "./snap/guides.js";
+  import type { LayerItem } from "./layers/types.js";
 
   let {
     viewModeEnabled = false,
@@ -503,6 +528,7 @@
     void appState.viewBackgroundColor;
     void appState.gridModeEnabled;
     staticRender();
+    syncLayersFromScene();
   });
 
   // NewElementCanvas repaint: the wrapper's internal $effect tracks only
@@ -529,6 +555,8 @@
     // initial history floor captures the restored state, not "empty".
     tryLoad();
     loadLibrary();
+    loadRecentFiles();
+    loadSettings();
     sceneReady++; // triggers the first static paint
 
     // Initialize the upstream Fonts loader. It takes a scene object
@@ -1477,6 +1505,96 @@
 
   let libraryItems = $state<LibraryItem[]>([]);
   let libraryPanelOpen = $state(false);
+  let showTemplateSelector = $state(false);
+
+  interface RecentFile {
+    id: string;
+    name: string;
+    timestamp: number;
+  }
+
+  let recentFiles = $state<RecentFile[]>([]);
+  let showRecentFiles = $state(false);
+  const RECENT_FILES_KEY = "sveltedraw-recent-files";
+
+  interface AppSettings {
+    theme: "light" | "dark" | "auto";
+    gridVisible: boolean;
+    gridSize: number;
+    snapToGrid: boolean;
+    autoSaveInterval: number;
+    undoHistorySize: number;
+  }
+
+  const DEFAULT_SETTINGS: AppSettings = {
+    theme: "light",
+    gridVisible: true,
+    gridSize: 20,
+    snapToGrid: false,
+    autoSaveInterval: 30,
+    undoHistorySize: 500,
+  };
+
+  let appSettings = $state<AppSettings>({ ...DEFAULT_SETTINGS });
+  let showSettings = $state(false);
+  const SETTINGS_KEY = "sveltedraw-settings";
+
+  let showHelpPanel = $state(false);
+
+  // Phase 13: Connectors
+  let connectors = $state<Connector[]>([]);
+  let connectorToolActive = $state(false);
+  let activeRoutingStyle = $state<RoutingStyle>("straight");
+  let selectedForConnection: string | null = $state(null);
+
+  // Phase 13: Smart Alignment & Guides
+  let alignmentPanelActive = $state(false);
+  let alignmentGuides = $state<AlignmentGuide[]>([]);
+
+  // Phase 13: Measurement & Dimensions
+  let measurementPanelActive = $state(false);
+  let measurementConfig = $state<MeasurementConfig>({
+    showRulers: false,
+    showDistances: false,
+    showDimensions: true,
+    unit: "px",
+    precision: 1,
+  });
+
+  // Phase 13: Auto-Layout Algorithm
+  let autoLayoutPanelActive = $state(false);
+
+  // Phase 13: Advanced Text Features
+  let textEditorPanelActive = $state(false);
+
+  // Phase 14: Grid & Snap System
+  let gridPanelActive = $state(false);
+  let gridConfig = $state({
+    enabled: true,
+    size: 20,
+    visible: false,
+    opacity: 0.15,
+  });
+  let snapConfig = $state({
+    enabled: true,
+    threshold: 8,
+    guides: true,
+    // Phase 14 Feature 4: Snap preferences
+    snapToGrid: true,
+    snapToElements: true,
+    snapEdges: true,
+    snapCenters: true,
+    showDistance: true,
+  });
+
+  // Phase 14: Snap Guides
+  let snapGuides = $state<SnapGuide[]>([]);
+  let isDraggingForSnap = $state(false);
+
+  // Phase 15: Layer Management
+  let layerPanelActive = $state(false);
+  let layers = $state<LayerItem[]>([]);
+  let selectedLayerId = $state<string | null>(null);
 
   const loadLibrary = () => {
     try {
@@ -1590,6 +1708,338 @@
   const deleteLibraryItem = (id: string) => {
     libraryItems = libraryItems.filter((it) => it.id !== id);
     persistLibrary();
+  };
+
+  const loadRecentFiles = () => {
+    try {
+      const raw = localStorage.getItem(RECENT_FILES_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as RecentFile[];
+      if (Array.isArray(parsed)) recentFiles = parsed;
+    } catch {
+      /* corrupted — start fresh */
+    }
+  };
+
+  const persistRecentFiles = () => {
+    try {
+      localStorage.setItem(RECENT_FILES_KEY, JSON.stringify(recentFiles));
+    } catch {
+      /* quota exceeded */
+    }
+  };
+
+  const addToRecentFiles = (filename: string) => {
+    const existing = recentFiles.find(
+      (f) => f.name.toLowerCase() === filename.toLowerCase(),
+    );
+    if (existing) {
+      existing.timestamp = Date.now();
+    } else {
+      recentFiles.unshift({
+        id: randomId(),
+        name: filename,
+        timestamp: Date.now(),
+      });
+    }
+    // Keep only last 10 files
+    if (recentFiles.length > 10) {
+      recentFiles = recentFiles.slice(0, 10);
+    }
+    persistRecentFiles();
+  };
+
+  const deleteRecentFile = (id: string) => {
+    recentFiles = recentFiles.filter((f) => f.id !== id);
+    persistRecentFiles();
+  };
+
+  const loadSettings = () => {
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as AppSettings;
+      appSettings = { ...DEFAULT_SETTINGS, ...parsed };
+      applySettings();
+    } catch {
+      /* corrupted — use defaults */
+    }
+  };
+
+  const persistSettings = () => {
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(appSettings));
+    } catch {
+      /* quota exceeded */
+    }
+  };
+
+  const applySettings = () => {
+    // Apply theme
+    if (appSettings.theme === "dark") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (appState as any).theme = "dark";
+    } else if (appSettings.theme === "light") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (appState as any).theme = "light";
+    }
+    // Apply grid settings
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).gridModeEnabled = appSettings.gridVisible;
+  };
+
+  const updateSettings = (newSettings: AppSettings) => {
+    appSettings = newSettings;
+    applySettings();
+    persistSettings();
+  };
+
+  // Load template and create elements from it
+  const selectTemplate = (template: Template) => {
+    if (!scene) return;
+
+    // Convert template elements to proper excalidraw elements
+    const newElements = template.elements.map((templateEl: any) => {
+      const el = newElement({
+        type: templateEl.type || 'rectangle',
+        x: templateEl.x ?? 0,
+        y: templateEl.y ?? 0,
+        width: templateEl.width ?? 100,
+        height: templateEl.height ?? 100,
+        strokeColor: templateEl.strokeColor ?? '#000000',
+        backgroundColor: templateEl.backgroundColor ?? '#ffffff',
+        fillStyle: templateEl.fillStyle ?? 'solid',
+        strokeWidth: templateEl.strokeWidth ?? 1,
+        text: templateEl.text ?? '',
+      });
+      return el;
+    });
+
+    // Clear existing elements and replace with template
+    scene.replaceAllElements(newElements, { skipValidation: true });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).selectedElementIds = {};
+    pushHistory();
+    bumpSceneRepaint();
+    showTemplateSelector = false;
+  };
+
+  // Phase 13: Connector creation
+  const createConnector = (
+    fromElementId: string,
+    toElementId: string,
+  ) => {
+    if (!scene) return;
+    const fromEl = scene.getElement(fromElementId);
+    const toEl = scene.getElement(toElementId);
+    if (!fromEl || !toEl) return;
+
+    const connector: Connector = {
+      id: randomId(),
+      type: "connector",
+      fromPoint: {
+        elementId: fromElementId,
+        pointType: "right",
+        x: (fromEl as any).x + ((fromEl as any).width || 100),
+        y: (fromEl as any).y + (((fromEl as any).height || 100) / 2),
+      },
+      toPoint: {
+        elementId: toElementId,
+        pointType: "left",
+        x: (toEl as any).x,
+        y: (toEl as any).y + (((toEl as any).height || 100) / 2),
+      },
+      routingStyle: activeRoutingStyle,
+      strokeColor: "#000000",
+      strokeWidth: 2,
+      arrowEnd: "arrow",
+    };
+
+    connectors = [...connectors, connector];
+    connectorToolActive = false;
+    selectedForConnection = null;
+    pushHistory();
+  };
+
+  const deleteConnector = (id: string) => {
+    connectors = connectors.filter((c) => c.id !== id);
+    pushHistory();
+  };
+
+  // ── Smart Alignment & Guides ─────────────────────────────────────────
+  const handleAlign = (alignmentType: AlignmentType) => {
+    if (!scene) return;
+    const selected = getSelectedElements();
+    if (selected.length < 2) return;
+
+    const elements = selected.map(el => ({
+      id: el.id,
+      x: el.x,
+      y: el.y,
+      width: el.width,
+      height: el.height,
+      angle: el.angle,
+    }));
+
+    const aligned = alignElements(elements, alignmentType);
+    for (const el of selected) {
+      const updated = aligned.find((a) => a.id === el.id);
+      if (updated) {
+        el.x = updated.x;
+        el.y = updated.y;
+      }
+    }
+    pushHistory();
+    bumpSceneRepaint();
+  };
+
+  const handleDistribute = (distributionType: DistributionType) => {
+    if (!scene) return;
+    const selected = getSelectedElements();
+    if (selected.length < 3) return;
+
+    const elements = selected.map(el => ({
+      id: el.id,
+      x: el.x,
+      y: el.y,
+      width: el.width,
+      height: el.height,
+      angle: el.angle,
+    }));
+
+    const distributed = distributeElements(elements, distributionType);
+    for (const el of selected) {
+      const updated = distributed.find((a) => a.id === el.id);
+      if (updated) {
+        el.x = updated.x;
+        el.y = updated.y;
+      }
+    }
+    pushHistory();
+    bumpSceneRepaint();
+  };
+
+  const updateAlignmentGuides = () => {
+    const selected = getSelectedElements();
+    if (selected.length < 2) {
+      alignmentGuides = [];
+      return;
+    }
+
+    const elements = selected.map(el => ({
+      id: el.id,
+      x: el.x,
+      y: el.y,
+      width: el.width,
+      height: el.height,
+      angle: el.angle,
+    }));
+
+    alignmentGuides = calculateAlignmentGuides(elements);
+  };
+
+  const handleAutoLayout = (config: LayoutConfig) => {
+    if (!scene) return;
+    const selected = getSelectedElements();
+    if (selected.length < 2) return;
+
+    const elements = selected.map(el => ({
+      id: el.id,
+      x: el.x,
+      y: el.y,
+      width: el.width,
+      height: el.height,
+      angle: el.angle,
+    }));
+
+    const layoutResults = calculateLayout(elements, config);
+    const newElements = applyLayout(elements, layoutResults);
+
+    for (const el of selected) {
+      const updated = newElements.find((a) => a.id === el.id);
+      if (updated) {
+        el.x = updated.x;
+        el.y = updated.y;
+      }
+    }
+    pushHistory();
+    bumpSceneRepaint();
+  };
+
+  const handleTextPropertiesChange = (elementId: string, properties: Partial<TextProperties>) => {
+    if (!scene) return;
+    const element = scene.getNonDeletedElementsMap().get(elementId);
+    if (!element) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const [key, value] of Object.entries(properties)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (element as any)[key] = value;
+    }
+
+    pushHistory();
+    bumpSceneRepaint();
+  };
+
+  // Phase 15: Layer Management
+  const syncLayersFromScene = () => {
+    if (!scene) return;
+    const elements = scene.getNonDeletedElements();
+    layers = elements.map((el, idx) => ({
+      id: el.id,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      name: (el as any).customLayerName || `Layer ${idx + 1}`,
+      visible: !el.isDeleted,
+      locked: el.locked || false,
+      opacity: el.opacity ?? 1,
+      type: 'element' as const,
+      order: idx,
+    }));
+  };
+
+  const handleLayerSelect = (layerId: string) => {
+    selectedLayerId = layerId;
+    // Select the element in the scene
+    if (scene) {
+      const element = scene.getNonDeletedElementsMap().get(layerId);
+      if (element) {
+        appState.selectedElementIds = { [layerId]: true };
+        bumpSceneRepaint();
+      }
+    }
+  };
+
+  const handleLayerVisibilityChange = (layerId: string, visible: boolean) => {
+    if (!scene) return;
+    const element = scene.getNonDeletedElementsMap().get(layerId);
+    if (!element) return;
+
+    element.isDeleted = !visible;
+    pushHistory();
+    bumpSceneRepaint();
+    syncLayersFromScene();
+  };
+
+  const handleLayerLockChange = (layerId: string, locked: boolean) => {
+    if (!scene) return;
+    const element = scene.getNonDeletedElementsMap().get(layerId);
+    if (!element) return;
+
+    element.locked = locked;
+    pushHistory();
+    bumpSceneRepaint();
+    syncLayersFromScene();
+  };
+
+  const handleLayerOpacityChange = (layerId: string, opacity: number) => {
+    if (!scene) return;
+    const element = scene.getNonDeletedElementsMap().get(layerId);
+    if (!element) return;
+
+    element.opacity = Math.max(0, Math.min(1, opacity));
+    pushHistory();
+    bumpSceneRepaint();
+    syncLayersFromScene();
   };
 
   // ── Z-order: bring forward / send backward / to front / to back ─────
@@ -2605,6 +3055,56 @@
         return;
       }
 
+      // Phase 12: Template selector: Ctrl+N (new with template)
+      if (!event.shiftKey && (event.key === "n" || event.key === "N")) {
+        showTemplateSelector = true;
+        event.preventDefault();
+        return;
+      }
+
+      // Phase 12: Recent files: Ctrl+R
+      if (!event.shiftKey && (event.key === "r" || event.key === "R")) {
+        showRecentFiles = true;
+        event.preventDefault();
+        return;
+      }
+
+      // Phase 12: Settings: Ctrl+,
+      if (!event.shiftKey && event.key === ",") {
+        showSettings = true;
+        event.preventDefault();
+        return;
+      }
+
+      // Phase 13: Connector tool: Ctrl+Shift+C
+      if (event.shiftKey && (event.key === "c" || event.key === "C")) {
+        connectorToolActive = !connectorToolActive;
+        selectedForConnection = null;
+        event.preventDefault();
+        return;
+      }
+
+      // Phase 13: Measurement panel: Ctrl+M
+      if (!event.shiftKey && (event.key === "m" || event.key === "M")) {
+        measurementPanelActive = !measurementPanelActive;
+        event.preventDefault();
+        return;
+      }
+
+      // Phase 13: Auto-Layout panel: Ctrl+L
+      if (!event.shiftKey && (event.key === "l" || event.key === "L")) {
+        autoLayoutPanelActive = !autoLayoutPanelActive;
+        event.preventDefault();
+        return;
+      }
+
+      // Phase 13: Text Editor panel: Ctrl+T
+      if (!event.shiftKey && (event.key === "t" || event.key === "T")) {
+        textEditorPanelActive = !textEditorPanelActive;
+        event.preventDefault();
+        return;
+      }
+
       // Z-order: Ctrl+] / Ctrl+[ (one step), Ctrl+Shift+] / Ctrl+Shift+[
       // (to front / to back). Matches upstream keybindings.
       if (event.key === "]") {
@@ -2701,6 +3201,59 @@
       }
     }
 
+    // ── Ctrl+Alt: Alignment & Distribution shortcuts ─────────────────
+    if ((event.ctrlKey || event.metaKey) && event.altKey) {
+      const key = event.key.toLowerCase();
+
+      // Alignment shortcuts
+      if (key === "l") {
+        handleAlign("left");
+        event.preventDefault();
+        return;
+      }
+      if (key === "c") {
+        handleAlign("centerH");
+        event.preventDefault();
+        return;
+      }
+      if (key === "r") {
+        handleAlign("right");
+        event.preventDefault();
+        return;
+      }
+      if (key === "t") {
+        handleAlign("top");
+        event.preventDefault();
+        return;
+      }
+      if (key === "m") {
+        handleAlign("centerV");
+        event.preventDefault();
+        return;
+      }
+      if (key === "b") {
+        handleAlign("bottom");
+        event.preventDefault();
+        return;
+      }
+    }
+
+    // ── Ctrl+Shift: Distribution shortcuts ───────────────────────────
+    if ((event.ctrlKey || event.metaKey) && event.shiftKey && !event.altKey) {
+      const key = event.key.toLowerCase();
+
+      if (key === "h") {
+        handleDistribute("distributeEvenlyH");
+        event.preventDefault();
+        return;
+      }
+      if (key === "v") {
+        handleDistribute("distributeEvenlyV");
+        event.preventDefault();
+        return;
+      }
+    }
+
     // ── Space → temporary pan mode ────────────────────────────────────
     // Pressing space toggles a "grab" cursor and makes pointerdown pan
     // instead of doing its tool-specific action.
@@ -2769,6 +3322,13 @@
     // Show help dialog on `?`.
     if (event.key === "?" || (event.key === "/" && event.shiftKey)) {
       helpDialogOpen = true;
+      event.preventDefault();
+      return;
+    }
+
+    // Show comprehensive help on F1.
+    if (event.key === "F1") {
+      showHelpPanel = true;
       event.preventDefault();
       return;
     }
@@ -4535,6 +5095,33 @@
             <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>S</kbd><span>Export PNG</span></div>
             <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd><span>Export SVG</span></div>
           </div>
+          <div class="hd-section">
+            <h4>Templates & Library</h4>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>N</kbd><span>New from template</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>R</kbd><span>Recent files</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>,</kbd><span>Settings</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>L</kbd><span>Toggle library</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd><span>New frame</span></div>
+          </div>
+          <div class="hd-section">
+            <h4>Advanced Tools (Phase 13)</h4>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd><span>Connector tool</span></div>
+            <h5 style="margin: 12px 0 8px; font-weight: 600; color: #666;">Alignment & Distribution</h5>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>L</kbd><span>Align left</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd><span>Align center</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>R</kbd><span>Align right</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd><span>Align top</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd><span>Align middle</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>B</kbd><span>Align bottom</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd><span>Distribute horizontally</span></div>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd><span>Distribute vertically</span></div>
+            <h5 style="margin: 12px 0 8px; font-weight: 600; color: #666;">Measurements & Dimensions</h5>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>M</kbd><span>Show/hide measurements panel</span></div>
+            <h5 style="margin: 12px 0 8px; font-weight: 600; color: #666;">Auto-Layout</h5>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>L</kbd><span>Show/hide auto-layout panel</span></div>
+            <h5 style="margin: 12px 0 8px; font-weight: 600; color: #666;">Advanced Text Features</h5>
+            <div class="hd-row"><kbd>Ctrl</kbd>+<kbd>T</kbd><span>Show/hide text editor panel</span></div>
+          </div>
         </div>
       </div>
     </div>
@@ -4659,6 +5246,103 @@
     <button
       type="button"
       class="sveltedraw-util-btn"
+      aria-label="New from template"
+      title="New from template (Ctrl+N)"
+      onclick={() => (showTemplateSelector = true)}
+    >
+      📋
+    </button>
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
+      aria-label="Recent files"
+      title="Recent files (Ctrl+R)"
+      onclick={() => (showRecentFiles = true)}
+    >
+      🕐
+    </button>
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
+      aria-label="Settings"
+      title="Settings (Ctrl+,)"
+      onclick={() => (showSettings = true)}
+    >
+      ⚙️
+    </button>
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
+      class:active={connectorToolActive}
+      aria-label="Connector tool"
+      title="Connector tool (Ctrl+Shift+C)"
+      onclick={() => (connectorToolActive = !connectorToolActive)}
+    >
+      ⚡
+    </button>
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
+      class:active={alignmentPanelActive}
+      aria-label="Alignment tool"
+      title="Alignment & Distribution (Ctrl+Alt+L, etc)"
+      onclick={() => (alignmentPanelActive = !alignmentPanelActive)}
+    >
+      ◫
+    </button>
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
+      class:active={measurementPanelActive}
+      aria-label="Measurements"
+      title="Measurements & Dimensions (Ctrl+M)"
+      onclick={() => (measurementPanelActive = !measurementPanelActive)}
+    >
+      📏
+    </button>
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
+      class:active={autoLayoutPanelActive}
+      aria-label="Auto Layout"
+      title="Auto Layout (Ctrl+L)"
+      onclick={() => (autoLayoutPanelActive = !autoLayoutPanelActive)}
+    >
+      🎯
+    </button>
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
+      class:active={textEditorPanelActive}
+      aria-label="Text Editor"
+      title="Text Properties (Ctrl+T)"
+      onclick={() => (textEditorPanelActive = !textEditorPanelActive)}
+    >
+      ✏️
+    </button>
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
+      class:active={gridPanelActive}
+      aria-label="Grid & Snap"
+      title="Grid & Snap Settings"
+      onclick={() => (gridPanelActive = !gridPanelActive)}
+    >
+      ⊞
+    </button>
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
+      class:active={layerPanelActive}
+      aria-label="Layers"
+      title="Layer Management"
+      onclick={() => (layerPanelActive = !layerPanelActive)}
+    >
+      📑
+    </button>
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
       aria-label="Toggle dark mode"
       title="Toggle dark mode"
       onclick={toggleTheme}
@@ -4675,7 +5359,112 @@
         <option value={lang.code}>{lang.label}</option>
       {/each}
     </select>
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
+      aria-label="Help"
+      title="Help (F1)"
+      onclick={() => (showHelpPanel = true)}
+    >
+      ❓
+    </button>
   </div>
+
+  <!-- Connector tool panel — Phase 13 -->
+  {#if connectorToolActive}
+    <div class="sveltedraw-connector-panel">
+      <ConnectorTool
+        {connectors}
+        {activeRoutingStyle}
+        onRoutingStyleChange={(style) => (activeRoutingStyle = style)}
+      />
+    </div>
+  {/if}
+
+  <!-- Alignment panel — Phase 13 Feature 2 -->
+  {#if alignmentPanelActive}
+    <div class="sveltedraw-alignment-panel">
+      <AlignmentPanel
+        selectedCount={getSelectedElements().length}
+        onAlign={handleAlign}
+        onDistribute={handleDistribute}
+      />
+    </div>
+  {/if}
+
+  <!-- Measurement panel — Phase 13 Feature 3 -->
+  {#if measurementPanelActive}
+    <div class="sveltedraw-measurement-panel">
+      <MeasurementPanel
+        selectedElements={getSelectedElements().map(el => ({
+          id: el.id,
+          x: el.x,
+          y: el.y,
+          width: el.width,
+          height: el.height,
+        }))}
+        config={measurementConfig}
+        onConfigChange={(newConfig) => (measurementConfig = newConfig)}
+      />
+    </div>
+  {/if}
+
+  <!-- Auto-Layout panel — Phase 13 Feature 4 -->
+  {#if autoLayoutPanelActive}
+    <div class="sveltedraw-autolayout-panel">
+      <AutoLayoutPanel
+        selectedCount={getSelectedElements().length}
+        onLayout={handleAutoLayout}
+      />
+    </div>
+  {/if}
+
+  <!-- Text Editor panel — Phase 13 Feature 5 -->
+  {#if textEditorPanelActive}
+    <div class="sveltedraw-texteditor-panel">
+      <TextEditorPanel
+        selectedElements={getSelectedElements().map(el => ({
+          id: el.id,
+          fontSize: el.fontSize,
+          fontFamily: el.fontFamily,
+          fontWeight: el.fontWeight,
+          fontStyle: el.fontStyle,
+          textDecoration: el.textDecoration,
+          textColor: el.textColor,
+          textAlignment: el.textAlignment,
+          lineHeight: el.lineHeight,
+          angle: el.angle,
+        }))}
+        onTextPropertiesChange={handleTextPropertiesChange}
+      />
+    </div>
+  {/if}
+
+  <!-- Grid & Snap panel — Phase 14 Feature 1 -->
+  {#if gridPanelActive}
+    <div class="sveltedraw-grid-panel">
+      <GridPanel
+        {gridConfig}
+        {snapConfig}
+        onGridConfigChange={(newConfig) => (gridConfig = newConfig)}
+        onSnapConfigChange={(newConfig) => (snapConfig = newConfig)}
+      />
+    </div>
+  {/if}
+
+  <!-- Layer panel — Phase 15 Feature 1 -->
+  {#if layerPanelActive}
+    <div class="sveltedraw-layer-panel">
+      <LayerPanel
+        {layers}
+        {selectedLayerId}
+        onLayerSelect={handleLayerSelect}
+        onLayerVisibilityChange={handleLayerVisibilityChange}
+        onLayerLockChange={handleLayerLockChange}
+        onLayerOpacityChange={handleLayerOpacityChange}
+      />
+    </div>
+  {/if}
 
   <!-- Library panel — floats bottom-left. Each item is a button that
        inserts the saved elements at viewport center. The × closes
@@ -4720,6 +5509,37 @@
         </div>
       {/if}
     </div>
+  {/if}
+
+  <!-- Template selector — modal for choosing pre-made templates. -->
+  {#if showTemplateSelector}
+    <TemplateSelector
+      onSelect={selectTemplate}
+      onClose={() => (showTemplateSelector = false)}
+    />
+  {/if}
+
+  <!-- Recent files panel — shows last 10 files. -->
+  {#if showRecentFiles}
+    <RecentFilesPanel
+      files={recentFiles}
+      onClose={() => (showRecentFiles = false)}
+      onDelete={deleteRecentFile}
+    />
+  {/if}
+
+  <!-- Settings panel — user preferences. -->
+  {#if showSettings}
+    <SettingsPanel
+      settings={appSettings}
+      onSettingsChange={updateSettings}
+      onClose={() => (showSettings = false)}
+    />
+  {/if}
+
+  <!-- Help panel — comprehensive documentation. -->
+  {#if showHelpPanel}
+    <HelpPanel onClose={() => (showHelpPanel = false)} />
   {/if}
 
   <!-- Style panel. Shown whenever the editor is mounted; changes apply
@@ -5105,6 +5925,29 @@
     renderConfig={undefined}
     render={noopRender}
   />
+
+  <!-- Grid Renderer — Phase 14 Feature 2 -->
+  <GridRenderer
+    {gridConfig}
+    width={appState.width}
+    height={appState.height}
+    zoomLevel={scale}
+    offsetX={0}
+    offsetY={0}
+  />
+
+  <!-- Snap Guide Renderer — Phase 14 Feature 3 -->
+  {#if snapConfig.guides && isDraggingForSnap && snapGuides.length > 0}
+    <!-- @ts-ignore -->
+    <SnapGuideRenderer
+      guides={snapGuides}
+      width={appState.width}
+      height={appState.height}
+      zoomLevel={scale}
+      offsetX={0}
+      offsetY={0}
+    />
+  {/if}
 
   <InteractiveCanvas
     appState={{
@@ -5966,5 +6809,123 @@
     height: 1px;
     background: #e5e7ea;
     margin: 4px 0;
+  }
+
+  .sveltedraw-connector-panel {
+    position: absolute;
+    bottom: 16px;
+    right: 20px;
+    width: 280px;
+    max-height: 50vh;
+    background: #fff;
+    border: 1px solid #d1d4da;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    z-index: 40;
+    overflow-y: auto;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-connector-panel {
+    background: #232329;
+    border-color: #363636;
+  }
+
+  .sveltedraw-alignment-panel {
+    position: absolute;
+    bottom: 16px;
+    right: 320px;
+    width: 320px;
+    max-height: 60vh;
+    background: #fff;
+    border: 1px solid #d1d4da;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    z-index: 40;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-alignment-panel {
+    background: #232329;
+    border-color: #363636;
+  }
+
+  .sveltedraw-measurement-panel {
+    position: absolute;
+    bottom: 16px;
+    right: 620px;
+    width: 280px;
+    max-height: 60vh;
+    background: #fff;
+    border: 1px solid #d1d4da;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    z-index: 40;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-measurement-panel {
+    background: #232329;
+    border-color: #363636;
+  }
+
+  .sveltedraw-autolayout-panel {
+    position: absolute;
+    bottom: 16px;
+    right: 920px;
+    width: 280px;
+    max-height: 70vh;
+    background: #fff;
+    border: 1px solid #d1d4da;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    z-index: 40;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-autolayout-panel {
+    background: #232329;
+    border-color: #363636;
+  }
+
+  .sveltedraw-texteditor-panel {
+    position: absolute;
+    bottom: 16px;
+    right: 1220px;
+    width: 280px;
+    max-height: 70vh;
+    background: #fff;
+    border: 1px solid #d1d4da;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    z-index: 40;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-texteditor-panel {
+    background: #232329;
+    border-color: #363636;
+  }
+
+  .sveltedraw-grid-panel {
+    position: absolute;
+    bottom: 16px;
+    right: 1520px;
+    width: 280px;
+    max-height: 60vh;
+    background: #fff;
+    border: 1px solid #d1d4da;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    z-index: 40;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-grid-panel {
+    background: #232329;
+    border-color: #363636;
+  }
+
+  .sveltedraw-layer-panel {
+    position: absolute;
+    bottom: 16px;
+    right: 1820px;
+    background: #fff;
+    border: 1px solid #d1d4da;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    z-index: 40;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-layer-panel {
+    background: #232329;
+    border-color: #363636;
   }
 </style>

@@ -1,0 +1,91 @@
+{
+  "name": "Organization Chart",
+  "description": "Hierarchical organization structure",
+  "thumbnail": "orgchart.png",
+  "elements": [
+    {
+      "type": "rectangle",
+      "x": 150,
+      "y": 20,
+      "width": 100,
+      "height": 50,
+      "text": "CEO",
+      "strokeColor": "#000000",
+      "backgroundColor": "#e3f2fd",
+      "fillStyle": "solid",
+      "strokeWidth": 2
+    },
+    {
+      "type": "rectangle",
+      "x": 50,
+      "y": 120,
+      "width": 90,
+      "height": 50,
+      "text": "VP Sales",
+      "strokeColor": "#000000",
+      "backgroundColor": "#f3e5f5",
+      "fillStyle": "solid",
+      "strokeWidth": 2
+    },
+    {
+      "type": "rectangle",
+      "x": 170,
+      "y": 120,
+      "width": 90,
+      "height": 50,
+      "text": "VP Tech",
+      "strokeColor": "#000000",
+      "backgroundColor": "#f3e5f5",
+      "fillStyle": "solid",
+      "strokeWidth": 2
+    },
+    {
+      "type": "rectangle",
+      "x": 290,
+      "y": 120,
+      "width": 90,
+      "height": 50,
+      "text": "VP Ops",
+      "strokeColor": "#000000",
+      "backgroundColor": "#f3e5f5",
+      "fillStyle": "solid",
+      "strokeWidth": 2
+    },
+    {
+      "type": "rectangle",
+      "x": 20,
+      "y": 220,
+      "width": 80,
+      "height": 40,
+      "text": "Sales Mgr",
+      "strokeColor": "#000000",
+      "backgroundColor": "#fff9c4",
+      "fillStyle": "solid",
+      "strokeWidth": 1
+    },
+    {
+      "type": "rectangle",
+      "x": 120,
+      "y": 220,
+      "width": 80,
+      "height": 40,
+      "text": "Engineer 1",
+      "strokeColor": "#000000",
+      "backgroundColor": "#fff9c4",
+      "fillStyle": "solid",
+      "strokeWidth": 1
+    },
+    {
+      "type": "rectangle",
+      "x": 220,
+      "y": 220,
+      "width": 80,
+      "height": 40,
+      "text": "Engineer 2",
+      "strokeColor": "#000000",
+      "backgroundColor": "#fff9c4",
+      "fillStyle": "solid",
+      "strokeWidth": 1
+    }
+  ]
+}

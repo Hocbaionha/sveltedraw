@@ -1,0 +1,91 @@
+{
+  "name": "Kanban Board",
+  "description": "Three-column workflow board (TODO, In Progress, Done)",
+  "thumbnail": "kanban.png",
+  "elements": [
+    {
+      "type": "rectangle",
+      "x": 20,
+      "y": 10,
+      "width": 120,
+      "height": 30,
+      "text": "TODO",
+      "strokeColor": "#e03131",
+      "backgroundColor": "#ffe0e0",
+      "fillStyle": "solid",
+      "strokeWidth": 2
+    },
+    {
+      "type": "rectangle",
+      "x": 160,
+      "y": 10,
+      "width": 120,
+      "height": 30,
+      "text": "IN PROGRESS",
+      "strokeColor": "#f59f00",
+      "backgroundColor": "#fff3bf",
+      "fillStyle": "solid",
+      "strokeWidth": 2
+    },
+    {
+      "type": "rectangle",
+      "x": 300,
+      "y": 10,
+      "width": 120,
+      "height": 30,
+      "text": "DONE",
+      "strokeColor": "#51cf66",
+      "backgroundColor": "#d4f8db",
+      "fillStyle": "solid",
+      "strokeWidth": 2
+    },
+    {
+      "type": "rectangle",
+      "x": 20,
+      "y": 60,
+      "width": 120,
+      "height": 50,
+      "text": "Task 1",
+      "strokeColor": "#e03131",
+      "backgroundColor": "#ffffff",
+      "fillStyle": "solid",
+      "strokeWidth": 1
+    },
+    {
+      "type": "rectangle",
+      "x": 20,
+      "y": 125,
+      "width": 120,
+      "height": 50,
+      "text": "Task 2",
+      "strokeColor": "#e03131",
+      "backgroundColor": "#ffffff",
+      "fillStyle": "solid",
+      "strokeWidth": 1
+    },
+    {
+      "type": "rectangle",
+      "x": 160,
+      "y": 60,
+      "width": 120,
+      "height": 50,
+      "text": "Task 3",
+      "strokeColor": "#f59f00",
+      "backgroundColor": "#ffffff",
+      "fillStyle": "solid",
+      "strokeWidth": 1
+    },
+    {
+      "type": "rectangle",
+      "x": 300,
+      "y": 60,
+      "width": 120,
+      "height": 50,
+      "text": "Task 4",
+      "strokeColor": "#51cf66",
+      "backgroundColor": "#ffffff",
+      "fillStyle": "solid",
+      "strokeWidth": 1
+    }
+  ]
+}

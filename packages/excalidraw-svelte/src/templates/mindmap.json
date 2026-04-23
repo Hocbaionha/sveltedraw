@@ -1,0 +1,67 @@
+{
+  "name": "Mind Map",
+  "description": "Radial mind map with central topic and branches",
+  "thumbnail": "mindmap.png",
+  "elements": [
+    {
+      "type": "ellipse",
+      "x": 175,
+      "y": 150,
+      "width": 100,
+      "height": 100,
+      "text": "Central Topic",
+      "strokeColor": "#6965db",
+      "backgroundColor": "#eeedfa",
+      "fillStyle": "solid",
+      "strokeWidth": 2
+    },
+    {
+      "type": "ellipse",
+      "x": 50,
+      "y": 50,
+      "width": 80,
+      "height": 60,
+      "text": "Branch 1",
+      "strokeColor": "#1890f9",
+      "backgroundColor": "#e6f7ff",
+      "fillStyle": "solid",
+      "strokeWidth": 1
+    },
+    {
+      "type": "ellipse",
+      "x": 320,
+      "y": 50,
+      "width": 80,
+      "height": 60,
+      "text": "Branch 2",
+      "strokeColor": "#1890f9",
+      "backgroundColor": "#e6f7ff",
+      "fillStyle": "solid",
+      "strokeWidth": 1
+    },
+    {
+      "type": "ellipse",
+      "x": 50,
+      "y": 250,
+      "width": 80,
+      "height": 60,
+      "text": "Branch 3",
+      "strokeColor": "#1890f9",
+      "backgroundColor": "#e6f7ff",
+      "fillStyle": "solid",
+      "strokeWidth": 1
+    },
+    {
+      "type": "ellipse",
+      "x": 320,
+      "y": 250,
+      "width": 80,
+      "height": 60,
+      "text": "Branch 4",
+      "strokeColor": "#1890f9",
+      "backgroundColor": "#e6f7ff",
+      "fillStyle": "solid",
+      "strokeWidth": 1
+    }
+  ]
+}
