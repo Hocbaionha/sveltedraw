@@ -41,6 +41,8 @@
 
 <script lang="ts">
   import { setContext, untrack, onMount } from "svelte";
+  import * as Y from "yjs";
+  import { WebsocketProvider } from "y-websocket";
   // @ts-ignore — upstream, resolved via Vite alias
   import { getDefaultAppState } from "@excalidraw/excalidraw/appState";
   // @ts-ignore — upstream
@@ -721,6 +723,69 @@
       ro = new ResizeObserver(() => measure());
       ro.observe(containerEl);
     }
+
+    // ── Phase 10: Real-time Collaboration with Yjs ──────────────────
+    // Initialize CRDT document for multi-user synchronization.
+    // Check for collaboration server URL (env var or query param).
+    const getCollabServerUrl = (): string | null => {
+      try {
+        const url = new URL(window.location.href);
+        const urlParam = url.searchParams.get("collab");
+        if (urlParam) return urlParam;
+      } catch {
+        // ignore
+      }
+      return import.meta.env.VITE_COLLAB_SERVER || null;
+    };
+
+    const collabServerUrl = getCollabServerUrl();
+    let provider: WebsocketProvider | null = null;
+    let ydoc: Y.Doc | null = null;
+
+    if (collabServerUrl) {
+      try {
+        // Create Yjs doc and map for elements
+        ydoc = new Y.Doc();
+        ymap = ydoc.getMap("excalidraw-elements");
+
+        // Connect to collaboration server
+        provider = new WebsocketProvider(collabServerUrl, "sveltedraw-room", ydoc);
+
+        // Set local awareness state (cursor, user info)
+        provider.awareness.setLocalState({
+          user: {
+            name: `User-${Math.random().toString(36).substr(2, 9)}`,
+            color: `#${Math.floor(Math.random() * 16777215).toString(16)}`,
+          },
+          cursor: null,
+        });
+
+        // Sync local elements to Yjs
+        const elements = scene?.getElementsIncludingDeleted() ?? [];
+        ymap!.set("elements", elements);
+
+        // Listen for remote changes
+        ymap!.observe((event: Y.YMapEvent<any>) => {
+          for (const [key, change] of event.changes.entries()) {
+            if (key === "elements" && change.action === "update") {
+              const remoteElements = ymap!.get("elements");
+              if (remoteElements && Array.isArray(remoteElements)) {
+                // Update scene with remote elements
+                scene?.replaceAllElements(
+                  remoteElements.map((el: any) => deepCopyElement(el)),
+                  { skipValidation: true }
+                );
+                bumpSceneRepaint();
+              }
+            }
+          }
+        });
+      } catch (err) {
+        console.warn("Collaboration setup failed:", err);
+        // Continue without collaboration if server unavailable
+      }
+    }
+
     window.addEventListener("resize", measure);
     measure();
 
@@ -748,6 +813,13 @@
       containerEl?.removeEventListener("touchstart", onTouchStart);
       containerEl?.removeEventListener("touchmove", onTouchMove);
       containerEl?.removeEventListener("touchend", onTouchEnd);
+      // Cleanup collaboration provider
+      if (provider) {
+        provider.destroy();
+      }
+      if (ydoc) {
+        ydoc.destroy();
+      }
       // Flush the pending save synchronously on unmount too.
       if (saveTimer) {
         clearTimeout(saveTimer);
@@ -960,6 +1032,7 @@
   };
   const history: HistorySnapshot[] = [];
   let historyIndex = -1;
+  let ymap: Y.Map<any> | null = null; // Phase 10: Collaboration map
   // Snapshots deep-clone all scene elements. A 100-element scene at
   // 1KB/element × 500 history entries ≈ 50MB — bounded. Without the
   // cap an active editing session leaks indefinitely. Using delta
@@ -1072,6 +1145,11 @@
     while (history.length > MAX_HISTORY) {
       history.shift();
       historyIndex--;
+    }
+    // Phase 10: Sync to collaboration server if connected
+    if (ymap) {
+      const elements = scene?.getElementsIncludingDeleted() ?? [];
+      ymap.set("elements", elements);
     }
     scheduleSave();
   };
