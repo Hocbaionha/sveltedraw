@@ -7030,9 +7030,11 @@
     gap: 8px;
   }
   .sveltedraw-style-panel .sp-label {
-    width: 50px;
+    width: 76px;
+    flex-shrink: 0;
     color: #5a5d66;
     font-weight: 500;
+    white-space: nowrap;
   }
   .sveltedraw-style-panel .sp-swatches {
     display: flex;
@@ -7478,11 +7480,14 @@
 
   .sveltedraw-utility-bar {
     position: absolute;
-    top: 12px;
+    top: 64px;
     right: 12px;
     display: flex;
     gap: 6px;
     z-index: 50;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: calc(100vw - 24px);
   }
   .sveltedraw-utility-bar .sveltedraw-util-btn {
     height: 30px;
