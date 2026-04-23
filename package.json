@@ -35,6 +35,8 @@
     "start": "yarn --cwd ./sveltedraw-app dev",
     "preview": "yarn --cwd ./sveltedraw-app preview",
     "smoke": "yarn --cwd ./sveltedraw-app smoke",
+    "test:puppeteer": "node ./scripts/test-runner.js --workers=4",
+    "test:puppeteer:fast": "node ./scripts/test-runner.js --workers=4 --fast",
     "test:all": "yarn test:typecheck && yarn test:other && yarn test:app --watch=false",
     "test:app": "vitest",
     "test:typecheck": "tsc",
