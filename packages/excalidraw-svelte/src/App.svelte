@@ -3449,6 +3449,54 @@
     return true;
   });
 
+  // Rectangles/diamonds support roundness (ADAPTIVE_RADIUS = type 3),
+  // linear supports roundness (PROPORTIONAL_RADIUS = type 2). Ellipse
+  // is already "round" so exclude it. Show the Edges toggle when any
+  // selected element can accept a roundness change.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const hasRoundableSelected = $derived.by<boolean>(() => {
+    void sceneReady;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ids = (appState as any).selectedElementIds ?? {};
+    if (!scene) return false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const el of scene.getNonDeletedElements() as any[]) {
+      if (!ids[el.id]) continue;
+      if (el.type === "line" || el.type === "arrow" ||
+          el.type === "rectangle" || el.type === "diamond") {
+        return true;
+      }
+    }
+    return false;
+  });
+
+  // Roundness type per element type (upstream ROUNDNESS constants):
+  //   linear  → 2 (PROPORTIONAL_RADIUS)
+  //   rect/diamond → 3 (ADAPTIVE_RADIUS)
+  const roundnessTypeFor = (el: { type: string }) =>
+    el.type === "line" || el.type === "arrow" ? 2 : 3;
+
+  const applyRoundnessToSelection = (round: boolean) => {
+    const selected = getSelectedElements();
+    if (selected.length === 0 || !scene) {
+      // No selection → update currentItemRoundness default.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (appState as any).currentItemRoundness = round ? { type: 3 } : null;
+      scheduleSave();
+      return;
+    }
+    for (const el of selected) {
+      if (el.type !== "line" && el.type !== "arrow" &&
+          el.type !== "rectangle" && el.type !== "diamond") {
+        continue;
+      }
+      const patch = round ? { roundness: { type: roundnessTypeFor(el) } } : { roundness: null };
+      scene.mutateElement(el, patch, { informMutation: false, isDragging: false });
+    }
+    pushHistory();
+    bumpSceneRepaint();
+  };
+
   // True iff selection is ENTIRELY linear — hide Fill / Fill style /
   // Background for those. Linear has stroke + arrowheads only.
   const allSelectedAreLinear = $derived.by<boolean>(() => {
@@ -6488,11 +6536,10 @@
       </div>
     {/if}
 
-    {#if hasLinearSelected}
-      <!-- Edge style: sharp corners vs smooth curves. Applies the
-           ROUNDNESS.PROPORTIONAL_RADIUS flag — rough.js reads it and
-           interpolates a smooth curve through the polyline points.
-           Null = sharp; {type: 2} = round. -->
+    {#if hasRoundableSelected}
+      <!-- Edge style: sharp corners vs smooth curves. applyRoundnessToSelection
+           picks the right roundness.type per element (ADAPTIVE for rectangles/
+           diamonds, PROPORTIONAL for lines/arrows). -->
       <div class="sp-row">
         <div class="sp-label">Edges</div>
         <div class="sp-swatches">
@@ -6504,7 +6551,7 @@
             data-value="sharp"
             aria-label="Sharp"
             title="Sharp"
-            onclick={() => applyStyle({ roundness: null })}
+            onclick={() => applyRoundnessToSelection(false)}
           >
             <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M4 14 L4 6 L16 6" stroke-linecap="round" stroke-linejoin="miter"/>
@@ -6518,7 +6565,7 @@
             data-value="round"
             aria-label="Round"
             title="Round"
-            onclick={() => applyStyle({ roundness: { type: 2 } })}
+            onclick={() => applyRoundnessToSelection(true)}
           >
             <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M4 14 Q4 6 10 6 L16 6" stroke-linecap="round" stroke-linejoin="round"/>
@@ -6526,7 +6573,9 @@
           </button>
         </div>
       </div>
+    {/if}
 
+    {#if hasLinearSelected}
       {#snippet arrowheadIcon(value: string | null, flip: boolean)}
         {#if value === null}
           <ArrowheadNoneIcon {flip} />
