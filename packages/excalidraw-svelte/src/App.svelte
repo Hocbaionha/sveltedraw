@@ -157,6 +157,19 @@
 
   const appState = $state<ShellAppState>(initial as ShellAppState);
 
+  // ── Phase 11: Frames (Page Management) ───────────────────────────────────
+  type Frame = {
+    id: string;
+    name: string;
+    elementIds: Set<string>;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  };
+  const frames = $state<Map<string, Frame>>(new Map());
+  let currentFrameId: string | null = $state(null);
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const patchAppState = (patch: Partial<ShellAppState>) => {
     for (const [k, v] of Object.entries(patch)) {
@@ -1225,6 +1238,58 @@
     if (historyIndex >= history.length - 1) return;
     historyIndex++;
     applySnapshot(history[historyIndex]);
+  };
+
+  // ── Frame management (Phase 11) ──────────────────────────────────────────
+  const createFrame = (name: string, x: number, y: number, w: number, h: number) => {
+    const id = randomId();
+    frames.set(id, {
+      id,
+      name,
+      elementIds: new Set(),
+      x,
+      y,
+      w,
+      h,
+    });
+    return id;
+  };
+
+  const deleteFrame = (frameId: string) => {
+    frames.delete(frameId);
+    if (currentFrameId === frameId) {
+      currentFrameId = frames.size > 0 ? Array.from(frames.keys())[0] : null;
+    }
+  };
+
+  const renameFrame = (frameId: string, name: string) => {
+    const frame = frames.get(frameId);
+    if (frame) {
+      frame.name = name;
+    }
+  };
+
+  const addElementToFrame = (frameId: string, elementId: string) => {
+    const frame = frames.get(frameId);
+    if (frame) {
+      frame.elementIds.add(elementId);
+    }
+  };
+
+  const removeElementFromFrame = (frameId: string, elementId: string) => {
+    const frame = frames.get(frameId);
+    if (frame) {
+      frame.elementIds.delete(elementId);
+    }
+  };
+
+  const switchFrame = (frameId: string) => {
+    if (frames.has(frameId)) {
+      currentFrameId = frameId;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (appState as any).selectedElementIds = {};
+      bumpSceneRepaint();
+    }
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2527,6 +2592,15 @@
       if (event.key === "g" || event.key === "G") {
         if (event.shiftKey) ungroupSelected();
         else groupSelected();
+        event.preventDefault();
+        return;
+      }
+
+      // Phase 11: New frame: Ctrl+Shift+F
+      if (event.shiftKey && (event.key === "f" || event.key === "F")) {
+        const name = `Frame ${frames.size + 1}`;
+        createFrame(name, 0, 0, 400, 300);
+        pushHistory();
         event.preventDefault();
         return;
       }
