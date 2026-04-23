@@ -102,7 +102,6 @@
     getPreferredLanguage,
     availableLanguages,
   } from "./state/i18n.svelte.js";
-  import ColorPicker from "./components/color-picker/ColorPicker.svelte";
   import FontPicker from "./components/font-picker/FontPicker.svelte";
   import type { FontDescriptor } from "./components/font-picker/types.js";
   import Icon from "./icons/Icon.svelte";
@@ -144,6 +143,8 @@
   import StyleSliderRow from "./components/StyleSliderRow.svelte";
   import PresetIconRow from "./components/PresetIconRow.svelte";
   import FormatRow from "./components/FormatRow.svelte";
+  import EdgesRow from "./components/EdgesRow.svelte";
+  import ColorRow from "./components/ColorRow.svelte";
   import LayerPanel from "./components/LayerPanel.svelte";
   import HistoryPanel from "./components/HistoryPanel.svelte";
   import ShapeLibraryPanel from "./components/ShapeLibraryPanel.svelte";
@@ -7258,50 +7259,36 @@
   <!-- Style panel. Shown whenever the editor is mounted; changes apply
        to the current selection OR to currentItem* defaults if none. -->
   <div class="sveltedraw-style-panel">
-    <div class="sp-row">
-      <div class="sp-label">{t("labels.stroke")}</div>
-      <div class="sp-picker">
-        <ColorPicker
-          type="elementStroke"
-          color={panelStyle.strokeColor}
-          label="Stroke"
-          elements={pickerElements}
-          updateData={() => {}}
-          open={strokePickerOpen}
-          onToggle={() => {
-            strokePickerOpen = !strokePickerOpen;
-            if (strokePickerOpen) bgPickerOpen = false;
-          }}
-          onClose={() => (strokePickerOpen = false)}
-          onChange={(c) => applyStyle({ strokeColor: c })}
-          onEyeDropperToggle={() => {}}
-          container={containerEl}
-        />
-      </div>
-    </div>
+    <ColorRow
+      label={t("labels.stroke")}
+      type="elementStroke"
+      color={panelStyle.strokeColor}
+      elements={pickerElements}
+      open={strokePickerOpen}
+      onToggle={() => {
+        strokePickerOpen = !strokePickerOpen;
+        if (strokePickerOpen) bgPickerOpen = false;
+      }}
+      onClose={() => (strokePickerOpen = false)}
+      onChange={(c) => applyStyle({ strokeColor: c })}
+      container={containerEl}
+    />
 
     {#if !allSelectedAreText && !allSelectedAreLinear}
-      <div class="sp-row">
-        <div class="sp-label">{t("labels.background")}</div>
-        <div class="sp-picker">
-          <ColorPicker
-            type="elementBackground"
-            color={panelStyle.backgroundColor}
-            label="Background"
-            elements={pickerElements}
-            updateData={() => {}}
-            open={bgPickerOpen}
-            onToggle={() => {
-              bgPickerOpen = !bgPickerOpen;
-              if (bgPickerOpen) strokePickerOpen = false;
-            }}
-            onClose={() => (bgPickerOpen = false)}
-            onChange={(c) => applyStyle({ backgroundColor: c })}
-            onEyeDropperToggle={() => {}}
-            container={containerEl}
-          />
-        </div>
-      </div>
+      <ColorRow
+        label={t("labels.background")}
+        type="elementBackground"
+        color={panelStyle.backgroundColor}
+        elements={pickerElements}
+        open={bgPickerOpen}
+        onToggle={() => {
+          bgPickerOpen = !bgPickerOpen;
+          if (bgPickerOpen) strokePickerOpen = false;
+        }}
+        onClose={() => (bgPickerOpen = false)}
+        onChange={(c) => applyStyle({ backgroundColor: c })}
+        container={containerEl}
+      />
     {/if}
 
     {#if !allSelectedAreText}
@@ -7360,42 +7347,10 @@
     {/if}
 
     {#if hasRoundableSelected}
-      <!-- Edge style: sharp corners vs smooth curves. applyRoundnessToSelection
-           picks the right roundness.type per element (ADAPTIVE for rectangles/
-           diamonds, PROPORTIONAL for lines/arrows). -->
-      <div class="sp-row">
-        <div class="sp-label">Edges</div>
-        <div class="sp-swatches">
-          <button
-            type="button"
-            class="sp-icon-btn"
-            class:active={!panelStyle.roundness}
-            data-preset="edges"
-            data-value="sharp"
-            aria-label="Sharp"
-            title="Sharp"
-            onclick={() => applyRoundnessToSelection(false)}
-          >
-            <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M4 14 L4 6 L16 6" stroke-linecap="round" stroke-linejoin="miter"/>
-            </svg>
-          </button>
-          <button
-            type="button"
-            class="sp-icon-btn"
-            class:active={!!panelStyle.roundness}
-            data-preset="edges"
-            data-value="round"
-            aria-label="Round"
-            title="Round"
-            onclick={() => applyRoundnessToSelection(true)}
-          >
-            <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M4 14 Q4 6 10 6 L16 6" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-        </div>
-      </div>
+      <EdgesRow
+        hasRoundness={!!panelStyle.roundness}
+        onSelect={applyRoundnessToSelection}
+      />
     {/if}
 
     {#if hasLinearSelected}
@@ -7420,42 +7375,26 @@
           <ArrowheadBarIcon {flip} />
         {/if}
       {/snippet}
-      <div class="sp-row">
-        <div class="sp-label">Start arrow</div>
-        <div class="sp-swatches">
-          {#each ARROWHEAD_PRESETS as a}
-            <button
-              type="button"
-              class="sp-icon-btn"
-              class:active={panelStyle.startArrowhead === a.value}
-              data-preset="startArrowhead"
-              data-value={a.value ?? "none"}
-              aria-label={`Start arrow ${a.name}`}
-              onclick={() => applyStyle({ startArrowhead: a.value })}
-            >
-              {@render arrowheadIcon(a.value, true)}
-            </button>
-          {/each}
-        </div>
-      </div>
-      <div class="sp-row">
-        <div class="sp-label">End arrow</div>
-        <div class="sp-swatches">
-          {#each ARROWHEAD_PRESETS as a}
-            <button
-              type="button"
-              class="sp-icon-btn"
-              class:active={panelStyle.endArrowhead === a.value}
-              data-preset="endArrowhead"
-              data-value={a.value ?? "none"}
-              aria-label={`End arrow ${a.name}`}
-              onclick={() => applyStyle({ endArrowhead: a.value })}
-            >
-              {@render arrowheadIcon(a.value, false)}
-            </button>
-          {/each}
-        </div>
-      </div>
+      <PresetIconRow
+        label="Start arrow"
+        presets={ARROWHEAD_PRESETS}
+        current={panelStyle.startArrowhead}
+        dataPreset="startArrowhead"
+        ariaLabelPrefix="Start arrow"
+        onSelect={(v) => applyStyle({ startArrowhead: v })}
+      >
+        {#snippet iconFor(a)}{@render arrowheadIcon(a.value, true)}{/snippet}
+      </PresetIconRow>
+      <PresetIconRow
+        label="End arrow"
+        presets={ARROWHEAD_PRESETS}
+        current={panelStyle.endArrowhead}
+        dataPreset="endArrowhead"
+        ariaLabelPrefix="End arrow"
+        onSelect={(v) => applyStyle({ endArrowhead: v })}
+      >
+        {#snippet iconFor(a)}{@render arrowheadIcon(a.value, false)}{/snippet}
+      </PresetIconRow>
     {/if}
 
     {#if hasTextSelected}
