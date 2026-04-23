@@ -136,9 +136,12 @@
   import LayerPanel from "./components/LayerPanel.svelte";
   import HistoryPanel from "./components/HistoryPanel.svelte";
   import ShapeLibraryPanel from "./components/ShapeLibraryPanel.svelte";
+  import PresentationMode from "./components/PresentationMode.svelte";
   import type { HistoryState } from "./history/types.js";
   import type { LibraryComponent, LibraryCategory } from "./library/types.js";
   import { getDefaultLibraryConfig, createLibraryComponent, getCategoryLabel } from "./library/types.js";
+  import type { PresentationSlide, PresentationConfig } from "./presentation/types.js";
+  import { getDefaultPresentationConfig, createPresentationSlide } from "./presentation/types.js";
   import type { Template } from "./templates/index.js";
   import type { Connector, RoutingStyle } from "./connectors/types.js";
   import { generateConnectorPath } from "./connectors/types.js";
@@ -1615,6 +1618,13 @@
   let librarySelectedCategory = $state('all');
   let librarySearchQuery = $state('');
 
+  // Phase 16 Feature 3: Presentation Mode
+  const presentationConfig = getDefaultPresentationConfig();
+  let presentationActive = $state(false);
+  let presentationSlides = $state<PresentationSlide[]>([]);
+  let presentationCurrentIndex = $state(0);
+  let presentationIsPlaying = $state(false);
+
   const loadLibrary = () => {
     try {
       const raw = localStorage.getItem(LIBRARY_KEY);
@@ -2301,6 +2311,52 @@
       reader.readAsText(file);
     };
     input.click();
+  };
+
+  // ── Phase 16 Feature 3: Presentation Mode ──────────────────────────
+  const handleStartPresentation = () => {
+    // Create slides from scene snapshots
+    if (!scene) return;
+    // In a full implementation, we'd segment the scene into logical slides
+    // For now, create a single slide from all elements
+    const slide = createPresentationSlide(
+      'Presentation',
+      scene.getNonDeletedElements(),
+      0,
+      'Press right arrow or space to navigate',
+    );
+    presentationSlides = [slide];
+    presentationActive = true;
+  };
+
+  const handlePresentationNextSlide = () => {
+    if (presentationCurrentIndex < presentationSlides.length - 1) {
+      presentationCurrentIndex += 1;
+    } else if (presentationConfig.loopOnEnd) {
+      presentationCurrentIndex = 0;
+    }
+  };
+
+  const handlePresentationPreviousSlide = () => {
+    if (presentationCurrentIndex > 0) {
+      presentationCurrentIndex -= 1;
+    }
+  };
+
+  const handlePresentationTogglePlayPause = () => {
+    presentationIsPlaying = !presentationIsPlaying;
+  };
+
+  const handlePresentationExit = () => {
+    presentationActive = false;
+    presentationIsPlaying = false;
+    presentationCurrentIndex = 0;
+  };
+
+  const handlePresentationSlideJump = (index: number) => {
+    if (index >= 0 && index < presentationSlides.length) {
+      presentationCurrentIndex = index;
+    }
   };
 
   // ── Z-order: bring forward / send backward / to front / to back ─────
@@ -5624,6 +5680,15 @@
     <button
       type="button"
       class="sveltedraw-util-btn"
+      aria-label="Presentation"
+      title="Start Presentation Mode"
+      onclick={handleStartPresentation}
+    >
+      🎬
+    </button>
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
       aria-label="Toggle dark mode"
       title="Toggle dark mode"
       onclick={toggleTheme}
@@ -5778,6 +5843,22 @@
         onImportLibrary={handleLibraryImport}
       />
     </div>
+  {/if}
+
+  <!-- Presentation Mode — Phase 16 Feature 3 -->
+  {#if presentationActive}
+    <PresentationMode
+      slides={presentationSlides}
+      currentSlideIndex={presentationCurrentIndex}
+      isPlaying={presentationIsPlaying}
+      showSlideNumbers={presentationConfig.showSlideNumbers}
+      showNotes={presentationConfig.showNotes}
+      onNextSlide={handlePresentationNextSlide}
+      onPreviousSlide={handlePresentationPreviousSlide}
+      onTogglePlayPause={handlePresentationTogglePlayPause}
+      onExit={handlePresentationExit}
+      onSlideJump={handlePresentationSlideJump}
+    />
   {/if}
 
   <!-- Library panel — floats bottom-left. Each item is a button that
