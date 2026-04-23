@@ -117,6 +117,34 @@ const delay = (ms) => new Promise((r) => setTimeout(r, ms));
     JSON.stringify(beforeRect) === JSON.stringify(afterRect),
     `before=${JSON.stringify(beforeRect)} after=${JSON.stringify(afterRect)}`);
 
+  // TEST 4': multi-select flips around SELECTION bbox (not per-element)
+  // Two rects side by side at (100,100) and (300,100), width 60 each.
+  // Selection bbox: x=[100,360], center=230. After horizontal flip:
+  // - r_a (left=100, right=160) → mirror around 230 → left=300, right=360
+  // - r_b (left=300, right=360) → mirror around 230 → left=100, right=160
+  // They SWAP horizontal slots.
+  const mkR = (id, x) => ({
+    id, type: 'rectangle', x, y: 100, width: 60, height: 60, angle: 0,
+    strokeColor: '#000', backgroundColor: '#ccc', fillStyle: 'solid',
+    strokeWidth: 2, strokeStyle: 'solid', roughness: 1, opacity: 100,
+    seed: 1, versionNonce: 1, version: 1, isDeleted: false,
+    groupIds: [], frameId: null, boundElements: null, updated: Date.now(),
+    link: null, locked: false, roundness: null,
+  });
+  await seed([mkR('r_a', 100), mkR('r_b', 300)]);
+  await page.evaluate(() => {
+    const p = window.__sveltedrawProbe;
+    p.appState.selectedElementIds = { r_a: true, r_b: true };
+    p.flipSelected('horizontal');
+  });
+  await delay(150);
+  const multi = await page.evaluate(() => ({
+    a: window.__sveltedrawProbe.scene.getElement('r_a').x,
+    b: window.__sveltedrawProbe.scene.getElement('r_b').x,
+  }));
+  log('multi-select horizontal flip swaps slots around selection bbox',
+    multi.a === 300 && multi.b === 100, JSON.stringify(multi));
+
   // TEST 5: locked arrow immune to flip
   await seed([mkArrow('arrL', [[0, 0], [100, 50]])]);
   await page.evaluate(() => {

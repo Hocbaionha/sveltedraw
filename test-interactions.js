@@ -141,8 +141,8 @@ const delay = (ms) => new Promise((r) => setTimeout(r, ms));
   // ============================================================
   console.log('\n── I4: flip × bound arrow ──');
   await seed([
-    mkRect('s1', 200, 200),
-    mkRect('s2', 600, 400),
+    mkRect('s1', 200, 200, { boundElements: [{ id: 'ar', type: 'arrow' }] }),
+    mkRect('s2', 600, 400, { boundElements: [{ id: 'ar', type: 'arrow' }] }),
     { id: 'ar', type: 'arrow', x: 260, y: 240, width: 400, height: 200,
       angle: 0, strokeColor: '#000', backgroundColor: 'transparent',
       fillStyle: 'solid', strokeWidth: 2, strokeStyle: 'solid',
@@ -171,11 +171,13 @@ const delay = (ms) => new Promise((r) => setTimeout(r, ms));
   log('flip arrow mirrors points',
     afterFlip.points[0][0] === 400 && afterFlip.points[1][0] === 0,
     JSON.stringify(afterFlip.points));
-  log('flip arrow KEEPS bindings (may re-route on next shape move)',
-    afterFlip.startBinding === 's1' && afterFlip.endBinding === 's2',
+  log('flip arrow SWAPS start/end bindings (was s1→s2, now s2→s1)',
+    afterFlip.startBinding === 's2' && afterFlip.endBinding === 's1',
     JSON.stringify(afterFlip));
 
-  // Now move s1 → does updateBoundElements re-route the flipped arrow?
+  // After flip+swap, moving s1 should update the arrow's END (since s1 is
+  // now the end-bound shape). The flip direction stays consistent.
+  const ptsBefore = afterFlip.points;
   await page.evaluate(() => {
     const p = window.__sveltedrawProbe;
     const s1 = p.scene.getElement('s1');
@@ -185,10 +187,15 @@ const delay = (ms) => new Promise((r) => setTimeout(r, ms));
   await delay(150);
   const afterMove = await page.evaluate(() => {
     const a = window.__sveltedrawProbe.scene.getElement('ar');
-    return { points: JSON.parse(JSON.stringify(a.points)) };
+    return {
+      points: JSON.parse(JSON.stringify(a.points)),
+      x: a.x, y: a.y,
+    };
   });
-  log('bound arrow re-routes after shape move (flipped state overwritten)',
-    afterMove.points !== null, JSON.stringify(afterMove));
+  log('bound arrow re-routes after shape move (x/y or points change)',
+    afterMove.x !== 260 || afterMove.y !== 240 ||
+    JSON.stringify(afterMove.points) !== JSON.stringify(ptsBefore),
+    `before pts=${JSON.stringify(ptsBefore)}; after=${JSON.stringify(afterMove)}`);
 
   // ============================================================
   // [I5] B1 frame × C2 flip: flip a frame (should be no-op)
@@ -475,7 +482,7 @@ const delay = (ms) => new Promise((r) => setTimeout(r, ms));
     ticksAt2x > 0, `ticks=${ticksAt2x}`);
 
   // ============================================================
-  // [I15] Multi-select × flip: each flips around own bbox
+  // [I15] Multi-select × flip: group mirrors around selection bbox
   // ============================================================
   console.log('\n── I15: multi-select × flip ──');
   const mkArrow = (id, x, y, pts) => ({
@@ -491,6 +498,8 @@ const delay = (ms) => new Promise((r) => setTimeout(r, ms));
     startBinding: null, endBinding: null,
     startArrowhead: null, endArrowhead: 'arrow', elbowed: false,
   });
+  // m1: x=[100,180], m2: x=[300,400]. Selection bbox x=[100,400], center=250.
+  // After H flip: m1 → x=[320,400], m2 → x=[100,200].
   await seed([
     mkArrow('m1', 100, 100, [[0, 0], [80, 40]]),
     mkArrow('m2', 300, 200, [[0, 0], [100, 50]]),
@@ -504,13 +513,17 @@ const delay = (ms) => new Promise((r) => setTimeout(r, ms));
   const multiFlip = await page.evaluate(() => {
     const p = window.__sveltedrawProbe;
     return {
-      m1: JSON.parse(JSON.stringify(p.scene.getElement('m1').points)),
-      m2: JSON.parse(JSON.stringify(p.scene.getElement('m2').points)),
+      m1x: p.scene.getElement('m1').x,
+      m2x: p.scene.getElement('m2').x,
+      m1pts: JSON.parse(JSON.stringify(p.scene.getElement('m1').points)),
+      m2pts: JSON.parse(JSON.stringify(p.scene.getElement('m2').points)),
     };
   });
-  log('each element flips around OWN bbox (m1 width=80, m2 width=100)',
-    multiFlip.m1[0][0] === 80 && multiFlip.m1[1][0] === 0 &&
-    multiFlip.m2[0][0] === 100 && multiFlip.m2[1][0] === 0,
+  log('multi-select flip mirrors positions around selection bbox',
+    multiFlip.m1x === 320 && multiFlip.m2x === 100,
+    JSON.stringify(multiFlip));
+  log('multi-select flip also mirrors per-element points',
+    multiFlip.m1pts[0][0] === 80 && multiFlip.m2pts[0][0] === 100,
     JSON.stringify(multiFlip));
 
   // ============================================================

@@ -3976,30 +3976,64 @@
   // Toggle lock on every selected element. Locked elements can't be
   // clicked / dragged / resized; they're essentially inert until
   // unlocked. Matches upstream's element.locked boolean field.
-  // C2: mirror selected elements across their own horizontal or vertical
-  // axis. Linear elements (line/arrow/freedraw) mirror their points array;
-  // images negate the corresponding scale axis; bbox shapes are visually
-  // symmetric so flipping is a no-op (skipped silently).
+  // C2: mirror selected elements. For a single selection, mirror around
+  // the element's own bbox (symmetric shapes are no-ops visually). For
+  // multi-select, mirror around the COMBINED bounding box of the
+  // selection — each element's points + position get reflected so the
+  // group as a whole flips rigidly, matching upstream Excalidraw UX.
   const flipSelected = (axis: "horizontal" | "vertical") => {
     if (!scene) return;
     const selected = getSelectedElements();
     if (selected.length === 0) return;
+    const flippables = (selected as any[]).filter((el) => !el.locked);
+    if (flippables.length === 0) return;
+    // Selection bbox (axis-aligned): the reflection axis that keeps the
+    // group centered. For single-selection this collapses to the element's
+    // own bbox, so behavior stays identical for the common case.
+    let selMinX = Infinity, selMinY = Infinity;
+    let selMaxX = -Infinity, selMaxY = -Infinity;
+    for (const el of flippables) {
+      selMinX = Math.min(selMinX, el.x);
+      selMinY = Math.min(selMinY, el.y);
+      selMaxX = Math.max(selMaxX, el.x + el.width);
+      selMaxY = Math.max(selMaxY, el.y + el.height);
+    }
+    const groupCenterX = (selMinX + selMaxX) / 2;
+    const groupCenterY = (selMinY + selMaxY) / 2;
     let mutated = 0;
-    for (const el of selected as any[]) {
-      if (el.locked) continue;
+    for (const el of flippables) {
       const w = el.width;
       const h = el.height;
+      // Reflect element position around the group axis. New top-left =
+      // (group axis) * 2 - (old right) for horizontal, similarly for
+      // vertical. This ensures the element ends up in the mirrored slot
+      // of the group bbox.
+      const newX = axis === "horizontal" ? 2 * groupCenterX - (el.x + w) : el.x;
+      const newY = axis === "vertical" ? 2 * groupCenterY - (el.y + h) : el.y;
+      const positionPatch =
+        newX !== el.x || newY !== el.y ? { x: newX, y: newY } : null;
       if (el.type === "line" || el.type === "arrow" || el.type === "freedraw") {
         const pts = (el.points ?? []) as number[][];
         const next = pts.map(([px, py]) => [
           axis === "horizontal" ? w - px : px,
           axis === "vertical" ? h - py : py,
         ]);
-        scene.mutateElement(
-          el,
-          { points: next },
-          { informMutation: false, isDragging: false },
-        );
+        // Line/arrow: swap endpoint metadata so "the other end" is still
+        // the other end. Without this, the next updateBoundElements call
+        // would re-route points back toward the original endpoints and
+        // visibly undo the flip.
+        const patch: any = { points: next, ...(positionPatch ?? {}) };
+        if (el.type === "arrow" || el.type === "line") {
+          if (el.startBinding || el.endBinding) {
+            patch.startBinding = el.endBinding ?? null;
+            patch.endBinding = el.startBinding ?? null;
+          }
+          if (el.startArrowhead !== undefined || el.endArrowhead !== undefined) {
+            patch.startArrowhead = el.endArrowhead ?? null;
+            patch.endArrowhead = el.startArrowhead ?? null;
+          }
+        }
+        scene.mutateElement(el, patch, { informMutation: false, isDragging: false });
         mutated++;
       } else if (el.type === "image") {
         const cur = (el.scale ?? [1, 1]) as number[];
@@ -4009,13 +4043,20 @@
         ];
         scene.mutateElement(
           el,
-          { scale: next },
+          { scale: next, ...(positionPatch ?? {}) },
           { informMutation: false, isDragging: false },
         );
         mutated++;
+      } else if (positionPatch) {
+        // Symmetric bbox shapes (rectangle/diamond/ellipse/text): the
+        // shape itself is mirror-identical, but in a multi-select it
+        // still needs to swap SLOTS in the group bbox so the group
+        // flips as a whole. Skip entirely for single-select where
+        // positionPatch is null.
+        scene.mutateElement(el, positionPatch,
+          { informMutation: false, isDragging: false });
+        mutated++;
       }
-      // rectangle / diamond / ellipse / text are visually symmetric across
-      // both axes when un-rotated; skip them.
     }
     if (mutated > 0) {
       pushHistory();
