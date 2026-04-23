@@ -137,11 +137,14 @@
   import HistoryPanel from "./components/HistoryPanel.svelte";
   import ShapeLibraryPanel from "./components/ShapeLibraryPanel.svelte";
   import PresentationMode from "./components/PresentationMode.svelte";
+  import ExportPanel from "./components/ExportPanel.svelte";
   import type { HistoryState } from "./history/types.js";
   import type { LibraryComponent, LibraryCategory } from "./library/types.js";
   import { getDefaultLibraryConfig, createLibraryComponent, getCategoryLabel } from "./library/types.js";
   import type { PresentationSlide, PresentationConfig } from "./presentation/types.js";
   import { getDefaultPresentationConfig, createPresentationSlide } from "./presentation/types.js";
+  import type { ExportOptions, ExportPreset } from "./export/types.js";
+  import { getDefaultExportOptions, EXPORT_PRESETS, getDefaultBatchExportConfig } from "./export/types.js";
   import type { Template } from "./templates/index.js";
   import type { Connector, RoutingStyle } from "./connectors/types.js";
   import { generateConnectorPath } from "./connectors/types.js";
@@ -1625,6 +1628,12 @@
   let presentationCurrentIndex = $state(0);
   let presentationIsPlaying = $state(false);
 
+  // Phase 16 Feature 4: Export Enhancements
+  let exportPanelActive = $state(false);
+  let exportOptions = $state<ExportOptions>(getDefaultExportOptions());
+  let exportPresets = $state<ExportPreset[]>(EXPORT_PRESETS);
+  let batchExportConfig = $state(getDefaultBatchExportConfig());
+
   const loadLibrary = () => {
     try {
       const raw = localStorage.getItem(LIBRARY_KEY);
@@ -2357,6 +2366,83 @@
     if (index >= 0 && index < presentationSlides.length) {
       presentationCurrentIndex = index;
     }
+  };
+
+  // ── Phase 16 Feature 4: Export Enhancements ──────────────────────────
+  const handleExport = (options: ExportOptions) => {
+    if (!scene) return;
+
+    const elements = scene.getNonDeletedElements();
+    let content = '';
+
+    switch (options.format) {
+      case 'json':
+        // Export as JSON data
+        content = JSON.stringify(elements, null, 2);
+        const jsonBlob = new Blob([content], { type: 'application/json' });
+        downloadFile(jsonBlob, options.fileName + '.json');
+        break;
+
+      case 'svg':
+        // Export as SVG
+        content = generateSVG(elements, options);
+        const svgBlob = new Blob([content], { type: 'image/svg+xml' });
+        downloadFile(svgBlob, options.fileName + '.svg');
+        break;
+
+      case 'png':
+        // Export as PNG (requires canvas rendering)
+        exportCanvasAsPNG(options);
+        break;
+
+      case 'pdf':
+        // Export as PDF
+        content = 'PDF export requires PDF library integration';
+        console.log('PDF export:', content);
+        break;
+    }
+
+    exportPanelActive = false;
+  };
+
+  const downloadFile = (blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const generateSVG = (elements: any[], options: ExportOptions): string => {
+    // Basic SVG generation
+    let svg = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+    svg += `<svg xmlns="http://www.w3.org/2000/svg" width="${options.width}" height="${options.height}" viewBox="0 0 ${options.width} ${options.height}">\n`;
+
+    if (options.includeBackground) {
+      svg += `  <rect width="${options.width}" height="${options.height}" fill="white"/>\n`;
+    }
+
+    // Add border if requested
+    if (options.includeBorder) {
+      svg += `  <rect x="${options.borderWidth / 2}" y="${options.borderWidth / 2}" `;
+      svg += `width="${options.width - options.borderWidth}" height="${options.height - options.borderWidth}" `;
+      svg += `stroke="${options.borderColor}" stroke-width="${options.borderWidth}" fill="none"/>\n`;
+    }
+
+    // Simple placeholder for elements
+    svg += `  <!-- ${elements.length} elements -->\n`;
+    svg += `</svg>`;
+    return svg;
+  };
+
+  const exportCanvasAsPNG = (options: ExportOptions) => {
+    // In a real implementation, this would render to canvas and export as PNG
+    console.log('PNG export:', options.fileName + '.png');
+    const blob = new Blob(['PNG export not yet implemented'], { type: 'image/png' });
+    downloadFile(blob, options.fileName + '.png');
   };
 
   // ── Z-order: bring forward / send backward / to front / to back ─────
@@ -5689,6 +5775,15 @@
     <button
       type="button"
       class="sveltedraw-util-btn"
+      aria-label="Export"
+      title="Export Drawing"
+      onclick={() => (exportPanelActive = true)}
+    >
+      💾
+    </button>
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
       aria-label="Toggle dark mode"
       title="Toggle dark mode"
       onclick={toggleTheme}
@@ -5858,6 +5953,28 @@
       onTogglePlayPause={handlePresentationTogglePlayPause}
       onExit={handlePresentationExit}
       onSlideJump={handlePresentationSlideJump}
+    />
+  {/if}
+
+  <!-- Export Panel — Phase 16 Feature 4 -->
+  {#if exportPanelActive}
+    <ExportPanel
+      options={exportOptions}
+      presets={exportPresets}
+      elementCount={scene ? scene.getNonDeletedElements().length : 0}
+      onExport={handleExport}
+      onOptionsChange={(opts) => (exportOptions = opts)}
+      onPresetSelect={(preset) => {
+        exportOptions = {
+          ...exportOptions,
+          format: preset.format,
+          width: preset.width,
+          height: preset.height,
+          scale: preset.scale,
+          quality: preset.quality,
+        };
+      }}
+      onClose={() => (exportPanelActive = false)}
     />
   {/if}
 
