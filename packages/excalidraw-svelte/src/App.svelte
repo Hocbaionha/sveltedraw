@@ -135,7 +135,10 @@
   import SnapGuideRenderer from "./components/SnapGuideRenderer.svelte";
   import LayerPanel from "./components/LayerPanel.svelte";
   import HistoryPanel from "./components/HistoryPanel.svelte";
+  import ShapeLibraryPanel from "./components/ShapeLibraryPanel.svelte";
   import type { HistoryState } from "./history/types.js";
+  import type { LibraryComponent, LibraryCategory } from "./library/types.js";
+  import { getDefaultLibraryConfig, createLibraryComponent, getCategoryLabel } from "./library/types.js";
   import type { Template } from "./templates/index.js";
   import type { Connector, RoutingStyle } from "./connectors/types.js";
   import { generateConnectorPath } from "./connectors/types.js";
@@ -1604,6 +1607,14 @@
   let editorHistory = $state<HistoryState[]>([]);
   let historyCurrentIndex = $state(0);
 
+  // Phase 16 Feature 2: Shape Library & Component Manager
+  const libraryConfig = getDefaultLibraryConfig();
+  let libraryPanelActive = $state(false);
+  let libraryComponents = $state<LibraryComponent[]>([]);
+  let libraryCategories = $state<LibraryCategory[]>(libraryConfig.defaultCategories);
+  let librarySelectedCategory = $state('all');
+  let librarySearchQuery = $state('');
+
   const loadLibrary = () => {
     try {
       const raw = localStorage.getItem(LIBRARY_KEY);
@@ -2229,6 +2240,67 @@
   const handleHistoryClear = () => {
     editorHistory = [];
     historyCurrentIndex = 0;
+  };
+
+  // ── Phase 16 Feature 2: Library Management ─────────────────────────
+  const handleSaveComponentToLibrary = () => {
+    const selected = getSelectedElements();
+    if (selected.length === 0) return;
+
+    const name = window.prompt('Component name', `Component ${libraryComponents.length + 1}`);
+    if (name === null) return;
+
+    const category = librarySelectedCategory === 'all' ? 'custom' : librarySelectedCategory;
+    const component = createLibraryComponent(name, category, selected);
+    libraryComponents = [...libraryComponents, component];
+  };
+
+  const handleLibraryComponentSelect = (component: LibraryComponent) => {
+    if (!scene) return;
+    // In a real implementation, we'd insert the component elements at viewport center
+    // For now, just increment usage count
+    const index = libraryComponents.findIndex(c => c.id === component.id);
+    if (index !== -1) {
+      libraryComponents[index].usage += 1;
+    }
+  };
+
+  const handleLibraryComponentDelete = (componentId: string) => {
+    libraryComponents = libraryComponents.filter(c => c.id !== componentId);
+  };
+
+  const handleLibraryExport = () => {
+    const json = JSON.stringify(libraryComponents, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `shape-library-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleLibraryImport = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const imported = JSON.parse(ev.target?.result as string);
+          if (Array.isArray(imported)) {
+            libraryComponents = [...libraryComponents, ...imported];
+          }
+        } catch (err) {
+          console.error('Failed to import library:', err);
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
   };
 
   // ── Z-order: bring forward / send backward / to front / to back ─────
@@ -5542,6 +5614,16 @@
     <button
       type="button"
       class="sveltedraw-util-btn"
+      class:active={libraryPanelActive}
+      aria-label="Shape Library"
+      title="Shape Library & Components"
+      onclick={() => (libraryPanelActive = !libraryPanelActive)}
+    >
+      📚
+    </button>
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
       aria-label="Toggle dark mode"
       title="Toggle dark mode"
       onclick={toggleTheme}
@@ -5676,6 +5758,24 @@
         currentIndex={historyCurrentIndex}
         onJumpToState={handleHistoryJump}
         onClearHistory={handleHistoryClear}
+      />
+    </div>
+  {/if}
+
+  <!-- Shape Library panel — Phase 16 Feature 2 -->
+  {#if libraryPanelActive}
+    <div class="sveltedraw-shape-library-panel">
+      <ShapeLibraryPanel
+        components={libraryComponents}
+        categories={libraryCategories}
+        selectedCategoryId={librarySelectedCategory}
+        searchQuery={librarySearchQuery}
+        onSelectComponent={handleLibraryComponentSelect}
+        onDeleteComponent={handleLibraryComponentDelete}
+        onCategoryChange={(id) => (librarySelectedCategory = id)}
+        onSearchChange={(q) => (librarySearchQuery = q)}
+        onExportLibrary={handleLibraryExport}
+        onImportLibrary={handleLibraryImport}
       />
     </div>
   {/if}
@@ -7154,6 +7254,21 @@
     z-index: 40;
   }
   :global(.excalidraw.theme--dark) .sveltedraw-history-panel {
+    background: #232329;
+    border-color: #363636;
+  }
+
+  .sveltedraw-shape-library-panel {
+    position: absolute;
+    bottom: 16px;
+    right: 2420px;
+    background: #fff;
+    border: 1px solid #d1d4da;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    z-index: 40;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-shape-library-panel {
     background: #232329;
     border-color: #363636;
   }
