@@ -2064,8 +2064,22 @@
       const element = scene.getNonDeletedElementsMap().get(layerId);
       if (element) {
         appState.selectedElementIds = { [layerId]: true };
+        // Highlight the element visually
         bumpSceneRepaint();
       }
+    }
+  };
+
+  const syncSelectionFromCanvas = () => {
+    // When canvas selection changes, update layer selection
+    const selected = getSelectedElements();
+    if (selected.length === 1) {
+      selectedLayerId = selected[0].id;
+    } else if (selected.length === 0) {
+      selectedLayerId = null;
+    } else {
+      // Multiple elements selected - highlight first
+      selectedLayerId = selected[0].id;
     }
   };
 

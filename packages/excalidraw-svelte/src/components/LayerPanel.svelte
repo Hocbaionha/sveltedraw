@@ -76,6 +76,7 @@
               <div
                 class="lp-item lp-group-header"
                 class:selected={selectedLayerId === layer.id}
+                data-layer-id={layer.id}
                 role="button"
                 tabindex="0"
                 onmousedown={() => onLayerSelect(layer.id)}
@@ -402,14 +403,25 @@
   }
 
   .lp-item.selected {
-    background: #dde4f0;
+    background: #e3e8f8;
     border-left: 3px solid #6965db;
     padding-left: 5px;
+    box-shadow: inset 0 0 0 1px #6965db;
   }
 
   :global(.excalidraw.theme--dark) .lp-item.selected {
-    background: #2d3748;
+    background: #3d4658;
     border-left-color: #7c7cff;
+    box-shadow: inset 0 0 0 1px #7c7cff;
+  }
+
+  .lp-group-header.selected {
+    background: #e3e8f8;
+    font-weight: 600;
+  }
+
+  :global(.excalidraw.theme--dark) .lp-group-header.selected {
+    background: #3d4658;
   }
 
   .lp-visibility,
