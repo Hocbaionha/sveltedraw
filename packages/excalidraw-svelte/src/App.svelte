@@ -136,6 +136,9 @@
   import GridPanel from "./components/GridPanel.svelte";
   import GridRenderer from "./components/GridRenderer.svelte";
   import SnapGuideRenderer from "./components/SnapGuideRenderer.svelte";
+  import LaserOverlay from "./components/LaserOverlay.svelte";
+  import MeasurementOverlay from "./components/MeasurementOverlay.svelte";
+  import LinkChip from "./components/LinkChip.svelte";
   import LayerPanel from "./components/LayerPanel.svelte";
   import HistoryPanel from "./components/HistoryPanel.svelte";
   import ShapeLibraryPanel from "./components/ShapeLibraryPanel.svelte";
@@ -156,7 +159,6 @@
   import type { AlignmentType, DistributionType, AlignmentGuide } from "./alignment/types.js";
   import { calculateAlignmentGuides, alignElements, distributeElements } from "./alignment/types.js";
   import type { MeasurementConfig } from "./measurements/types.js";
-  import { formatMeasurement } from "./measurements/types.js";
   import type { LayoutConfig } from "./autolayout/types.js";
   import { calculateLayout, applyLayout } from "./autolayout/types.js";
   import type { GridConfig, SnapConfig } from "./snap/types.js";
@@ -3895,6 +3897,20 @@
     return (scene.getNonDeletedElements() as any[]).filter(
       (el) => ids[el.id] && (el.type === "line" || el.type === "arrow"),
     );
+  });
+
+  // Reactive version of getSelectedElements() for prop-passing to child
+  // components. Inline getSelectedElements() call sites don't track ID
+  // changes across the function boundary, so props derived from them
+  // go stale. Use this whenever a child component needs the live list.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const selectedElementsReactive = $derived.by<any[]>(() => {
+    void sceneReady;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ids = (appState as any).selectedElementIds ?? {};
+    if (!scene) return [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (scene.getNonDeletedElements() as any[]).filter((el) => ids[el.id]);
   });
 
   // Text-only: shows text-alignment rows. Same inline-proxy-access
@@ -7762,23 +7778,13 @@
     render={noopRender}
   />
 
-  <!-- A1: link chip overlay. `linkedSelected` is a $derived that reads
-       sceneReady explicitly so it recomputes after mutateElement bumps. -->
-  {#each linkedSelected as el (el.id)}
-    {@const zoomV = (appState.zoom as any).value ?? 1}
-    {@const cx = (el.x + el.width + ((appState.scrollX as any) ?? 0)) * zoomV}
-    {@const cy = (el.y + ((appState.scrollY as any) ?? 0)) * zoomV}
-    <a
-      class="sveltedraw-link-chip"
-      style="left: {Math.max(cx - 180, 8)}px; top: {Math.max(cy - 28, 8)}px;"
-      href={(el as any).link}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={(el as any).link}
-    >
-      🔗 {(el as any).link}
-    </a>
-  {/each}
+  <!-- A1: link chip overlay — extracted to LinkChip.svelte. -->
+  <LinkChip
+    linked={linkedSelected}
+    zoom={(appState.zoom as any).value ?? 1}
+    scrollX={((appState.scrollX as any) ?? 0)}
+    scrollY={((appState.scrollY as any) ?? 0)}
+  />
 
   <!-- Grid Renderer — Phase 14 Feature 2 -->
   <GridRenderer
@@ -7803,126 +7809,30 @@
     />
   {/if}
 
-  <!-- A5: measurement overlays (rulers / dimensions / distances). All three
-       render as one absolutely-positioned SVG. Outer {#if} reads sceneReady
-       so mutateElement bumps trigger a rerender — otherwise resize/move
-       don't update the dimension/distance labels since el.width reads
-       happen inside non-reactive {@const} evaluation. -->
-  {#if (sceneReady >= 0) && (measurementConfig.showRulers || ((measurementConfig.showDimensions || measurementConfig.showDistances) && getSelectedElements().length >= 1))}
-    {@const zoomV = (appState.zoom as any).value ?? 1}
-    {@const scX = ((appState.scrollX as any) ?? 0)}
-    {@const scY = ((appState.scrollY as any) ?? 0)}
-    {@const measSelected = getSelectedElements()}
-    {@const showRulers = measurementConfig.showRulers}
-    {@const showDims = measurementConfig.showDimensions && measSelected.length >= 1}
-    {@const showDists = measurementConfig.showDistances && measSelected.length >= 2}
-    <svg
-      class="sveltedraw-measurement-overlay"
-      width={appState.width}
-      height={appState.height}
-      viewBox="0 0 {appState.width} {appState.height}"
-    >
-      {#if showRulers}
-        {@const RULER_SIZE = 20}
-        {@const tickStep = Math.max(gridConfig.size, 1)}
-        <!-- Ruler backgrounds -->
-        <rect x="0" y="0" width={appState.width} height={RULER_SIZE}
-              fill="rgba(255,255,255,0.92)" stroke="#d1d4da" />
-        <rect x="0" y="0" width={RULER_SIZE} height={appState.height}
-              fill="rgba(255,255,255,0.92)" stroke="#d1d4da" />
-        <!-- Horizontal ticks -->
-        {#each Array.from({ length: Math.ceil(appState.width / (tickStep * zoomV)) + 2 }) as _, i}
-          {@const sceneX = Math.floor(-scX / tickStep) * tickStep + i * tickStep}
-          {@const vx = (sceneX + scX) * zoomV}
-          {#if vx >= RULER_SIZE && vx <= appState.width}
-            <line x1={vx} y1={RULER_SIZE - 6} x2={vx} y2={RULER_SIZE}
-                  stroke="#888" stroke-width="1" />
-            <text x={vx + 2} y={12} font-size="9" fill="#666"
-                  font-family="system-ui, -apple-system, sans-serif">
-              {formatMeasurement(sceneX, measurementConfig.unit, 0)}
-            </text>
-          {/if}
-        {/each}
-        <!-- Vertical ticks -->
-        {#each Array.from({ length: Math.ceil(appState.height / (tickStep * zoomV)) + 2 }) as _, i}
-          {@const sceneY = Math.floor(-scY / tickStep) * tickStep + i * tickStep}
-          {@const vy = (sceneY + scY) * zoomV}
-          {#if vy >= RULER_SIZE && vy <= appState.height}
-            <line x1={RULER_SIZE - 6} y1={vy} x2={RULER_SIZE} y2={vy}
-                  stroke="#888" stroke-width="1" />
-            <text x={2} y={vy + 10} font-size="9" fill="#666"
-                  font-family="system-ui, -apple-system, sans-serif">
-              {formatMeasurement(sceneY, measurementConfig.unit, 0)}
-            </text>
-          {/if}
-        {/each}
-      {/if}
+  <!-- A5: measurement overlays — extracted to MeasurementOverlay.svelte.
+       Uses selectedElementsReactive (a $derived) so prop updates track
+       selection + scene mutations across the component boundary. -->
+  <MeasurementOverlay
+    config={measurementConfig}
+    selected={selectedElementsReactive}
+    zoom={(appState.zoom as any).value ?? 1}
+    scrollX={((appState.scrollX as any) ?? 0)}
+    scrollY={((appState.scrollY as any) ?? 0)}
+    gridSize={gridConfig.size}
+    width={appState.width}
+    height={appState.height}
+    sceneNonce={sceneReady}
+  />
 
-      {#if showDims}
-        {#each measSelected as el, i (el.id + ":" + sceneReady)}
-          <text class="sveltedraw-measurement-dimension"
-                x={(el.x + el.width / 2 + scX) * zoomV}
-                y={(el.y + scY) * zoomV - 8}
-                text-anchor="middle" font-size="11"
-                font-family="system-ui, -apple-system, sans-serif"
-                fill="#6965db" font-weight="600">
-            {formatMeasurement(el.width, measurementConfig.unit, measurementConfig.precision)} × {formatMeasurement(el.height, measurementConfig.unit, measurementConfig.precision)}
-          </text>
-        {/each}
-      {/if}
-
-      {#if showDists}
-        {#each measSelected.slice(1) as el, i (el.id + ":" + sceneReady)}
-          {@const a = measSelected[i]}
-          {@const b = el}
-          {@const ax = (a.x + a.width / 2 + scX) * zoomV}
-          {@const ay = (a.y + a.height / 2 + scY) * zoomV}
-          {@const bx = (b.x + b.width / 2 + scX) * zoomV}
-          {@const by = (b.y + b.height / 2 + scY) * zoomV}
-          {@const d = Math.hypot(bx - ax, by - ay) / zoomV}
-          <line class="sveltedraw-measurement-distance"
-                x1={ax} y1={ay} x2={bx} y2={by}
-                stroke="#6965db" stroke-width="1.5"
-                stroke-dasharray="4 3" />
-          <text x={(ax + bx) / 2} y={(ay + by) / 2 - 6}
-                text-anchor="middle" font-size="11"
-                font-family="system-ui, -apple-system, sans-serif"
-                fill="#6965db" font-weight="600">
-            d = {formatMeasurement(d, measurementConfig.unit, measurementConfig.precision)}
-          </text>
-        {/each}
-      {/if}
-    </svg>
-  {/if}
-
-  <!-- A2: laser pointer overlay. Polyline with per-segment opacity fading
-       over LASER_FADE_MS. Pointer-events: none so it never swallows clicks.
-       Void-read laserFrame so the RAF loop continuously refreshes opacity
-       even when the pointer stops moving. -->
-  {#if laserActive || laserTrail.length > 0}
-    <svg
-      class="sveltedraw-laser-overlay"
-      data-laser-frame={laserFrame}
-      width={appState.width}
-      height={appState.height}
-      viewBox="0 0 {appState.width} {appState.height}"
-    >
-      {#each laserTrail as p, i (p.t)}
-        {#if i > 0}
-          {@const prev = laserTrail[i - 1]}
-          {@const age = performance.now() - p.t}
-          {@const opacity = Math.max(0, 1 - age / LASER_FADE_MS)}
-          <line
-            x1={prev.x} y1={prev.y} x2={p.x} y2={p.y}
-            stroke="#ff3b30"
-            stroke-width="4"
-            stroke-linecap="round"
-            stroke-opacity={opacity}
-          />
-        {/if}
-      {/each}
-    </svg>
-  {/if}
+  <!-- A2: laser pointer overlay — extracted to LaserOverlay.svelte. -->
+  <LaserOverlay
+    active={laserActive}
+    trail={laserTrail}
+    frame={laserFrame}
+    fadeMs={LASER_FADE_MS}
+    width={appState.width}
+    height={appState.height}
+  />
 
   <InteractiveCanvas
     appState={{
@@ -8187,37 +8097,12 @@
 
   /* A1: link chip — shown over a selected linked element so the user can
      jump to the URL without opening the dialog. */
-  .sveltedraw-link-chip {
-    position: absolute;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    background: #1e1e1e;
-    color: #fff;
-    border-radius: 14px;
-    font: 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    text-decoration: none;
-    white-space: nowrap;
-    max-width: 280px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-    z-index: 60;
-    cursor: pointer;
-  }
-  .sveltedraw-link-chip:hover { background: #2b2b2b; }
-  .sveltedraw-link-chip:focus-visible { outline: 2px solid #6965db; }
+  /* .sveltedraw-link-chip styles live in LinkChip.svelte now. */
 
   /* A2: laser overlay pinned over the canvas. pointer-events: none so the
      trail never blocks clicks on the underlying canvas. Z-index above the
      canvas layer but below side panels. */
-  .sveltedraw-laser-overlay {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    z-index: 30;
-  }
+  /* .sveltedraw-laser-overlay styles live in LaserOverlay.svelte now. */
   :global(.sveltedraw--laser) { cursor: crosshair; }
   :global(.sveltedraw--eraser) { cursor: crosshair; }
 
