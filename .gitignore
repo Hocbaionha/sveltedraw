@@ -27,3 +27,13 @@ dev-dist
 html
 meta*.json
 .claude
+
+# Puppeteer smoke-test artifacts (visual baselines, PDF exports, etc.)
+# Tests generate these alongside their assertions; they're not source-of-truth.
+/test-*.pdf
+/test-*.png
+/*.png
+/packages/excalidraw-svelte/*.png
+/packages/excalidraw-svelte/*.pdf
+/sveltedraw-app/*.png
+/sveltedraw-app/*.pdf
