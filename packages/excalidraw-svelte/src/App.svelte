@@ -2083,6 +2083,39 @@
     }
   };
 
+  const handleReorderLayers = (fromId: string, toId: string) => {
+    if (!scene || fromId === toId) return;
+
+    const elements = scene.getNonDeletedElements();
+    const fromIndex = elements.findIndex(el => el.id === fromId);
+    const toIndex = elements.findIndex(el => el.id === toId);
+
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    // Determine if we're moving up or down
+    if (fromIndex < toIndex) {
+      // Moving down (towards lower z-order)
+      for (let i = fromIndex; i < toIndex; i++) {
+        const temp = elements[i];
+        elements[i] = elements[i + 1];
+        elements[i + 1] = temp;
+      }
+    } else {
+      // Moving up (towards higher z-order)
+      for (let i = fromIndex; i > toIndex; i--) {
+        const temp = elements[i];
+        elements[i] = elements[i - 1];
+        elements[i - 1] = temp;
+      }
+    }
+
+    // Update the scene with new order
+    scene.replaceAllElements(elements, { skipValidation: true });
+    pushHistory();
+    bumpSceneRepaint();
+    syncLayersFromScene();
+  };
+
   const handleLayerVisibilityChange = (layerId: string, visible: boolean) => {
     if (!scene) return;
     const element = scene.getNonDeletedElementsMap().get(layerId);
@@ -5588,7 +5621,7 @@
     </div>
   {/if}
 
-  <!-- Layer panel — Phase 15 Feature 1 + 2 -->
+  <!-- Layer panel — Phase 15 Feature 1 + 2 + 3 + 4 -->
   {#if layerPanelActive}
     <div class="sveltedraw-layer-panel">
       <LayerPanel
@@ -5600,6 +5633,7 @@
         onLayerOpacityChange={handleLayerOpacityChange}
         onCreateGroup={handleCreateGroup}
         onDeleteGroup={handleDeleteGroup}
+        onReorderLayers={handleReorderLayers}
       />
     </div>
   {/if}

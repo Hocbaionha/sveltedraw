@@ -12,6 +12,7 @@
     onCreateGroup?: (layerIds: string[]) => void;
     onDeleteGroup?: (groupId: string) => void;
     onRenameLayer?: (layerId: string, name: string) => void;
+    onReorderLayers?: (fromId: string, toId: string) => void;
   };
 
   let {
@@ -23,10 +24,13 @@
     onLayerOpacityChange,
     onCreateGroup,
     onDeleteGroup,
-    onRenameLayer
+    onRenameLayer,
+    onReorderLayers
   } = $props();
 
   let expandedGroups = $state<Set<string>>(new Set());
+  let draggedLayerId = $state<string | null>(null);
+  let dragOverLayerId = $state<string | null>(null);
 
   const sortedLayers = $derived(
     [...layers].sort((a, b) => b.order - a.order)
@@ -44,6 +48,30 @@
 
   const getChildLayers = (parentId: string): LayerItem[] => {
     return layers.filter(l => l.parentId === parentId).sort((a, b) => b.order - a.order);
+  };
+
+  const handleDragStart = (layerId: string) => {
+    draggedLayerId = layerId;
+  };
+
+  const handleDragOver = (layerId: string, e: DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer!.dropEffect = 'move';
+    dragOverLayerId = layerId;
+  };
+
+  const handleDragEnd = () => {
+    draggedLayerId = null;
+    dragOverLayerId = null;
+  };
+
+  const handleDrop = (toLayerId: string, e: DragEvent) => {
+    e.preventDefault();
+    if (draggedLayerId && draggedLayerId !== toLayerId) {
+      onReorderLayers?.(draggedLayerId, toLayerId);
+    }
+    draggedLayerId = null;
+    dragOverLayerId = null;
   };
 </script>
 
@@ -76,7 +104,17 @@
               <div
                 class="lp-item lp-group-header"
                 class:selected={selectedLayerId === layer.id}
+                class:dragging={draggedLayerId === layer.id}
+                class:drag-over={dragOverLayerId === layer.id}
                 data-layer-id={layer.id}
+                draggable="true"
+                ondragstart={() => handleDragStart(layer.id)}
+                ondragover={(e) => handleDragOver(layer.id, e)}
+                ondrop={(e) => handleDrop(layer.id, e)}
+                ondragend={handleDragEnd}
+                ondragleave={() => {
+                  if (dragOverLayerId === layer.id) dragOverLayerId = null;
+                }}
                 role="button"
                 tabindex="0"
                 onmousedown={() => onLayerSelect(layer.id)}
@@ -217,6 +255,17 @@
             <div
               class="lp-item"
               class:selected={selectedLayerId === layer.id}
+              class:dragging={draggedLayerId === layer.id}
+              class:drag-over={dragOverLayerId === layer.id}
+              data-layer-id={layer.id}
+              draggable="true"
+              ondragstart={() => handleDragStart(layer.id)}
+              ondragover={(e) => handleDragOver(layer.id, e)}
+              ondrop={(e) => handleDrop(layer.id, e)}
+              ondragend={handleDragEnd}
+              ondragleave={() => {
+                if (dragOverLayerId === layer.id) dragOverLayerId = null;
+              }}
               role="button"
               tabindex="0"
               onmousedown={() => onLayerSelect(layer.id)}
@@ -564,5 +613,44 @@
   .lp-depth-spacer {
     width: 16px;
     flex-shrink: 0;
+  }
+
+  .lp-item[draggable="true"] {
+    cursor: grab;
+  }
+
+  .lp-item[draggable="true"]:active {
+    cursor: grabbing;
+  }
+
+  .lp-item.dragging {
+    opacity: 0.5;
+    background: #f0f0f0;
+  }
+
+  :global(.excalidraw.theme--dark) .lp-item.dragging {
+    background: #363636;
+  }
+
+  .lp-item.drag-over {
+    border-top: 2px solid #6965db;
+    padding-top: 6px;
+  }
+
+  :global(.excalidraw.theme--dark) .lp-item.drag-over {
+    border-top-color: #7c7cff;
+  }
+
+  .lp-group-header.dragging {
+    opacity: 0.5;
+  }
+
+  .lp-group-header.drag-over {
+    border-top: 2px solid #6965db;
+    padding-top: 6px;
+  }
+
+  :global(.excalidraw.theme--dark) .lp-group-header.drag-over {
+    border-top-color: #7c7cff;
   }
 </style>
