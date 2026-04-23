@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { GridConfig, SnapConfig } from '../snap/types.js';
+  import { t } from '../state/i18n.svelte.js';
 
   type Props = {
     gridConfig: GridConfig;
@@ -16,7 +17,7 @@
 
 <div class="grid-panel">
   <div class="gp-header">
-    <h3 class="gp-title">Grid & Snap</h3>
+    <h3 class="gp-title">{t('sveltedraw.panels.gridSnapTitle', undefined, 'Grid & Snap')}</h3>
   </div>
 
   <!-- Grid Section -->
@@ -32,7 +33,7 @@
               enabled: e.currentTarget.checked,
             })}
         />
-        <span>Enable Grid</span>
+        <span>{t('sveltedraw.panels.enableGrid', undefined, 'Enable Grid')}</span>
       </label>
     </div>
 

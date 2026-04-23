@@ -59,6 +59,27 @@ export function getCurrentLangCode(): string {
   return langCode;
 }
 
+// D4: pick a supported language from the browser's preference order.
+// Tries exact match first (e.g. "vi-VN"), then the base tag (e.g. "vi" —
+// matched against the first entry whose code starts with the same base).
+// Falls back to English when no preference matches.
+export function getPreferredLanguage(): string {
+  if (typeof navigator === "undefined") return defaultLang.code;
+  const prefs = Array.isArray(navigator.languages)
+    ? navigator.languages
+    : [navigator.language || defaultLang.code];
+  const supportedExact = new Set(availableLanguages.map((l) => l.code));
+  for (const pref of prefs) {
+    if (supportedExact.has(pref)) return pref;
+    const base = pref.split("-")[0].toLowerCase();
+    const match = availableLanguages.find(
+      (l) => l.code.split("-")[0].toLowerCase() === base,
+    );
+    if (match) return match.code;
+  }
+  return defaultLang.code;
+}
+
 export async function setLanguage(code: string): Promise<void> {
   if (code === "en") {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

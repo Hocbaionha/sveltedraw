@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { LayoutConfig, LayoutType } from '../autolayout/types.js';
+  import { t } from '../state/i18n.svelte.js';
 
   interface Props {
     selectedCount: number;
@@ -31,7 +32,7 @@
 
 <div class="autolayout-panel">
   <div class="al-header">
-    <h3 class="al-title">Auto Layout</h3>
+    <h3 class="al-title">{t('sveltedraw.panels.autoLayoutTitle', undefined, 'Auto Layout')}</h3>
     {#if selectedCount > 0}
       <span class="al-count">{selectedCount}</span>
     {/if}
@@ -39,7 +40,7 @@
 
   {#if selectedCount < 2}
     <div class="al-message">
-      <p>Select 2+ shapes to apply automatic layout</p>
+      <p>{t('sveltedraw.panels.autoLayoutEmpty', undefined, 'Select 2+ shapes to apply automatic layout')}</p>
     </div>
   {:else}
     <div class="al-section">

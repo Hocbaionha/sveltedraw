@@ -826,6 +826,38 @@ export const renderElement = (
     reduceAlphaForSelection ? DEFAULT_REDUCED_GLOBAL_ALPHA : 1,
   );
 
+  // C1: drop shadow. Sveltedraw non-upstream. Apply before the switch so
+  // roughjs drawImage calls + path strokes inherit ctx.shadow*. Saved /
+  // restored around the whole render so it doesn't leak into siblings.
+  const shadow = (element as any).shadow as
+    | { color: string; offsetX: number; offsetY: number; blur: number }
+    | null
+    | undefined;
+  const hasShadow = shadow && typeof shadow.color === "string";
+  if (hasShadow) {
+    context.save();
+    context.shadowColor = shadow!.color;
+    context.shadowOffsetX = shadow!.offsetX * appState.zoom.value;
+    context.shadowOffsetY = shadow!.offsetY * appState.zoom.value;
+    context.shadowBlur = shadow!.blur * appState.zoom.value;
+  }
+  const result = renderElementCore(
+    element, elementsMap, allElementsMap, rc, context, renderConfig, appState,
+  );
+  if (hasShadow) context.restore();
+  return result;
+};
+
+const renderElementCore = (
+  element: NonDeletedExcalidrawElement,
+  elementsMap: RenderableElementsMap,
+  allElementsMap: NonDeletedSceneElementsMap,
+  rc: RoughCanvas,
+  context: CanvasRenderingContext2D,
+  renderConfig: StaticCanvasRenderConfig,
+  appState: StaticCanvasAppState | InteractiveCanvasAppState,
+) => {
+
   switch (element.type) {
     case "magicframe":
     case "frame": {

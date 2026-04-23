@@ -1,170 +1,116 @@
 <script lang="ts">
-  import type { Connector, RoutingStyle } from '../connectors/types.js';
-  import { generateConnectorPath } from '../connectors/types.js';
+  import { t } from '../state/i18n.svelte.js';
 
-  interface Props {
-    connectors: Connector[];
-    activeRoutingStyle: RoutingStyle;
-    onRoutingStyleChange: (style: RoutingStyle) => void;
-  }
+  type Props = {
+    hasFirstPick: boolean;
+    onCancel: () => void;
+  };
 
-  let { connectors, activeRoutingStyle, onRoutingStyleChange }: Props = $props();
-
-  const routingStyles: RoutingStyle[] = ['straight', 'orthogonal', 'curved', 'bezier'];
+  let { hasFirstPick, onCancel }: Props = $props();
 </script>
 
-<div class="connector-tool">
+<div class="ct-panel">
   <div class="ct-header">
-    <label for="routing-select" class="ct-label">Connector Style:</label>
-    <select
-      id="routing-select"
-      class="ct-select"
-      bind:value={activeRoutingStyle}
-      onchange={(e) => onRoutingStyleChange(activeRoutingStyle)}
-    >
-      <option value="straight">Straight</option>
-      <option value="orthogonal">Orthogonal (Grid)</option>
-      <option value="curved">Curved</option>
-      <option value="bezier">Bezier</option>
-    </select>
+    <strong>{t('sveltedraw.panels.connectShapes', undefined, 'Connect Shapes')}</strong>
+    <button class="ct-cancel" aria-label="Cancel" onclick={onCancel}>✕</button>
   </div>
-
-  <div class="ct-info">
-    <p class="ct-text">
-      Click two shapes to connect them with a line. Drag existing connectors to reconfigure.
-    </p>
+  <div class="ct-step" class:ct-step-active={!hasFirstPick}>
+    <span class="ct-num">1</span>
+    {t('sveltedraw.panels.connectorStep1', undefined, 'Click the first shape')}
   </div>
-
-  {#if connectors.length > 0}
-    <div class="ct-list">
-      <p class="ct-count">Active Connectors: {connectors.length}</p>
-      {#each connectors.slice(0, 5) as connector (connector.id)}
-        <div class="ct-item">
-          <span class="ct-item-label">{connector.label || 'Untitled'}</span>
-          <span class="ct-item-style">{connector.routingStyle}</span>
-        </div>
-      {/each}
-      {#if connectors.length > 5}
-        <p class="ct-more">+ {connectors.length - 5} more</p>
-      {/if}
-    </div>
-  {/if}
+  <div class="ct-step" class:ct-step-active={hasFirstPick}>
+    <span class="ct-num">2</span>
+    {t('sveltedraw.panels.connectorStep2', undefined, 'Click the second shape')}
+  </div>
+  <div class="ct-hint">
+    An arrow is created with bindings on both ends — moving either shape
+    re-routes the connection automatically.
+  </div>
 </div>
 
 <style>
-  .connector-tool {
-    padding: 12px;
-    border-left: 1px solid #e5e7ea;
-    background: white;
+  .ct-panel {
+    padding: 12px 14px;
     font-size: 13px;
+    color: #1e1e1e;
   }
-
-  :global(.excalidraw.theme--dark) .connector-tool {
-    background: #232329;
-    border-left-color: #363636;
+  :global(.excalidraw.theme--dark) .ct-panel {
     color: #e5e7ea;
   }
-
   .ct-header {
     display: flex;
-    gap: 8px;
+    justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e5e7ea;
   }
-
-  .ct-label {
-    font-weight: 600;
-    white-space: nowrap;
+  :global(.excalidraw.theme--dark) .ct-header {
+    border-bottom-color: #363636;
   }
-
-  .ct-select {
-    flex: 1;
-    padding: 6px 8px;
-    border: 1px solid #d1d4da;
-    border-radius: 4px;
-    background: white;
-    color: inherit;
-    font-size: 12px;
+  .ct-cancel {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    color: #999;
+    padding: 2px 6px;
+    border-radius: 3px;
   }
-
-  :global(.excalidraw.theme--dark) .ct-select {
-    background: #2e2e36;
-    border-color: #363636;
+  .ct-cancel:hover {
+    background: rgba(0, 0, 0, 0.08);
   }
-
-  .ct-info {
-    margin-bottom: 12px;
-    padding: 8px;
-    background: #f5f5f5;
-    border-radius: 4px;
+  :global(.excalidraw.theme--dark) .ct-cancel:hover {
+    background: rgba(255, 255, 255, 0.1);
   }
-
-  :global(.excalidraw.theme--dark) .ct-info {
-    background: #2e2e36;
-  }
-
-  .ct-text {
-    margin: 0;
-    font-size: 12px;
+  .ct-step {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 6px 4px;
     color: #666;
-    line-height: 1.4;
+    font-size: 12px;
   }
-
-  :global(.excalidraw.theme--dark) .ct-text {
+  :global(.excalidraw.theme--dark) .ct-step {
     color: #aaa;
   }
-
-  .ct-list {
-    padding: 8px 0;
-    border-top: 1px solid #e5e7ea;
-  }
-
-  :global(.excalidraw.theme--dark) .ct-list {
-    border-top-color: #363636;
-  }
-
-  .ct-count {
-    margin: 0 0 8px;
+  .ct-step-active {
+    color: #1e1e1e;
     font-weight: 600;
-    color: #6965db;
   }
-
-  .ct-item {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 6px 0;
-    font-size: 12px;
-    border-bottom: 1px solid #f0f0f0;
+  :global(.excalidraw.theme--dark) .ct-step-active {
+    color: #e5e7ea;
   }
-
-  :global(.excalidraw.theme--dark) .ct-item {
-    border-bottom-color: #2e2e36;
-  }
-
-  .ct-item-label {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .ct-item-style {
-    color: #999;
-    font-size: 11px;
-    padding: 2px 4px;
-    background: #f0f0f0;
-    border-radius: 2px;
-    white-space: nowrap;
-  }
-
-  :global(.excalidraw.theme--dark) .ct-item-style {
-    background: #2e2e36;
+  .ct-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #e5e7ea;
     color: #666;
-  }
-
-  .ct-more {
-    margin: 4px 0 0;
+    font-weight: 600;
     font-size: 11px;
-    color: #999;
+  }
+  :global(.excalidraw.theme--dark) .ct-num {
+    background: #2e2e36;
+    color: #aaa;
+  }
+  .ct-step-active .ct-num {
+    background: #6965db;
+    color: white;
+  }
+  .ct-hint {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #f0f0f0;
+    color: #666;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  :global(.excalidraw.theme--dark) .ct-hint {
+    border-top-color: #2e2e36;
+    color: #888;
   }
 </style>

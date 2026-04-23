@@ -91,9 +91,16 @@
       altKey: boolean;
     }) {
       if (!previewEl) return;
-      // FIXME swap offset when the preview gets outside viewport
-      previewEl.style.top = `${clientY + 20}px`;
-      previewEl.style.left = `${clientX + 20}px`;
+      // D5: flip the preview to the opposite side when it would clip
+      // past the viewport edge. Measure once per frame; assume width/height
+      // are fixed via CSS (upstream swatch is ~32×32px; allow 48px pad).
+      const PAD = 48;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const dx = clientX + 20 + PAD > vw ? -PAD : 20;
+      const dy = clientY + 20 + PAD > vh ? -PAD : 20;
+      previewEl.style.top = `${clientY + dy}px`;
+      previewEl.style.left = `${clientX + dx}px`;
       const currentColor = getCurrentColor({ clientX, clientY });
       if (isHoldingPointerDown) {
         onChange({

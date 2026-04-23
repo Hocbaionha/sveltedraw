@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { MeasurementConfig } from '../measurements/types.js';
   import { getMeasurementSummary } from '../measurements/types.js';
+  import { t } from '../state/i18n.svelte.js';
 
   interface Element {
     id: string;
@@ -44,7 +45,7 @@
 
 <div class="measurement-panel">
   <div class="mp-header">
-    <h3 class="mp-title">Measurements</h3>
+    <h3 class="mp-title">{t('sveltedraw.panels.measurementsTitle', undefined, 'Measurements')}</h3>
     {#if selectedElements.length > 0}
       <span class="mp-count">{selectedElements.length}</span>
     {/if}
@@ -58,7 +59,7 @@
         onchange={toggleShowRulers}
         aria-label="Show rulers"
       />
-      <span>Show Rulers</span>
+      <span>{t('sveltedraw.panels.showRulers', undefined, 'Show Rulers')}</span>
     </label>
     <label class="mp-label">
       <input
@@ -67,7 +68,7 @@
         onchange={toggleShowDistances}
         aria-label="Show distances"
       />
-      <span>Show Distances</span>
+      <span>{t('sveltedraw.panels.showDistances', undefined, 'Show Distances')}</span>
     </label>
     <label class="mp-label">
       <input
@@ -76,7 +77,7 @@
         onchange={toggleShowDimensions}
         aria-label="Show dimensions"
       />
-      <span>Show Dimensions</span>
+      <span>{t('sveltedraw.panels.showDimensions', undefined, 'Show Dimensions')}</span>
     </label>
   </div>
 

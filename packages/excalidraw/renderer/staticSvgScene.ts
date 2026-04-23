@@ -131,6 +131,63 @@ const renderElementToSvg = (
     if (isTestEnv()) {
       node.setAttribute("data-id", element.id);
     }
+    // C1: drop shadow. If the element carries a shadow config, emit (or
+    // reuse) a <filter> in the root <defs> and tag the node so the SVG
+    // viewer applies it. `_shadowFilterIds` is a per-export cache keyed
+    // by color+offset+blur so identical shadows share a filter.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const shadow = (element as any).shadow as
+      | { color: string; offsetX: number; offsetY: number; blur: number }
+      | null
+      | undefined;
+    if (shadow && typeof shadow.color === "string") {
+      const doc = svgRoot.ownerDocument;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cache = ((svgRoot as any)._shadowFilterIds ||=
+        new Map<string, string>());
+      const key = `${shadow.color}|${shadow.offsetX}|${shadow.offsetY}|${shadow.blur}`;
+      let id = cache.get(key);
+      if (!id) {
+        id = `shadow-${cache.size + 1}`;
+        cache.set(key, id);
+        let defs = svgRoot.querySelector("defs");
+        if (!defs) {
+          defs = doc.createElementNS(SVG_NS, "defs") as unknown as Element;
+          svgRoot.insertBefore(defs, svgRoot.firstChild);
+        }
+        const filter = doc.createElementNS(SVG_NS, "filter");
+        filter.setAttribute("id", id);
+        filter.setAttribute("x", "-50%");
+        filter.setAttribute("y", "-50%");
+        filter.setAttribute("width", "200%");
+        filter.setAttribute("height", "200%");
+        const blur = doc.createElementNS(SVG_NS, "feGaussianBlur");
+        blur.setAttribute("in", "SourceAlpha");
+        blur.setAttribute("stdDeviation", String(Math.max(0, shadow.blur / 2)));
+        filter.appendChild(blur);
+        const offset = doc.createElementNS(SVG_NS, "feOffset");
+        offset.setAttribute("dx", String(shadow.offsetX));
+        offset.setAttribute("dy", String(shadow.offsetY));
+        offset.setAttribute("result", "offsetblur");
+        filter.appendChild(offset);
+        const flood = doc.createElementNS(SVG_NS, "feFlood");
+        flood.setAttribute("flood-color", shadow.color);
+        filter.appendChild(flood);
+        const composite = doc.createElementNS(SVG_NS, "feComposite");
+        composite.setAttribute("in2", "offsetblur");
+        composite.setAttribute("operator", "in");
+        filter.appendChild(composite);
+        const merge = doc.createElementNS(SVG_NS, "feMerge");
+        const mergeNode1 = doc.createElementNS(SVG_NS, "feMergeNode");
+        merge.appendChild(mergeNode1);
+        const mergeNode2 = doc.createElementNS(SVG_NS, "feMergeNode");
+        mergeNode2.setAttribute("in", "SourceGraphic");
+        merge.appendChild(mergeNode2);
+        filter.appendChild(merge);
+        (defs as Element).appendChild(filter);
+      }
+      node.setAttribute("filter", `url(#${id})`);
+    }
     root.appendChild(node);
   };
 

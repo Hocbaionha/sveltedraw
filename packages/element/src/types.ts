@@ -79,6 +79,15 @@ type _ExcalidrawElementBase = Readonly<{
   link: string | null;
   locked: boolean;
   customData?: Record<string, any>;
+  /** C1: Drop shadow. Non-upstream; optional so legacy elements remain valid.
+      Canvas renderer reads this once at the top of renderElement() and applies
+      ctx.shadow*. SVG exporter emits a per-element <filter> in <defs>. */
+  shadow?: {
+    color: string;
+    offsetX: number;
+    offsetY: number;
+    blur: number;
+  } | null;
 }>;
 
 export type ExcalidrawSelectionElement = _ExcalidrawElementBase & {

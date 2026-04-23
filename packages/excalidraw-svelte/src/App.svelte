@@ -70,6 +70,8 @@
   // @ts-ignore — upstream
   import { newElement, newLinearElement, newArrowElement, newFreeDrawElement, newTextElement, newImageElement, hitElementItself, duplicateElements, deepCopyElement, moveOneLeft, moveOneRight, moveAllLeft, moveAllRight } from "@excalidraw/element";
   // @ts-ignore — upstream
+  import { updateBoundElements } from "@excalidraw/element";
+  // @ts-ignore — upstream
   import { DEFAULT_FONT_SIZE, getFontFamilyString } from "@excalidraw/common";
   // @ts-ignore — upstream, resolved via Vite alias
   import { exportToBlob, exportToSvg } from "@excalidraw/utils/export";
@@ -97,6 +99,7 @@
     t,
     setLanguage,
     getCurrentLangCode,
+    getPreferredLanguage,
     availableLanguages,
   } from "./state/i18n.svelte.js";
   import ColorPicker from "./components/color-picker/ColorPicker.svelte";
@@ -122,6 +125,7 @@
   import InteractiveCanvas from "./components/canvases/InteractiveCanvas.svelte";
   import NewElementCanvas from "./components/canvases/NewElementCanvas.svelte";
   import TemplateSelector from "./components/TemplateSelector.svelte";
+  import ElementLinkDialog from "./components/ElementLinkDialog.svelte";
   import RecentFilesPanel from "./components/RecentFilesPanel.svelte";
   import SettingsPanel from "./components/SettingsPanel.svelte";
   import HelpPanel from "./components/HelpPanel.svelte";
@@ -129,7 +133,6 @@
   import AlignmentPanel from "./components/AlignmentPanel.svelte";
   import MeasurementPanel from "./components/MeasurementPanel.svelte";
   import AutoLayoutPanel from "./components/AutoLayoutPanel.svelte";
-  import TextEditorPanel from "./components/TextEditorPanel.svelte";
   import GridPanel from "./components/GridPanel.svelte";
   import GridRenderer from "./components/GridRenderer.svelte";
   import SnapGuideRenderer from "./components/SnapGuideRenderer.svelte";
@@ -146,16 +149,19 @@
   import type { ExportOptions, ExportPreset } from "./export/types.js";
   import { getDefaultExportOptions, EXPORT_PRESETS, getDefaultBatchExportConfig } from "./export/types.js";
   import type { Template } from "./templates/index.js";
-  import type { Connector, RoutingStyle } from "./connectors/types.js";
-  import { generateConnectorPath } from "./connectors/types.js";
+  // Connector tool creates real Excalidraw arrow elements with
+  // startBinding/endBinding — the custom Connector type (Phase 13)
+  // was never rendered. Arrows get rendering + export + hit-testing
+  // for free from the upstream pipeline.
   import type { AlignmentType, DistributionType, AlignmentGuide } from "./alignment/types.js";
   import { calculateAlignmentGuides, alignElements, distributeElements } from "./alignment/types.js";
   import type { MeasurementConfig } from "./measurements/types.js";
+  import { formatMeasurement } from "./measurements/types.js";
   import type { LayoutConfig } from "./autolayout/types.js";
   import { calculateLayout, applyLayout } from "./autolayout/types.js";
-  import type { TextProperties } from "./texteditor/types.js";
   import type { GridConfig, SnapConfig } from "./snap/types.js";
   import type { SnapGuide } from "./snap/guides.js";
+  import { computeDragSnap } from "./snap/guides.js";
   import type { LayerItem } from "./layers/types.js";
   import { getLayerName } from "./layers/types.js";
 
@@ -563,6 +569,14 @@
     renderer = new Renderer(scene);
     rc = rough.canvas(staticCanvas);
 
+    // D4: detect the browser's preferred language and switch to it if it's
+    // not already the default. Fire-and-forget; the async load is safe
+    // because the fallback locale data ships with the bundle.
+    const preferred = getPreferredLanguage();
+    if (preferred !== getCurrentLangCode()) {
+      void setLanguage(preferred);
+    }
+
     // Attempt to hydrate from localStorage BEFORE seeding history so the
     // initial history floor captures the restored state, not "empty".
     tryLoad();
@@ -638,6 +652,91 @@
         jumpHistory: (i: number) => handleHistoryJump(i),
         clearHistory: () => handleHistoryClear(),
         pushHistory: () => pushHistory(),
+        // Bound-arrow test helper: force-route arrows after moving a shape.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        updateBoundElements: (el: any) => updateBoundElements(el, scene),
+        // Render-trigger for tests that mutate scene outside the normal
+        // pointer-event path (see drag handler, ~line 5494).
+        bumpSceneRepaint: () => bumpSceneRepaint(),
+        // Snap/grid config mutators for honest A4/A6 tests (negative cases
+        // need snap disabled, which the GridPanel UI can't easily drive).
+        getSnapConfig: () => snapConfig,
+        getGridConfig: () => gridConfig,
+        setSnapConfig: (patch: Partial<typeof snapConfig>) =>
+          Object.assign(snapConfig, patch),
+        setGridConfig: (patch: Partial<typeof gridConfig>) =>
+          Object.assign(gridConfig, patch),
+        // A1: link-dialog hooks for tests. openLinkDialog uses the current
+        // selection; confirmLinkViaDialog lets tests bypass the UI typeahead.
+        openLinkDialog: () => openLinkDialog(),
+        closeLinkDialog: () => closeLinkDialog(),
+        confirmLinkDialog: (v: string | null) => confirmLinkDialog(v),
+        isLinkDialogOpen: () => linkDialogOpen,
+        // A2: laser hooks. Tests need to toggle + inspect trail length.
+        toggleLaser: () => toggleLaser(),
+        isLaserActive: () => laserActive,
+        getLaserTrailLen: () => laserTrail.length,
+        // A5: measurement overlay hooks for honest tests.
+        setMeasurementConfig: (patch: Partial<MeasurementConfig>) =>
+          Object.assign(measurementConfig, patch),
+        getMeasurementConfig: () => ({ ...measurementConfig }),
+        // B4: generate a PNG blob with embedded Excalidraw scene metadata.
+        // Mirrors the export pipeline but adds the tEXt chunk so the paste
+        // round-trip test can verify restoration without touching the UI.
+        exportPngWithMetadata: async () => {
+          if (!scene) return null;
+          const elements = scene.getNonDeletedElements();
+          const blob = await exportToBlob({
+            elements,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            appState: { ...(appState as any), exportBackground: true, exportScale: 1 },
+            files: binaryFiles,
+            mimeType: "image/png",
+            quality: 0.92,
+            exportPadding: 10,
+          });
+          const { encodePngMetadata } = await import("@excalidraw/excalidraw/data/image");
+          return encodePngMetadata({
+            blob,
+            metadata: JSON.stringify({
+              type: "excalidraw",
+              version: 2,
+              source: window.location.origin,
+              elements,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              appState: { viewBackgroundColor: (appState as any).viewBackgroundColor },
+              files: binaryFiles,
+            }),
+          });
+        },
+        tryRestoreSceneFromPng: (b: Blob) => tryRestoreSceneFromPng(b),
+        // C2: flip hook for tests.
+        flipSelected: (axis: "horizontal" | "vertical") => flipSelected(axis),
+        // D3: presentation auto-advance probe hooks.
+        setAutoAdvanceDuration: (ms: number) => {
+          (presentationConfig as any).autoAdvanceDuration = ms;
+        },
+        setPresentationPlaying: (v: boolean) => { presentationIsPlaying = v; },
+        getPresentationCurrentIndex: () => presentationCurrentIndex,
+        // Test-only: seed N fake slides so the auto-advance loop has
+        // room to progress without depending on the full scene/slides
+        // pipeline. Bypasses handleStartPresentation's SVG pre-render.
+        // B1: frame creation hook.
+        createFrameAtCenter: () => createFrameAtCenter(),
+        forcePresentationSlides: (n: number) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          presentationSlides = Array.from({ length: n }, (_, i) => ({
+            id: `s${i}`,
+            title: `Slide ${i + 1}`,
+            description: "",
+            elements: [],
+            order: i,
+            duration: 0,
+          }) as any);
+          presentationSlideSvgs = Array.from({ length: n }, () => "");
+          presentationCurrentIndex = 0;
+          presentationActive = true;
+        },
       };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__sveltedrawHistoryLen = () => history.length;
@@ -884,6 +983,12 @@
       containerEl?.removeEventListener("touchstart", onTouchStart);
       containerEl?.removeEventListener("touchmove", onTouchMove);
       containerEl?.removeEventListener("touchend", onTouchEnd);
+      // A2: stop the laser RAF loop on unmount so callbacks don't fire
+      // against a torn-down component.
+      if (laserRafId !== null) {
+        cancelAnimationFrame(laserRafId);
+        laserRafId = null;
+      }
       // Cleanup collaboration provider
       if (provider) {
         provider.destroy();
@@ -946,12 +1051,21 @@
     "8": "text",
     t: "text",
     T: "text",
+    // B2: eraser tool — 'e' hotkey matches upstream.
+    e: "eraser",
+    E: "eraser",
   };
 
   const setActiveTool = (type: string) => {
     // Commit any in-progress polyline before switching tool — otherwise
     // the floating newElement would leak across tool changes.
     if (polylineActive) commitPolyline();
+    // A2: switching tools (or entering selection) exits laser. Matches
+    // the plan's "Laser mode auto-exits on Esc or tool switch".
+    if (laserActive) {
+      laserActive = false;
+      laserTrail = [];
+    }
     // Preserve the lock flag across tool changes: if the user had
     // "tool lock" enabled with a drawing tool and draws a shape,
     // the pointerup handler skips the auto-switch — but when the
@@ -1404,7 +1518,13 @@
     if (!scene) return;
     const selected = getSelectedElements();
     if (selected.length === 0) return;
-    const selectedSet = new Set(selected.map((el) => el.id));
+    // A8: locked elements survive bulk delete. Only unlocked IDs are
+    // stripped; selection is cleared regardless so the locked ones aren't
+    // left looking partially-selected.
+    const selectedSet = new Set(
+      selected.filter((el: any) => !el.locked).map((el) => el.id),
+    );
+    if (selectedSet.size === 0) return;
     const remaining = scene
       .getElementsIncludingDeleted()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1576,6 +1696,124 @@
   let libraryPanelOpen = $state(false);
   let showTemplateSelector = $state(false);
 
+  // A1: element-link dialog. Opens via Ctrl+K or context-menu on a single
+  // selected element. `targetId` points at the element whose link we edit.
+  let linkDialogOpen = $state(false);
+  let linkDialogTargetId = $state<string | null>(null);
+
+  // B2: eraser tool. `eraserDragActive` is the drag-in-progress flag;
+  // `eraserDraggedIds` collects elements deleted during one drag so we
+  // push a single history entry on pointerup (not one per shape).
+  let eraserDragActive = false;
+  const eraserDraggedIds = new Set<string>();
+
+  const eraseAt = (sceneX: number, sceneY: number) => {
+    if (!scene) return;
+    const hit = hitTestAt(sceneX, sceneY);
+    if (!hit) return;
+    if ((hit as any).locked) return;
+    if (eraserDraggedIds.has(hit.id)) return;
+    scene.mutateElement(
+      hit,
+      { isDeleted: true },
+      { informMutation: false, isDragging: false },
+    );
+    eraserDraggedIds.add(hit.id);
+    bumpSceneRepaint();
+  };
+
+  // A2: laser pointer. `laserActive` toggles the tool; `laserTrail` holds
+  // recent pointer samples; a RAF loop prunes points older than LASER_FADE_MS
+  // so the SVG overlay shows a fading trail. Points are in viewport coords
+  // (container-relative) — renderer doesn't need zoom/scroll math that way.
+  const LASER_FADE_MS = 800;
+  let laserActive = $state(false);
+  let laserTrail = $state<Array<{ x: number; y: number; t: number }>>([]);
+  // `laserFrame` bumps every RAF tick so the polyline re-evaluates opacity
+  // continuously — otherwise a stationary pointer leaves the trail at a
+  // stale opacity until the next sample lands.
+  let laserFrame = $state(0);
+  let laserRafId: number | null = null;
+
+  const pruneLaserTrail = () => {
+    const cutoff = performance.now() - LASER_FADE_MS;
+    let i = 0;
+    while (i < laserTrail.length && laserTrail[i].t < cutoff) i++;
+    if (i > 0) laserTrail = laserTrail.slice(i);
+    laserFrame++;
+    if (laserActive || laserTrail.length > 0) {
+      laserRafId = requestAnimationFrame(pruneLaserTrail);
+    } else {
+      laserRafId = null;
+    }
+  };
+
+  const startLaserRaf = () => {
+    if (laserRafId !== null) return;
+    laserRafId = requestAnimationFrame(pruneLaserTrail);
+  };
+
+  const toggleLaser = () => {
+    laserActive = !laserActive;
+    if (laserActive) {
+      startLaserRaf();
+    } else {
+      laserTrail = [];
+    }
+  };
+
+  const openLinkDialog = () => {
+    const sel = getSelectedElements();
+    if (sel.length !== 1) return;
+    linkDialogTargetId = sel[0].id;
+    linkDialogOpen = true;
+  };
+
+  const confirmLinkDialog = (nextLink: string | null) => {
+    if (!scene || !linkDialogTargetId) return;
+    const el = scene.getElement(linkDialogTargetId);
+    if (!el) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    scene.mutateElement(el, { link: nextLink } as any,
+      { informMutation: false, isDragging: false });
+    pushHistory();
+    bumpSceneRepaint();
+  };
+
+  const closeLinkDialog = () => {
+    linkDialogOpen = false;
+    linkDialogTargetId = null;
+  };
+
+  // Returns the live link for the dialog + chip renderer. Reads sceneReady
+  // so mutateElement-driven bumps (including isDeleted flips) are tracked.
+  const getLinkedElement = $derived.by(() => {
+    void sceneReady;
+    if (!linkDialogTargetId || !scene) return null;
+    const el = scene.getElement(linkDialogTargetId);
+    if (!el || (el as any).isDeleted) return null;
+    return el;
+  });
+
+  // A1 robustness: auto-close the dialog when its target element is removed
+  // or soft-deleted under our feet (e.g. erased while dialog is open).
+  // Prevents a ghost modal that blocks pointer events on the rest of the UI.
+  $effect(() => {
+    if (linkDialogOpen && !getLinkedElement) {
+      linkDialogOpen = false;
+      linkDialogTargetId = null;
+    }
+  });
+
+  // A1: chips are derived from selection + sceneReady nonce so they re-run
+  // when mutateElement changes an element's .link (see the $derived body's
+  // explicit void sceneReady — otherwise the .link read inside the
+  // non-reactive getSelectedElements() call isn't tracked).
+  const linkedSelected = $derived.by(() => {
+    void sceneReady;
+    return getSelectedElements().filter((el) => !!(el as any).link);
+  });
+
   interface RecentFile {
     id: string;
     name: string;
@@ -1610,10 +1848,10 @@
 
   let showHelpPanel = $state(false);
 
-  // Phase 13: Connectors
-  let connectors = $state<Connector[]>([]);
+  // Connector tool: click first shape → click second shape → arrow with
+  // startBinding/endBinding between them. The arrow is a normal element,
+  // so it renders + exports + undoes like any other arrow.
   let connectorToolActive = $state(false);
-  let activeRoutingStyle = $state<RoutingStyle>("straight");
   let selectedForConnection: string | null = $state(null);
 
   // Phase 13: Smart Alignment & Guides
@@ -1632,9 +1870,6 @@
 
   // Phase 13: Auto-Layout Algorithm
   let autoLayoutPanelActive = $state(false);
-
-  // Phase 13: Advanced Text Features
-  let textEditorPanelActive = $state(false);
 
   // Phase 14: Grid & Snap System
   let gridPanelActive = $state(false);
@@ -1687,6 +1922,16 @@
   let presentationCurrentIndex = $state(0);
   let presentationIsPlaying = $state(false);
 
+  // D3: auto-advance while playing. Clears on stop/exit so no stale timers
+  // fire after the user pauses or closes the presentation.
+  $effect(() => {
+    if (!presentationActive || !presentationIsPlaying) return;
+    const ms = presentationConfig.autoAdvanceDuration;
+    if (!ms || ms <= 0) return;
+    const id = setInterval(() => handlePresentationNextSlide(), ms);
+    return () => clearInterval(id);
+  });
+
   // Phase 16 Feature 4: Export Enhancements
   let exportPanelActive = $state(false);
   let exportOptions = $state<ExportOptions>(getDefaultExportOptions());
@@ -1700,7 +1945,6 @@
     | "alignment"
     | "measurement"
     | "autolayout"
-    | "texteditor"
     | "grid"
     | "layer"
     | "history"
@@ -1711,7 +1955,6 @@
       case "alignment": return alignmentPanelActive;
       case "measurement": return measurementPanelActive;
       case "autolayout": return autoLayoutPanelActive;
-      case "texteditor": return textEditorPanelActive;
       case "grid": return gridPanelActive;
       case "layer": return layerPanelActive;
       case "history": return historyPanelActive;
@@ -1723,7 +1966,6 @@
     alignmentPanelActive = false;
     measurementPanelActive = false;
     autoLayoutPanelActive = false;
-    textEditorPanelActive = false;
     gridPanelActive = false;
     layerPanelActive = false;
     historyPanelActive = false;
@@ -1738,7 +1980,6 @@
       case "alignment": alignmentPanelActive = true; break;
       case "measurement": measurementPanelActive = true; break;
       case "autolayout": autoLayoutPanelActive = true; break;
-      case "texteditor": textEditorPanelActive = true; break;
       case "grid": gridPanelActive = true; break;
       case "layer": layerPanelActive = true; break;
       case "history": historyPanelActive = true; break;
@@ -1974,46 +2215,76 @@
     showTemplateSelector = false;
   };
 
-  // Phase 13: Connector creation
-  const createConnector = (
-    fromElementId: string,
-    toElementId: string,
-  ) => {
+  // Create an arrow element from center of `fromEl` to center of `toEl`
+  // with two-way bindings. updateBoundElements — called when either end
+  // moves — automatically reroutes the arrow to stay attached.
+  const createConnectorArrow = (fromId: string, toId: string) => {
     if (!scene) return;
-    const fromEl = scene.getElement(fromElementId);
-    const toEl = scene.getElement(toElementId);
+    const fromEl = scene.getElement(fromId);
+    const toEl = scene.getElement(toId);
     if (!fromEl || !toEl) return;
 
-    const connector: Connector = {
-      id: randomId(),
-      type: "connector",
-      fromPoint: {
-        elementId: fromElementId,
-        pointType: "right",
-        x: (fromEl as any).x + ((fromEl as any).width || 100),
-        y: (fromEl as any).y + (((fromEl as any).height || 100) / 2),
-      },
-      toPoint: {
-        elementId: toElementId,
-        pointType: "left",
-        x: (toEl as any).x,
-        y: (toEl as any).y + (((toEl as any).height || 100) / 2),
-      },
-      routingStyle: activeRoutingStyle,
-      strokeColor: "#000000",
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const f = fromEl as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const t = toEl as any;
+    const fx = f.x + (f.width ?? 0) / 2;
+    const fy = f.y + (f.height ?? 0) / 2;
+    const tx = t.x + (t.width ?? 0) / 2;
+    const ty = t.y + (t.height ?? 0) / 2;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const arrow: any = newArrowElement({
+      x: fx,
+      y: fy,
+      strokeColor: "#1e1e1e",
+      backgroundColor: "transparent",
+      fillStyle: "solid",
       strokeWidth: 2,
-      arrowEnd: "arrow",
+      strokeStyle: "solid",
+      roughness: 1,
+      opacity: 100,
+      points: [
+        [0, 0],
+        [tx - fx, ty - fy],
+      ],
+      endArrowhead: "arrow",
+      startArrowhead: null,
+      type: "arrow",
+    } as any);
+    // Center-bind both endpoints. updateBoundElements will move the arrow
+    // endpoints as the bound shapes move.
+    arrow.startBinding = {
+      elementId: fromId,
+      fixedPoint: [0.5, 0.5],
+      mode: "inside",
+    };
+    arrow.endBinding = {
+      elementId: toId,
+      fixedPoint: [0.5, 0.5],
+      mode: "inside",
     };
 
-    connectors = [...connectors, connector];
-    connectorToolActive = false;
-    selectedForConnection = null;
-    pushHistory();
-  };
+    const existing = scene.getElementsIncludingDeleted();
+    scene.replaceAllElements([...existing, arrow], { skipValidation: true });
 
-  const deleteConnector = (id: string) => {
-    connectors = connectors.filter((c) => c.id !== id);
+    // Register the arrow in each bound shape's boundElements array. Without
+    // this, updateBoundElements visits zero arrows when either shape moves.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const appendBinding = (shape: any) => {
+      const list = Array.isArray(shape.boundElements) ? shape.boundElements : [];
+      if (list.some((b: any) => b.id === arrow.id)) return;
+      scene.mutateElement(
+        shape,
+        { boundElements: [...list, { id: arrow.id, type: "arrow" }] },
+        { informMutation: false, isDragging: false },
+      );
+    };
+    appendBinding(fromEl);
+    appendBinding(toEl);
+
     pushHistory();
+    bumpSceneRepaint();
   };
 
   // ── Smart Alignment & Guides ─────────────────────────────────────────
@@ -2112,21 +2383,6 @@
         el.y = updated.y;
       }
     }
-    pushHistory();
-    bumpSceneRepaint();
-  };
-
-  const handleTextPropertiesChange = (elementId: string, properties: Partial<TextProperties>) => {
-    if (!scene) return;
-    const element = scene.getNonDeletedElementsMap().get(elementId);
-    if (!element) return;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const [key, value] of Object.entries(properties)) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (element as any)[key] = value;
-    }
-
     pushHistory();
     bumpSceneRepaint();
   };
@@ -2714,12 +2970,51 @@
         }
 
         case "pdf": {
-          // PDF requires a separate PDF lib (jsPDF etc.) not bundled here.
-          // Tell the user honestly rather than writing a broken file.
-          window.alert(
-            "PDF export is not yet supported.\n\nUse SVG (vector, prints at any size) or PNG (raster) instead.",
-          );
-          return; // don't close the panel so user can re-pick
+          // A7: render scene to PNG via the PNG pipeline, then embed into
+          // a single-page PDF. jspdf is lazy-loaded so its ~350KB only
+          // hits the user's bundle when they actually ask for a PDF.
+          const targetW = Math.max(1, options.width);
+          const targetH = Math.max(1, options.height);
+          const densityScale = Math.max(0.01, options.scale);
+          const pngBlob = await exportToBlob({
+            elements,
+            appState: buildExportAppState(options),
+            files: binaryFiles,
+            mimeType: "image/png",
+            quality: options.quality,
+            exportPadding: padding,
+            getDimensions: (naturalW: number, naturalH: number) => {
+              const fit = Math.min(targetW / naturalW, targetH / naturalH);
+              return {
+                width: Math.round(targetW * densityScale),
+                height: Math.round(targetH * densityScale),
+                scale: fit * densityScale,
+              };
+            },
+          });
+          // Convert blob → data URL for addImage.
+          const dataUrl: string = await new Promise((resolve, reject) => {
+            const r = new FileReader();
+            r.onload = () => resolve(r.result as string);
+            r.onerror = () => reject(r.error);
+            r.readAsDataURL(pngBlob);
+          });
+          // Lazy-load jspdf. vite resolves from root node_modules.
+          const { jsPDF } = await import("jspdf");
+          // Page size = target canvas size in px (pt unit keeps the math
+          // simple: 1 px ≈ 0.75 pt at 96 dpi, but we pass pixels as "pt"
+          // so the page matches the drawing's pixel dimensions). Opens at
+          // 100% zoom in all PDF viewers.
+          const doc = new jsPDF({
+            orientation: targetW >= targetH ? "landscape" : "portrait",
+            unit: "pt",
+            format: [targetW, targetH],
+            compress: true,
+          });
+          doc.addImage(dataUrl, "PNG", 0, 0, targetW, targetH);
+          const pdfBlob = doc.output("blob");
+          downloadFile(pdfBlob as Blob, options.fileName + ".pdf");
+          break;
         }
       }
     } catch (err) {
@@ -2733,6 +3028,14 @@
   };
 
   const downloadFile = (blob: Blob, fileName: string) => {
+    // Test hook: when defined on window, captures the blob + filename instead
+    // of initiating a download. Lets puppeteer verify PDF/PNG/SVG byte output
+    // without fighting headless Chrome's download handler.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const hook = (window as any).__sveltedrawDownloadHook;
+    if (typeof hook === "function") {
+      try { hook(blob, fileName); return; } catch { /* fall through */ }
+    }
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -3164,22 +3467,149 @@
     bumpSceneRepaint();
   };
 
+  // B1: minimal Frame creation. Upstream's `frame` element type is already
+  // handled by staticScene renderer (draws outline + title bar). We create
+  // a scene element of that type and auto-bind any existing elements whose
+  // bbox falls inside the frame rect via element.frameId.
+  const createFrameAtCenter = () => {
+    if (!scene) return;
+    const zoomV = (appState.zoom as any).value ?? 1;
+    const scX = (appState.scrollX as any) ?? 0;
+    const scY = (appState.scrollY as any) ?? 0;
+    const vpCenterX = appState.width / 2;
+    const vpCenterY = appState.height / 2;
+    const sceneCX = vpCenterX / zoomV - scX;
+    const sceneCY = vpCenterY / zoomV - scY;
+    const W = 480;
+    const H = 320;
+    const frameX = sceneCX - W / 2;
+    const frameY = sceneCY - H / 2;
+    const frameId = `frame_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const frame: any = {
+      id: frameId, type: "frame",
+      x: frameX, y: frameY, width: W, height: H, angle: 0,
+      strokeColor: "#bbb", backgroundColor: "transparent",
+      fillStyle: "solid", strokeWidth: 1, strokeStyle: "solid",
+      roughness: 0, opacity: 100,
+      seed: Math.floor(Math.random() * 2 ** 31),
+      versionNonce: 1, version: 1, isDeleted: false,
+      groupIds: [], frameId: null, boundElements: null,
+      updated: Date.now(), link: null, locked: false, roundness: null,
+      name: `Frame ${frames.size + 1}`,
+    };
+    const existing = scene.getNonDeletedElements();
+    // Bind any existing element whose bbox is fully inside the frame.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const nextElements = existing.map((el: any) => {
+      if (el.id === frameId) return el;
+      const cx = el.x + el.width / 2;
+      const cy = el.y + el.height / 2;
+      const insideX = cx >= frameX && cx <= frameX + W;
+      const insideY = cy >= frameY && cy <= frameY + H;
+      if (insideX && insideY) return { ...el, frameId };
+      return el;
+    });
+    // Frame renders FIRST so it sits behind its children — acting as a
+    // container, not an overlay. Upstream also places the frame at the
+    // bottom of its group. Array order == z-order.
+    scene.replaceAllElements([frame, ...nextElements], { skipValidation: true });
+    pushHistory();
+    bumpSceneRepaint();
+    return frameId;
+  };
+
+  // B3: URLs we accept as embeddable iframe sources. Matches upstream's
+  // allowlist intent — only origins we trust won't serve hostile content.
+  const EMBED_URL_PATTERNS = [
+    /^https?:\/\/(www\.)?youtube\.com\/watch\?v=/i,
+    /^https?:\/\/(www\.)?youtu\.be\//i,
+    /^https?:\/\/(www\.)?vimeo\.com\/\d+/i,
+    /^https?:\/\/(www\.)?codepen\.io\//i,
+    /^https?:\/\/excalidraw\.com\//i,
+    /^https?:\/\/plus\.excalidraw\.com\//i,
+  ];
+
+  const isEmbeddableUrl = (text: string): boolean =>
+    EMBED_URL_PATTERNS.some((re) => re.test(text.trim()));
+
+  const insertEmbed = (url: string, sceneX: number, sceneY: number) => {
+    if (!scene) return;
+    const id = `embed_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const el: any = {
+      id, type: "iframe",
+      x: sceneX, y: sceneY, width: 480, height: 270, angle: 0,
+      strokeColor: "#1e1e1e", backgroundColor: "transparent",
+      fillStyle: "solid", strokeWidth: 1, strokeStyle: "solid",
+      roughness: 0, opacity: 100,
+      seed: Math.floor(Math.random() * 2 ** 31),
+      versionNonce: 1, version: 1, isDeleted: false,
+      groupIds: [], frameId: null, boundElements: null,
+      updated: Date.now(), link: url, locked: false, roundness: null,
+      customData: { embedUrl: url },
+    };
+    const existing = scene.getNonDeletedElements();
+    scene.replaceAllElements([...existing, el], { skipValidation: true });
+    pushHistory();
+    bumpSceneRepaint();
+  };
+
   const onContainerPaste = async (event: ClipboardEvent) => {
     // Ignore paste inside the text editor.
     if (textEditor) return;
     const items = event.clipboardData?.items;
     if (!items) return;
+    // B3: text URL paste → embed element (before image-item path)
+    const text = event.clipboardData?.getData("text/plain")?.trim();
+    if (text && isEmbeddableUrl(text)) {
+      event.preventDefault();
+      const sceneX = ((appState as any).scrollX ? -(appState as any).scrollX : 0) + 200;
+      const sceneY = ((appState as any).scrollY ? -(appState as any).scrollY : 0) + 200;
+      insertEmbed(text, sceneX, sceneY);
+      return;
+    }
     for (const item of Array.from(items)) {
       if (item.type.startsWith("image/")) {
         const blob = item.getAsFile();
         if (blob) {
           event.preventDefault();
+          // B4: an Excalidraw-exported PNG carries the scene JSON in a
+          // private tEXt chunk. If we can decode it, restore the scene
+          // instead of inserting the PNG as a flat image.
+          if (blob.type === "image/png") {
+            const restored = await tryRestoreSceneFromPng(blob);
+            if (restored) return;
+          }
           await insertImageFromBlob(blob);
           return;
         }
       }
     }
     // Not an image paste — let browser handle.
+  };
+
+  // B4: try to decode the Excalidraw scene metadata embedded in a PNG.
+  // Returns true if the scene was restored; false if the PNG is a plain
+  // image (caller falls through to insertImageFromBlob). No throws —
+  // failure is a soft signal.
+  const tryRestoreSceneFromPng = async (blob: Blob): Promise<boolean> => {
+    try {
+      const { decodePngMetadata } = await import("@excalidraw/excalidraw/data/image");
+      const raw = await decodePngMetadata(blob);
+      const data = JSON.parse(raw);
+      const parsed = Array.isArray(data?.elements) ? data.elements : null;
+      if (!parsed || parsed.length === 0) return false;
+      if (!scene) return false;
+      scene.replaceAllElements(parsed, { skipValidation: true });
+      pushHistory();
+      bumpSceneRepaint();
+      return true;
+    } catch {
+      // Plain PNG (no tEXt chunk) or legacy / malformed metadata. Fall
+      // through to the generic image-paste path.
+      return false;
+    }
   };
 
   const onContainerDragOver = (event: DragEvent) => {
@@ -3365,6 +3795,14 @@
         textDecoration: (el as any).textDecoration ?? "none",
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         textColor: (el as any).textColor ?? null,
+        // A9: line-height + rotation moved here from TextEditorPanel. angle
+        // is already on every element; lineHeight is text-only.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        lineHeight: (el as any).lineHeight ?? 1.25,
+        angle: el.angle ?? 0,
+        // C1: drop shadow config — null when no shadow.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        shadow: (el as any).shadow ?? null,
       };
     }
     return {
@@ -3538,6 +3976,53 @@
   // Toggle lock on every selected element. Locked elements can't be
   // clicked / dragged / resized; they're essentially inert until
   // unlocked. Matches upstream's element.locked boolean field.
+  // C2: mirror selected elements across their own horizontal or vertical
+  // axis. Linear elements (line/arrow/freedraw) mirror their points array;
+  // images negate the corresponding scale axis; bbox shapes are visually
+  // symmetric so flipping is a no-op (skipped silently).
+  const flipSelected = (axis: "horizontal" | "vertical") => {
+    if (!scene) return;
+    const selected = getSelectedElements();
+    if (selected.length === 0) return;
+    let mutated = 0;
+    for (const el of selected as any[]) {
+      if (el.locked) continue;
+      const w = el.width;
+      const h = el.height;
+      if (el.type === "line" || el.type === "arrow" || el.type === "freedraw") {
+        const pts = (el.points ?? []) as number[][];
+        const next = pts.map(([px, py]) => [
+          axis === "horizontal" ? w - px : px,
+          axis === "vertical" ? h - py : py,
+        ]);
+        scene.mutateElement(
+          el,
+          { points: next },
+          { informMutation: false, isDragging: false },
+        );
+        mutated++;
+      } else if (el.type === "image") {
+        const cur = (el.scale ?? [1, 1]) as number[];
+        const next: [number, number] = [
+          axis === "horizontal" ? -cur[0] : cur[0],
+          axis === "vertical" ? -cur[1] : cur[1],
+        ];
+        scene.mutateElement(
+          el,
+          { scale: next },
+          { informMutation: false, isDragging: false },
+        );
+        mutated++;
+      }
+      // rectangle / diamond / ellipse / text are visually symmetric across
+      // both axes when un-rotated; skip them.
+    }
+    if (mutated > 0) {
+      pushHistory();
+      bumpSceneRepaint();
+    }
+  };
+
   const toggleLockSelected = () => {
     if (!scene) return;
     const selected = getSelectedElements();
@@ -3817,11 +4302,10 @@
         return;
       }
 
-      // Phase 11: New frame: Ctrl+Shift+F
+      // B1: New frame: Ctrl+Shift+F. Creates a frame at viewport center
+      // and auto-binds every element whose bbox center falls inside.
       if (event.shiftKey && (event.key === "f" || event.key === "F")) {
-        const name = `Frame ${frames.size + 1}`;
-        createFrame(name, 0, 0, 400, 300);
-        pushHistory();
+        createFrameAtCenter();
         event.preventDefault();
         return;
       }
@@ -3869,9 +4353,10 @@
         return;
       }
 
-      // Phase 13: Text Editor panel: Ctrl+T
-      if (!event.shiftKey && (event.key === "t" || event.key === "T")) {
-        toggleSidePanel("texteditor");
+      // A1: Edit-link dialog: Ctrl+K (upstream keybinding). Only opens when
+      // exactly one element is selected.
+      if (!event.shiftKey && (event.key === "k" || event.key === "K")) {
+        openLinkDialog();
         event.preventDefault();
         return;
       }
@@ -4025,6 +4510,25 @@
       }
     }
 
+    // A2: L key toggles laser when no modifier and no text input focused.
+    // Active in presentation and normal editing alike. Avoids conflict with
+    // Ctrl+L (autolayout panel) by requiring no ctrl/meta.
+    if (
+      (event.key === "l" || event.key === "L") &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      !event.shiftKey
+    ) {
+      const t = event.target as HTMLElement | null;
+      const tag = t?.tagName?.toLowerCase();
+      if (tag !== "input" && tag !== "textarea" && !t?.isContentEditable) {
+        toggleLaser();
+        event.preventDefault();
+        return;
+      }
+    }
+
     // ── Space → temporary pan mode ────────────────────────────────────
     // Pressing space toggles a "grab" cursor and makes pointerdown pan
     // instead of doing its tool-specific action.
@@ -4073,6 +4577,11 @@
 
     // Escape → clear in-progress element + selection + back to selection tool.
     if (event.key === "Escape") {
+      // A2: Esc also turns off laser if active.
+      if (laserActive) {
+        laserActive = false;
+        laserTrail = [];
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (appState as any).newElement = null;
       polylineActive = false;
@@ -4289,6 +4798,7 @@
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const el of scene.getNonDeletedElements() as any[]) {
       if (!selectedIds[el.id]) continue;
+      if (el.locked) continue;
       if (el.type !== "line" && el.type !== "arrow") continue;
       const pts = el.points ?? [];
       for (let i = 0; i < pts.length; i++) {
@@ -4309,6 +4819,7 @@
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const el of scene.getNonDeletedElements() as any[]) {
       if (!selectedIds[el.id]) continue;
+      if (el.locked) continue;
       if (el.type !== "line" && el.type !== "arrow") continue;
       const pts = el.points ?? [];
       for (let i = 0; i < pts.length - 1; i++) {
@@ -4331,6 +4842,10 @@
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const el of scene.getNonDeletedElements() as any[]) {
       if (!selectedIds[el.id]) continue;
+      // A8: locked elements show a selection outline but expose no
+      // rotation/resize/endpoint handles. Exits the loop early so the
+      // user can't grab a handle that shouldn't be there.
+      if (el.locked) continue;
 
       // Rotation handle works on EVERY element type (including linear
       // and freedraw). Resize handles are only meaningful for bbox
@@ -4473,7 +4988,9 @@
     const baseThreshold = DEFAULT_COLLISION_THRESHOLD / zoomV;
     for (let i = elements.length - 1; i >= 0; i--) {
       const el = elements[i];
-      if (el.locked) continue;
+      // A8: locked elements ARE hit-testable — clicking one selects it
+      // (so the user sees the padlock outline). The drag/resize guards
+      // live in onInteractivePointerDown and hitResizeHandle.
       // Linear elements (line, arrow) have no fill so selection
       // relies entirely on distance-to-outline. The default 8px
       // threshold is stingy on thin strokes at normal zoom — bump
@@ -4961,6 +5478,39 @@
       // First finger: fall through to the normal pointerdown handler.
     }
 
+    // ── Connector tool: pick two shapes, link them with a bound arrow ──
+    if (connectorToolActive) {
+      const { x: cx, y: cy } = toSceneCoords(event.clientX, event.clientY);
+      const hit = hitTestAt(cx, cy);
+      if (!hit) {
+        // Click on empty space exits the tool without linking.
+        connectorToolActive = false;
+        selectedForConnection = null;
+        event.preventDefault();
+        return;
+      }
+      if (!selectedForConnection) {
+        selectedForConnection = hit.id;
+        // Highlight the first pick so the user sees what they selected.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (appState as any).selectedElementIds = { [hit.id]: true };
+        event.preventDefault();
+        return;
+      }
+      if (selectedForConnection === hit.id) {
+        // Same shape clicked twice — ignore (can't self-connect).
+        event.preventDefault();
+        return;
+      }
+      createConnectorArrow(selectedForConnection, hit.id);
+      selectedForConnection = null;
+      connectorToolActive = false;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (appState as any).selectedElementIds = {};
+      event.preventDefault();
+      return;
+    }
+
     // ── Pan gesture (middle mouse OR space held OR left+Alt via upstream)
     //    takes precedence over any tool's pointerdown. ────────────────
     if (event.button === 1 || spaceHeld) {
@@ -5141,14 +5691,37 @@
         }
       }
 
+      // A1: Ctrl/Cmd-click on a linked element opens the URL in a new tab.
+      // Fire before the lock guard so linked-and-locked still navigates.
+      const hitLink = (hit as any).link as string | null | undefined;
+      if ((event.ctrlKey || event.metaKey) && hitLink) {
+        window.open(hitLink, "_blank", "noopener,noreferrer");
+        event.preventDefault();
+        return;
+      }
+
+      // A8: clicking directly on a locked element selects it (for the
+      // padlock outline) but MUST NOT initiate a drag. Skip dragOrigins
+      // entirely in that case so pointermove's drag branch stays dormant.
+      if ((hit as any).locked) {
+        dragOrigins = [];
+        dragStart = null;
+        tryCapture(event.currentTarget as HTMLElement | null, event.pointerId);
+        event.preventDefault();
+        return;
+      }
+
       // Snapshot every currently-selected element's origin for the drag.
+      // Locked elements are excluded — even when multi-selected (Ctrl+A),
+      // they must stay pinned while the rest of the group drags.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const selectedIds = Object.keys((appState as any).selectedElementIds);
       const map = scene.getNonDeletedElementsMap();
       dragOrigins = selectedIds
         .map((id: string) => {
           const el = map.get(id);
-          return el ? { id, x: el.x, y: el.y, el } : null;
+          if (!el || (el as any).locked) return null;
+          return { id, x: el.x, y: el.y, el };
         })
         .filter(Boolean) as typeof dragOrigins;
       dragStart = { x, y };
@@ -5156,6 +5729,20 @@
       // (see finalize branch). Recording on pointerdown would store the
       // pre-drag state; we want the post-drag state per the invariant.
       tryCapture(event.currentTarget as HTMLElement | null, event.pointerId);
+      return;
+    }
+
+    // ── Eraser tool: tap or drag to delete elements under the cursor.
+    //    Soft-deletes via isDeleted=true so undo restores them. Records
+    //    the starting set for the drag in eraserDragSet.
+    if (tool === "eraser") {
+      eraserDragActive = true;
+      eraserDraggedIds.clear();
+      eraseAt(x, y);
+      dragStart = { x, y };
+      dragOrigins = [];
+      tryCapture(event.currentTarget as HTMLElement | null, event.pointerId);
+      event.preventDefault();
       return;
     }
 
@@ -5271,6 +5858,26 @@
   };
 
   const onInteractivePointerMove = (event: PointerEvent) => {
+    // B2: eraser drag. Each hit is soft-deleted and tracked in the drag
+    // set so the same element isn't hit twice + history lands once.
+    if (eraserDragActive) {
+      const { x: sx, y: sy } = toSceneCoords(event.clientX, event.clientY);
+      eraseAt(sx, sy);
+      return;
+    }
+
+    // A2: laser trail. Record container-relative coords so the SVG overlay
+    // (also container-relative) can render without extra math. Runs before
+    // any drawing/drag handlers so it fires even during pan or pinch.
+    if (laserActive && containerEl) {
+      const r = containerEl.getBoundingClientRect();
+      laserTrail = [
+        ...laserTrail,
+        { x: event.clientX - r.left, y: event.clientY - r.top, t: performance.now() },
+      ];
+      startLaserRaf();
+    }
+
     // ── Pinch update: when 2+ touches are active, compute new
     //    distance & midpoint relative to the gesture's start. ──────
     //
@@ -5400,8 +6007,52 @@
 
     // ── Drag selected elements ──
     if (dragOrigins.length > 0 && scene) {
-      const dx = x - dragStart.x;
-      const dy = y - dragStart.y;
+      let dx = x - dragStart.x;
+      let dy = y - dragStart.y;
+
+      // A4/A6: snap + alignment guides. Shift bypasses snap (standard UX).
+      // Snap the primary (first) origin and apply the same offset to the
+      // rest so multi-element groups stay rigid.
+      if (snapConfig.enabled && !event.shiftKey && dragOrigins.length > 0) {
+        const primary = dragOrigins[0];
+        const candidate = {
+          x: primary.x + dx,
+          y: primary.y + dy,
+          width: primary.el.width,
+          height: primary.el.height,
+        };
+        const draggingIds = new Set(dragOrigins.map((o) => o.el.id));
+        const others = scene
+          .getNonDeletedElements()
+          .filter((el) => !draggingIds.has(el.id))
+          .map((el) => ({
+            id: el.id,
+            x: el.x,
+            y: el.y,
+            width: el.width,
+            height: el.height,
+          }));
+        const { snapOffsetX, snapOffsetY, guides } = computeDragSnap(
+          candidate,
+          others,
+          {
+            threshold: snapConfig.threshold,
+            snapToGrid: snapConfig.snapToGrid ?? false,
+            snapToElements: snapConfig.snapToElements ?? false,
+            snapEdges: snapConfig.snapEdges ?? true,
+            snapCenters: snapConfig.snapCenters ?? true,
+            gridSize: gridConfig.size,
+          },
+        );
+        dx += snapOffsetX;
+        dy += snapOffsetY;
+        snapGuides = guides;
+        isDraggingForSnap = guides.length > 0;
+      } else {
+        snapGuides = [];
+        isDraggingForSnap = false;
+      }
+
       for (const origin of dragOrigins) {
         // scene.mutateElement applies the update AND bumps scene nonce via
         // triggerUpdate() — but the static-render $effect doesn't track
@@ -5412,6 +6063,14 @@
           { x: origin.x + dx, y: origin.y + dy },
           { informMutation: false, isDragging: true },
         );
+        // Re-route arrows bound to this element so connectors follow as
+        // the shape moves. No-op if the element has no bound arrows.
+        try {
+          updateBoundElements(origin.el, scene);
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn("sveltedraw: updateBoundElements failed", err);
+        }
       }
       bumpSceneRepaint();
       return;
@@ -5507,6 +6166,18 @@
       return;
     }
 
+    // B2: finish an eraser drag. One history entry for the whole swipe
+    // (not one per shape). Clear the drag set + flag; tool stays active
+    // so the user can keep erasing with subsequent pointerdowns.
+    if (eraserDragActive) {
+      eraserDragActive = false;
+      if (eraserDraggedIds.size > 0) pushHistory();
+      eraserDraggedIds.clear();
+      bumpSceneRepaint();
+      tryRelease(event.currentTarget as HTMLElement | null, event.pointerId);
+      return;
+    }
+
     // Finalize marquee — commit selection, then clear.
     if (marquee) {
       commitMarquee();
@@ -5575,6 +6246,9 @@
       }
       dragOrigins = [];
       dragStart = null;
+      // Clear A4/A6 snap guides on pointerup.
+      snapGuides = [];
+      isDraggingForSnap = false;
       if (moved || altDragHadDuplicate) pushHistory();
       altDragHadDuplicate = false;
       bumpSceneRepaint();
@@ -5721,6 +6395,10 @@
         ? "excalidraw--view-mode"
         : "",
       editorInterface.formFactor === "phone" ? "excalidraw--mobile" : "",
+      // A2: crosshair cursor while laser tool is active.
+      laserActive ? "sveltedraw--laser" : "",
+      // B2: eraser cursor hint.
+      (appState.activeTool as any)?.type === "eraser" ? "sveltedraw--eraser" : "",
     ]
       .filter(Boolean)
       .join(" "),
@@ -5961,6 +6639,7 @@
     {@render toolBtn("arrow", "ArrowIcon", "a", "Arrow")}
     {@render toolBtn("line", "LineIcon", "l", "Line")}
     {@render toolBtn("freedraw", "FreedrawIcon", "p", "Draw")}
+    {@render toolBtn("eraser", "EraserIcon", "e", "Eraser")}
     {@render toolBtn("text", "TextIcon", "t", "Text")}
     <div class="tb-sep"></div>
     <button
@@ -6054,6 +6733,25 @@
     <button
       type="button"
       class="sveltedraw-util-btn"
+      class:active={laserActive}
+      aria-label="Laser pointer"
+      title="Laser pointer (K, L in presentation)"
+      onclick={toggleLaser}
+    >
+      ✦
+    </button>
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
+      aria-label="Create frame"
+      title="New frame (Ctrl+Shift+F)"
+      onclick={createFrameAtCenter}
+    >
+      ⬛
+    </button>
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
       class:active={alignmentPanelActive}
       aria-label="Alignment tool"
       title="Alignment & Distribution (Ctrl+Alt+L, etc)"
@@ -6080,16 +6778,6 @@
       onclick={() => toggleSidePanel("autolayout")}
     >
       🎯
-    </button>
-    <button
-      type="button"
-      class="sveltedraw-util-btn"
-      class:active={textEditorPanelActive}
-      aria-label="Text Editor"
-      title="Text Properties (Ctrl+T)"
-      onclick={() => toggleSidePanel("texteditor")}
-    >
-      ✏️
     </button>
     <button
       type="button"
@@ -6183,9 +6871,11 @@
   {#if connectorToolActive}
     <div class="sveltedraw-connector-panel">
       <ConnectorTool
-        {connectors}
-        {activeRoutingStyle}
-        onRoutingStyleChange={(style) => (activeRoutingStyle = style)}
+        hasFirstPick={selectedForConnection !== null}
+        onCancel={() => {
+          connectorToolActive = false;
+          selectedForConnection = null;
+        }}
       />
     </div>
   {/if}
@@ -6228,26 +6918,6 @@
     </div>
   {/if}
 
-  <!-- Text Editor panel — Phase 13 Feature 5 -->
-  {#if textEditorPanelActive}
-    <div class="sveltedraw-texteditor-panel">
-      <TextEditorPanel
-        selectedElements={getSelectedElements().map(el => ({
-          id: el.id,
-          fontSize: el.fontSize,
-          fontFamily: el.fontFamily,
-          fontWeight: el.fontWeight,
-          fontStyle: el.fontStyle,
-          textDecoration: el.textDecoration,
-          textColor: el.textColor,
-          textAlignment: el.textAlignment,
-          lineHeight: el.lineHeight,
-          angle: el.angle,
-        }))}
-        onTextPropertiesChange={handleTextPropertiesChange}
-      />
-    </div>
-  {/if}
 
   <!-- Grid & Snap panel — Phase 14 Feature 1 -->
   {#if gridPanelActive}
@@ -6398,6 +7068,36 @@
       onSelect={selectTemplate}
       onClose={() => (showTemplateSelector = false)}
     />
+  {/if}
+
+  <!-- A1: element-link dialog. Modal overlay; Ctrl+K, context menu, and the
+       hover chip all flow through openLinkDialog(). The overlay is just a
+       backdrop — click closes; keyboard Esc also closes via the dialog's
+       own listener. stopPropagation on the modal prevents backdrop clicks
+       from reaching it and closing accidentally. -->
+  {#if linkDialogOpen && getLinkedElement}
+    <div
+      class="sveltedraw-link-overlay"
+      role="presentation"
+      onclick={closeLinkDialog}
+    >
+      <div
+        class="sveltedraw-link-modal"
+        role="dialog"
+        aria-modal="true"
+        tabindex="-1"
+        onclick={(e) => e.stopPropagation()}
+        onkeydown={(e) => { if (e.key === "Escape") closeLinkDialog(); }}
+      >
+        <ElementLinkDialog
+          link={(getLinkedElement as any).link ?? null}
+          originalLink={(getLinkedElement as any).link ?? null}
+          onConfirm={confirmLinkDialog}
+          onClose={closeLinkDialog}
+          enabled={linkDialogOpen}
+        />
+      </div>
+    </div>
   {/if}
 
   <!-- Recent files panel — shows last 10 files. -->
@@ -6846,8 +7546,74 @@
       </div>
     {/if}
 
-    <!-- Lock/unlock selection. Locked elements ignore pointer events,
-         can't be resized/rotated/dragged. Upstream hotkey: Ctrl+Shift+L. -->
+    <!-- C1: drop shadow — one-click presets. None / Soft / Hard. Applied
+         on every selected element. Uses applyStyle so the value flows
+         through scene.mutateElement + history. -->
+    {#if Object.keys((appState as any).selectedElementIds ?? {}).length > 0}
+      <div class="sp-row">
+        <div class="sp-label">Shadow</div>
+        <div class="sp-swatches">
+          <button
+            type="button"
+            class="sp-icon-btn"
+            class:active={!panelStyle.shadow}
+            title="None"
+            aria-label="Shadow none"
+            onclick={() => applyStyle({ shadow: null })}
+          >∅</button>
+          <button
+            type="button"
+            class="sp-icon-btn"
+            title="Soft"
+            aria-label="Shadow soft"
+            onclick={() => applyStyle({ shadow: { color: "rgba(0,0,0,0.25)", offsetX: 4, offsetY: 4, blur: 8 } })}
+          >◌</button>
+          <button
+            type="button"
+            class="sp-icon-btn"
+            title="Hard"
+            aria-label="Shadow hard"
+            onclick={() => applyStyle({ shadow: { color: "#000", offsetX: 6, offsetY: 6, blur: 0 } })}
+          >●</button>
+        </div>
+      </div>
+    {/if}
+
+    <!-- A9: line-height slider (text-only). Migrated from TextEditorPanel.
+         Upstream stores lineHeight as a float multiplier (≈1.25 default). -->
+    {#if hasTextSelected}
+      <div class="sp-row">
+        <div class="sp-label">Line height</div>
+        <div class="sp-swatches sp-slider">
+          <input
+            type="range" min="1" max="3" step="0.05"
+            value={panelStyle.lineHeight}
+            oninput={(e) => applyStyle({ lineHeight: parseFloat((e.currentTarget as HTMLInputElement).value) })}
+            aria-label="Line height"
+          />
+          <span class="sp-slider-value">{Number(panelStyle.lineHeight ?? 1.25).toFixed(2)}</span>
+        </div>
+      </div>
+    {/if}
+
+    <!-- A9: rotation slider. Any element. Also migrated from TextEditorPanel.
+         Rotation handles still work; this is just a precise numeric input. -->
+    {#if Object.keys((appState as any).selectedElementIds ?? {}).length === 1}
+      <div class="sp-row">
+        <div class="sp-label">Rotation</div>
+        <div class="sp-swatches sp-slider">
+          <input
+            type="range" min="0" max="360" step="1"
+            value={Math.round(((panelStyle.angle ?? 0) * 180) / Math.PI)}
+            oninput={(e) => applyStyle({ angle: (parseInt((e.currentTarget as HTMLInputElement).value, 10) * Math.PI) / 180 })}
+            aria-label="Rotation angle"
+          />
+          <span class="sp-slider-value">{Math.round(((panelStyle.angle ?? 0) * 180) / Math.PI)}°</span>
+        </div>
+      </div>
+    {/if}
+
+    <!-- Lock/unlock + C2 flip (H/V). Actions row. -->
     {#if Object.keys((appState as any).selectedElementIds ?? {}).length > 0}
       <div class="sp-row">
         <div class="sp-label">Actions</div>
@@ -6861,6 +7627,20 @@
           >
             {getSelectedElements().some((el) => el.locked) ? "🔒" : "🔓"}
           </button>
+          <button
+            type="button"
+            class="sp-icon-btn"
+            aria-label="Flip horizontal"
+            title="Flip horizontal"
+            onclick={() => flipSelected("horizontal")}
+          >⇔</button>
+          <button
+            type="button"
+            class="sp-icon-btn"
+            aria-label="Flip vertical"
+            title="Flip vertical"
+            onclick={() => flipSelected("vertical")}
+          >⇕</button>
         </div>
       </div>
     {/if}
@@ -6873,6 +7653,24 @@
     renderConfig={undefined}
     render={noopRender}
   />
+
+  <!-- A1: link chip overlay. `linkedSelected` is a $derived that reads
+       sceneReady explicitly so it recomputes after mutateElement bumps. -->
+  {#each linkedSelected as el (el.id)}
+    {@const zoomV = (appState.zoom as any).value ?? 1}
+    {@const cx = (el.x + el.width + ((appState.scrollX as any) ?? 0)) * zoomV}
+    {@const cy = (el.y + ((appState.scrollY as any) ?? 0)) * zoomV}
+    <a
+      class="sveltedraw-link-chip"
+      style="left: {Math.max(cx - 180, 8)}px; top: {Math.max(cy - 28, 8)}px;"
+      href={(el as any).link}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={(el as any).link}
+    >
+      🔗 {(el as any).link}
+    </a>
+  {/each}
 
   <!-- Grid Renderer — Phase 14 Feature 2 -->
   <GridRenderer
@@ -6895,6 +7693,127 @@
       offsetX={0}
       offsetY={0}
     />
+  {/if}
+
+  <!-- A5: measurement overlays (rulers / dimensions / distances). All three
+       render as one absolutely-positioned SVG. Outer {#if} reads sceneReady
+       so mutateElement bumps trigger a rerender — otherwise resize/move
+       don't update the dimension/distance labels since el.width reads
+       happen inside non-reactive {@const} evaluation. -->
+  {#if (sceneReady >= 0) && (measurementConfig.showRulers || ((measurementConfig.showDimensions || measurementConfig.showDistances) && getSelectedElements().length >= 1))}
+    {@const zoomV = (appState.zoom as any).value ?? 1}
+    {@const scX = ((appState.scrollX as any) ?? 0)}
+    {@const scY = ((appState.scrollY as any) ?? 0)}
+    {@const measSelected = getSelectedElements()}
+    {@const showRulers = measurementConfig.showRulers}
+    {@const showDims = measurementConfig.showDimensions && measSelected.length >= 1}
+    {@const showDists = measurementConfig.showDistances && measSelected.length >= 2}
+    <svg
+      class="sveltedraw-measurement-overlay"
+      width={appState.width}
+      height={appState.height}
+      viewBox="0 0 {appState.width} {appState.height}"
+    >
+      {#if showRulers}
+        {@const RULER_SIZE = 20}
+        {@const tickStep = Math.max(gridConfig.size, 1)}
+        <!-- Ruler backgrounds -->
+        <rect x="0" y="0" width={appState.width} height={RULER_SIZE}
+              fill="rgba(255,255,255,0.92)" stroke="#d1d4da" />
+        <rect x="0" y="0" width={RULER_SIZE} height={appState.height}
+              fill="rgba(255,255,255,0.92)" stroke="#d1d4da" />
+        <!-- Horizontal ticks -->
+        {#each Array.from({ length: Math.ceil(appState.width / (tickStep * zoomV)) + 2 }) as _, i}
+          {@const sceneX = Math.floor(-scX / tickStep) * tickStep + i * tickStep}
+          {@const vx = (sceneX + scX) * zoomV}
+          {#if vx >= RULER_SIZE && vx <= appState.width}
+            <line x1={vx} y1={RULER_SIZE - 6} x2={vx} y2={RULER_SIZE}
+                  stroke="#888" stroke-width="1" />
+            <text x={vx + 2} y={12} font-size="9" fill="#666"
+                  font-family="system-ui, -apple-system, sans-serif">
+              {formatMeasurement(sceneX, measurementConfig.unit, 0)}
+            </text>
+          {/if}
+        {/each}
+        <!-- Vertical ticks -->
+        {#each Array.from({ length: Math.ceil(appState.height / (tickStep * zoomV)) + 2 }) as _, i}
+          {@const sceneY = Math.floor(-scY / tickStep) * tickStep + i * tickStep}
+          {@const vy = (sceneY + scY) * zoomV}
+          {#if vy >= RULER_SIZE && vy <= appState.height}
+            <line x1={RULER_SIZE - 6} y1={vy} x2={RULER_SIZE} y2={vy}
+                  stroke="#888" stroke-width="1" />
+            <text x={2} y={vy + 10} font-size="9" fill="#666"
+                  font-family="system-ui, -apple-system, sans-serif">
+              {formatMeasurement(sceneY, measurementConfig.unit, 0)}
+            </text>
+          {/if}
+        {/each}
+      {/if}
+
+      {#if showDims}
+        {#each measSelected as el, i (el.id + ":" + sceneReady)}
+          <text class="sveltedraw-measurement-dimension"
+                x={(el.x + el.width / 2 + scX) * zoomV}
+                y={(el.y + scY) * zoomV - 8}
+                text-anchor="middle" font-size="11"
+                font-family="system-ui, -apple-system, sans-serif"
+                fill="#6965db" font-weight="600">
+            {formatMeasurement(el.width, measurementConfig.unit, measurementConfig.precision)} × {formatMeasurement(el.height, measurementConfig.unit, measurementConfig.precision)}
+          </text>
+        {/each}
+      {/if}
+
+      {#if showDists}
+        {#each measSelected.slice(1) as el, i (el.id + ":" + sceneReady)}
+          {@const a = measSelected[i]}
+          {@const b = el}
+          {@const ax = (a.x + a.width / 2 + scX) * zoomV}
+          {@const ay = (a.y + a.height / 2 + scY) * zoomV}
+          {@const bx = (b.x + b.width / 2 + scX) * zoomV}
+          {@const by = (b.y + b.height / 2 + scY) * zoomV}
+          {@const d = Math.hypot(bx - ax, by - ay) / zoomV}
+          <line class="sveltedraw-measurement-distance"
+                x1={ax} y1={ay} x2={bx} y2={by}
+                stroke="#6965db" stroke-width="1.5"
+                stroke-dasharray="4 3" />
+          <text x={(ax + bx) / 2} y={(ay + by) / 2 - 6}
+                text-anchor="middle" font-size="11"
+                font-family="system-ui, -apple-system, sans-serif"
+                fill="#6965db" font-weight="600">
+            d = {formatMeasurement(d, measurementConfig.unit, measurementConfig.precision)}
+          </text>
+        {/each}
+      {/if}
+    </svg>
+  {/if}
+
+  <!-- A2: laser pointer overlay. Polyline with per-segment opacity fading
+       over LASER_FADE_MS. Pointer-events: none so it never swallows clicks.
+       Void-read laserFrame so the RAF loop continuously refreshes opacity
+       even when the pointer stops moving. -->
+  {#if laserActive || laserTrail.length > 0}
+    <svg
+      class="sveltedraw-laser-overlay"
+      data-laser-frame={laserFrame}
+      width={appState.width}
+      height={appState.height}
+      viewBox="0 0 {appState.width} {appState.height}"
+    >
+      {#each laserTrail as p, i (p.t)}
+        {#if i > 0}
+          {@const prev = laserTrail[i - 1]}
+          {@const age = performance.now() - p.t}
+          {@const opacity = Math.max(0, 1 - age / LASER_FADE_MS)}
+          <line
+            x1={prev.x} y1={prev.y} x2={p.x} y2={p.y}
+            stroke="#ff3b30"
+            stroke-width="4"
+            stroke-linecap="round"
+            stroke-opacity={opacity}
+          />
+        {/if}
+      {/each}
+    </svg>
   {/if}
 
   <InteractiveCanvas
@@ -7041,6 +7960,11 @@
       }}>{t("labels.paste")}</button>
       {#if contextMenu.hasSelection}
         <div class="ctx-sep"></div>
+        {#if getSelectedElements().length === 1}
+          <button type="button" class="ctx-item" onclick={() => { openLinkDialog(); closeContextMenu(); }}>
+            {getSelectedElements()[0]?.link ? "Edit link" : "Add link"}
+          </button>
+        {/if}
         <button type="button" class="ctx-item" onclick={() => { duplicateSelected(); closeContextMenu(); }}>{t("labels.duplicateSelection")}</button>
         <button type="button" class="ctx-item" onclick={() => { groupSelected(); closeContextMenu(); }}>{t("labels.group")}</button>
         <button type="button" class="ctx-item" onclick={() => { ungroupSelected(); closeContextMenu(); }}>{t("labels.ungroup")}</button>
@@ -7131,6 +8055,131 @@
 </div>
 
 <style>
+  /* A1: element-link dialog modal. */
+  .sveltedraw-link-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(12, 13, 19, 0.55);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sveltedraw-link-modal {
+    background: #fff;
+    border-radius: 8px;
+    padding: 16px 18px;
+    width: min(480px, 92vw);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-link-modal {
+    background: #1a1a1e;
+    color: #e5e7ea;
+  }
+
+  /* A1: link chip — shown over a selected linked element so the user can
+     jump to the URL without opening the dialog. */
+  .sveltedraw-link-chip {
+    position: absolute;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: #1e1e1e;
+    color: #fff;
+    border-radius: 14px;
+    font: 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    text-decoration: none;
+    white-space: nowrap;
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    z-index: 60;
+    cursor: pointer;
+  }
+  .sveltedraw-link-chip:hover { background: #2b2b2b; }
+  .sveltedraw-link-chip:focus-visible { outline: 2px solid #6965db; }
+
+  /* A2: laser overlay pinned over the canvas. pointer-events: none so the
+     trail never blocks clicks on the underlying canvas. Z-index above the
+     canvas layer but below side panels. */
+  .sveltedraw-laser-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 30;
+  }
+  :global(.sveltedraw--laser) { cursor: crosshair; }
+  :global(.sveltedraw--eraser) { cursor: crosshair; }
+
+  /* D1: dark-mode overrides for orphan upstream components whose SCSS
+     sidecars don't ship with theme--dark rules. Targets visible white-on-
+     white patterns: dialogs, buttons, color pickers, dropdowns, menus. */
+  :global(.excalidraw.theme--dark .excalidraw-button) {
+    background: #2e2e36;
+    color: #e5e7ea;
+    border-color: #363636;
+  }
+  :global(.excalidraw.theme--dark .excalidraw-button:hover) {
+    background: #363644;
+  }
+  :global(.excalidraw.theme--dark .excalidraw-button.selected) {
+    background: #6965db;
+    color: #fff;
+  }
+  :global(.excalidraw.theme--dark .Dialog),
+  :global(.excalidraw.theme--dark .Dialog__content) {
+    background: #232329;
+    color: #e5e7ea;
+    border-color: #363636;
+  }
+  :global(.excalidraw.theme--dark .Dialog__title) { color: #e5e7ea; }
+  :global(.excalidraw.theme--dark .context-menu),
+  :global(.excalidraw.theme--dark .dropdown-menu-container) {
+    background: #232329;
+    color: #e5e7ea;
+    border-color: #363636;
+  }
+  :global(.excalidraw.theme--dark .context-menu-option),
+  :global(.excalidraw.theme--dark .dropdown-menu-item) {
+    color: #e5e7ea;
+  }
+  :global(.excalidraw.theme--dark .context-menu-option:hover),
+  :global(.excalidraw.theme--dark .dropdown-menu-item:hover),
+  :global(.excalidraw.theme--dark .dropdown-menu-item[data-highlighted]) {
+    background: #2e2e36;
+  }
+  :global(.excalidraw.theme--dark .color-picker-container),
+  :global(.excalidraw.theme--dark .color-picker-popover-content),
+  :global(.excalidraw.theme--dark .color-picker-content),
+  :global(.excalidraw.theme--dark .Picker),
+  :global(.excalidraw.theme--dark .picker-heading),
+  :global(.excalidraw.theme--dark .shade-list),
+  :global(.excalidraw.theme--dark .top-picks) {
+    background: #232329;
+    color: #e5e7ea;
+    border-color: #363636;
+  }
+  :global(.excalidraw.theme--dark .color-input-container),
+  :global(.excalidraw.theme--dark .color-input) {
+    background: #2e2e36;
+    color: #e5e7ea;
+    border-color: #363636;
+  }
+  :global(.excalidraw.theme--dark .active-confirm-dialog) {
+    background: #232329;
+    color: #e5e7ea;
+  }
+
+  /* A5: measurement overlay — rulers, dimensions, distances. */
+  .sveltedraw-measurement-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 25;
+  }
+
   .excalidraw-container {
     position: relative;
     width: 100%;
@@ -7176,6 +8225,23 @@
   .sveltedraw-style-panel .sp-swatches {
     display: flex;
     gap: 4px;
+  }
+  /* A9: slider variant for line-height + rotation controls. */
+  .sveltedraw-style-panel .sp-slider {
+    flex: 1;
+    align-items: center;
+  }
+  .sveltedraw-style-panel .sp-slider input[type="range"] {
+    flex: 1;
+    min-width: 80px;
+  }
+  .sveltedraw-style-panel .sp-slider-value {
+    min-width: 42px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    color: #6965db;
+    font-weight: 600;
+    font-size: 11px;
   }
   .sveltedraw-style-panel .sp-picker {
     flex: 1;
@@ -7829,23 +8895,6 @@
     z-index: 40;
   }
   :global(.excalidraw.theme--dark) .sveltedraw-autolayout-panel {
-    background: #232329;
-    border-color: #363636;
-  }
-
-  .sveltedraw-texteditor-panel {
-    position: absolute;
-    bottom: 16px;
-    right: 16px;
-    width: 280px;
-    max-height: 70vh;
-    background: #fff;
-    border: 1px solid #d1d4da;
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    z-index: 40;
-  }
-  :global(.excalidraw.theme--dark) .sveltedraw-texteditor-panel {
     background: #232329;
     border-color: #363636;
   }

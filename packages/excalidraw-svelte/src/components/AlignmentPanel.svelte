@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { AlignmentType, DistributionType } from '../alignment/types.js';
+  import { t } from '../state/i18n.svelte.js';
 
   interface Props {
     onAlign: (type: AlignmentType) => void;
@@ -9,36 +10,36 @@
 
   let { onAlign, onDistribute, selectedCount }: Props = $props();
 
-  const alignmentOptions: Array<{ type: AlignmentType; label: string; shortcut: string }> = [
-    { type: 'left', label: 'Align Left', shortcut: 'Ctrl+Alt+L' },
-    { type: 'centerH', label: 'Align Center', shortcut: 'Ctrl+Alt+C' },
-    { type: 'right', label: 'Align Right', shortcut: 'Ctrl+Alt+R' },
-    { type: 'top', label: 'Align Top', shortcut: 'Ctrl+Alt+T' },
-    { type: 'centerV', label: 'Align Middle', shortcut: 'Ctrl+Alt+M' },
-    { type: 'bottom', label: 'Align Bottom', shortcut: 'Ctrl+Alt+B' },
-  ];
+  const alignmentOptions = $derived<Array<{ type: AlignmentType; label: string; shortcut: string }>>([
+    { type: 'left', label: t('labels.alignLeft', undefined, 'Align Left'), shortcut: 'Ctrl+Alt+L' },
+    { type: 'centerH', label: t('labels.centerHorizontally', undefined, 'Align Center'), shortcut: 'Ctrl+Alt+C' },
+    { type: 'right', label: t('labels.alignRight', undefined, 'Align Right'), shortcut: 'Ctrl+Alt+R' },
+    { type: 'top', label: t('labels.alignTop', undefined, 'Align Top'), shortcut: 'Ctrl+Alt+T' },
+    { type: 'centerV', label: t('labels.centerVertically', undefined, 'Align Middle'), shortcut: 'Ctrl+Alt+M' },
+    { type: 'bottom', label: t('labels.alignBottom', undefined, 'Align Bottom'), shortcut: 'Ctrl+Alt+B' },
+  ]);
 
-  const distributionOptions: Array<{ type: DistributionType; label: string; shortcut: string }> = [
-    { type: 'distributeEvenlyH', label: 'Distribute Horizontally', shortcut: 'Ctrl+Shift+H' },
-    { type: 'distributeEvenlyV', label: 'Distribute Vertically', shortcut: 'Ctrl+Shift+V' },
-  ];
+  const distributionOptions = $derived<Array<{ type: DistributionType; label: string; shortcut: string }>>([
+    { type: 'distributeEvenlyH', label: t('labels.distributeHorizontally', undefined, 'Distribute Horizontally'), shortcut: 'Ctrl+Shift+H' },
+    { type: 'distributeEvenlyV', label: t('labels.distributeVertically', undefined, 'Distribute Vertically'), shortcut: 'Ctrl+Shift+V' },
+  ]);
 </script>
 
 <div class="alignment-panel">
   <div class="ap-header">
-    <h3 class="ap-title">Alignment & Distribution</h3>
+    <h3 class="ap-title">{t('sveltedraw.panels.alignmentTitle', undefined, 'Alignment & Distribution')}</h3>
     {#if selectedCount > 0}
-      <span class="ap-count">{selectedCount} selected</span>
+      <span class="ap-count">{selectedCount} {t('sveltedraw.panels.selected', undefined, 'selected')}</span>
     {/if}
   </div>
 
   {#if selectedCount < 2}
     <div class="ap-message">
-      <p>Select 2+ shapes to align or distribute them</p>
+      <p>{t('sveltedraw.panels.alignmentEmpty', undefined, 'Select 2+ shapes to align or distribute them')}</p>
     </div>
   {:else}
     <div class="ap-section">
-      <p class="ap-section-label">Align</p>
+      <p class="ap-section-label">{t('sveltedraw.panels.align', undefined, 'Align')}</p>
       <div class="ap-grid">
         {#each alignmentOptions as option}
           <button
@@ -53,7 +54,7 @@
     </div>
 
     <div class="ap-section">
-      <p class="ap-section-label">Distribute</p>
+      <p class="ap-section-label">{t('sveltedraw.panels.distribute', undefined, 'Distribute')}</p>
       <div class="ap-grid">
         {#each distributionOptions as option}
           <button
@@ -68,8 +69,8 @@
     </div>
 
     <div class="ap-guides">
-      <p class="ap-guides-label">Smart Guides</p>
-      <p class="ap-guides-info">Guides appear when shapes align within snap threshold</p>
+      <p class="ap-guides-label">{t('sveltedraw.panels.smartGuides', undefined, 'Smart Guides')}</p>
+      <p class="ap-guides-info">{t('sveltedraw.panels.smartGuidesInfo', undefined, 'Guides appear when shapes align within snap threshold')}</p>
     </div>
   {/if}
 </div>
