@@ -134,6 +134,8 @@
   import GridRenderer from "./components/GridRenderer.svelte";
   import SnapGuideRenderer from "./components/SnapGuideRenderer.svelte";
   import LayerPanel from "./components/LayerPanel.svelte";
+  import HistoryPanel from "./components/HistoryPanel.svelte";
+  import type { HistoryState } from "./history/types.js";
   import type { Template } from "./templates/index.js";
   import type { Connector, RoutingStyle } from "./connectors/types.js";
   import { generateConnectorPath } from "./connectors/types.js";
@@ -1597,6 +1599,11 @@
   let selectedLayerId = $state<string | null>(null);
   let expandedGroups = $state<Set<string>>(new Set());
 
+  // Phase 16: History Panel & Timeline
+  let historyPanelActive = $state(false);
+  let editorHistory = $state<HistoryState[]>([]);
+  let historyCurrentIndex = $state(0);
+
   const loadLibrary = () => {
     try {
       const raw = localStorage.getItem(LIBRARY_KEY);
@@ -2209,6 +2216,19 @@
 
     pushHistory();
     bumpSceneRepaint();
+  };
+
+  // ── Phase 16: History Management ──────────────────────────────────
+  const handleHistoryJump = (index: number) => {
+    if (index < 0 || index >= editorHistory.length) return;
+    // In a real implementation, we'd restore the scene state from editorHistory[index]
+    // For now, we track which history state we're at
+    historyCurrentIndex = index;
+  };
+
+  const handleHistoryClear = () => {
+    editorHistory = [];
+    historyCurrentIndex = 0;
   };
 
   // ── Z-order: bring forward / send backward / to front / to back ─────
@@ -5512,6 +5532,16 @@
     <button
       type="button"
       class="sveltedraw-util-btn"
+      class:active={historyPanelActive}
+      aria-label="History"
+      title="Undo/Redo History"
+      onclick={() => (historyPanelActive = !historyPanelActive)}
+    >
+      ⏮
+    </button>
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
       aria-label="Toggle dark mode"
       title="Toggle dark mode"
       onclick={toggleTheme}
@@ -5634,6 +5664,18 @@
         onCreateGroup={handleCreateGroup}
         onDeleteGroup={handleDeleteGroup}
         onReorderLayers={handleReorderLayers}
+      />
+    </div>
+  {/if}
+
+  <!-- History panel — Phase 16 Feature 1 -->
+  {#if historyPanelActive}
+    <div class="sveltedraw-history-panel">
+      <HistoryPanel
+        history={editorHistory}
+        currentIndex={historyCurrentIndex}
+        onJumpToState={handleHistoryJump}
+        onClearHistory={handleHistoryClear}
       />
     </div>
   {/if}
@@ -7097,6 +7139,21 @@
     z-index: 40;
   }
   :global(.excalidraw.theme--dark) .sveltedraw-layer-panel {
+    background: #232329;
+    border-color: #363636;
+  }
+
+  .sveltedraw-history-panel {
+    position: absolute;
+    bottom: 16px;
+    right: 2120px;
+    background: #fff;
+    border: 1px solid #d1d4da;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    z-index: 40;
+  }
+  :global(.excalidraw.theme--dark) .sveltedraw-history-panel {
     background: #232329;
     border-color: #363636;
   }
