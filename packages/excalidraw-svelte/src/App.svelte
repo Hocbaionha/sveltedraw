@@ -1595,6 +1595,7 @@
   let layerPanelActive = $state(false);
   let layers = $state<LayerItem[]>([]);
   let selectedLayerId = $state<string | null>(null);
+  let expandedGroups = $state<Set<string>>(new Set());
 
   const loadLibrary = () => {
     try {
@@ -1985,16 +1986,27 @@
   const syncLayersFromScene = () => {
     if (!scene) return;
     const elements = scene.getNonDeletedElements();
-    layers = elements.map((el, idx) => ({
-      id: el.id,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      name: (el as any).customLayerName || `Layer ${idx + 1}`,
-      visible: !el.isDeleted,
-      locked: el.locked || false,
-      opacity: el.opacity ?? 1,
-      type: 'element' as const,
-      order: idx,
-    }));
+
+    // Build simple layer array for now (no grouping yet - that's Feature 2+)
+    const newLayers: LayerItem[] = [];
+    for (let idx = 0; idx < elements.length; idx++) {
+      const el = elements[idx];
+      newLayers.push({
+        id: el.id,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        name: (el as any).customLayerName || getLayerName(el),
+        visible: !el.isDeleted,
+        locked: el.locked || false,
+        opacity: el.opacity ?? 1,
+        type: 'element' as const,
+        order: idx,
+      });
+    }
+
+    // Only update if content actually changed to avoid infinite loops
+    if (JSON.stringify(layers.map(l => l.id)) !== JSON.stringify(newLayers.map(l => l.id))) {
+      layers = newLayers;
+    }
   };
 
   const handleLayerSelect = (layerId: string) => {
@@ -2040,6 +2052,21 @@
     pushHistory();
     bumpSceneRepaint();
     syncLayersFromScene();
+  };
+
+  const handleCreateGroup = () => {
+    // Feature 2 - TBD: Group selected elements
+    if (!scene) return;
+    const selected = getSelectedElements();
+    if (selected.length < 2) {
+      console.log('Select 2+ elements to create a group');
+      return;
+    }
+    // Group creation logic will be implemented in Feature 2
+  };
+
+  const handleDeleteGroup = (groupId: string) => {
+    // Feature 2 - TBD: Delete group and promote children
   };
 
   // ── Z-order: bring forward / send backward / to front / to back ─────
@@ -5452,7 +5479,7 @@
     </div>
   {/if}
 
-  <!-- Layer panel — Phase 15 Feature 1 -->
+  <!-- Layer panel — Phase 15 Feature 1 + 2 -->
   {#if layerPanelActive}
     <div class="sveltedraw-layer-panel">
       <LayerPanel
@@ -5462,6 +5489,8 @@
         onLayerVisibilityChange={handleLayerVisibilityChange}
         onLayerLockChange={handleLayerLockChange}
         onLayerOpacityChange={handleLayerOpacityChange}
+        onCreateGroup={handleCreateGroup}
+        onDeleteGroup={handleDeleteGroup}
       />
     </div>
   {/if}
