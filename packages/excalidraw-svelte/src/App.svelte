@@ -1525,6 +1525,26 @@
       selected.filter((el: any) => !el.locked).map((el) => el.id),
     );
     if (selectedSet.size === 0) return;
+    // B1: if any deleted element is a frame, clear frameId on its
+    // surviving children — otherwise they'd hold a dead reference and
+    // export/presentation code that filters by frameId would silently
+    // drop them. Upstream excalidraw does the same on frame removal.
+    const deletedFrameIds = new Set<string>();
+    for (const el of selected as any[]) {
+      if (selectedSet.has(el.id) && el.type === "frame") {
+        deletedFrameIds.add(el.id);
+      }
+    }
+    if (deletedFrameIds.size > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const el of scene.getNonDeletedElements() as any[]) {
+        if (selectedSet.has(el.id)) continue; // will be stripped anyway
+        if (el.frameId && deletedFrameIds.has(el.frameId)) {
+          scene.mutateElement(el, { frameId: null } as any,
+            { informMutation: false, isDragging: false });
+        }
+      }
+    }
     const remaining = scene
       .getElementsIncludingDeleted()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -5755,10 +5775,25 @@
       // Snapshot every currently-selected element's origin for the drag.
       // Locked elements are excluded — even when multi-selected (Ctrl+A),
       // they must stay pinned while the rest of the group drags.
+      // B1: when a frame is in the selection, its children (elements with
+      // frameId === frame.id) are pulled into dragOrigins so the frame
+      // moves as a container — upstream group-drag UX.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const selectedIds = Object.keys((appState as any).selectedElementIds);
+      const selectedIds = new Set(Object.keys((appState as any).selectedElementIds));
       const map = scene.getNonDeletedElementsMap();
-      dragOrigins = selectedIds
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const selectedFrameIds = new Set<string>();
+      for (const id of selectedIds) {
+        const el = map.get(id);
+        if (el && (el as any).type === "frame") selectedFrameIds.add(id);
+      }
+      if (selectedFrameIds.size > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const el of scene.getNonDeletedElements() as any[]) {
+          if (selectedFrameIds.has(el.frameId)) selectedIds.add(el.id);
+        }
+      }
+      dragOrigins = Array.from(selectedIds)
         .map((id: string) => {
           const el = map.get(id);
           if (!el || (el as any).locked) return null;
@@ -6094,16 +6129,48 @@
         isDraggingForSnap = false;
       }
 
+      // B1: precompute frame bboxes so drag-into-frame can assign frameId
+      // as each non-frame origin crosses the boundary. Skip frames that
+      // are themselves being dragged (moving with their children).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const draggingIds = new Set(dragOrigins.map((o: any) => o.el.id));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const framesForBinding: Array<{ id: string; x: number; y: number; r: number; b: number }> = [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const el of scene.getNonDeletedElements() as any[]) {
+        if (el.type !== "frame") continue;
+        if (draggingIds.has(el.id)) continue;
+        framesForBinding.push({
+          id: el.id, x: el.x, y: el.y,
+          r: el.x + el.width, b: el.y + el.height,
+        });
+      }
+
       for (const origin of dragOrigins) {
+        const nextX = origin.x + dx;
+        const nextY = origin.y + dy;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const patch: any = { x: nextX, y: nextY };
+        // B1: drag-into-frame — check bbox center against all non-dragging
+        // frames. Skip for frame elements themselves (frames-in-frames not
+        // supported here). `null` = not in any frame, which is also a valid
+        // patch when the element is dragged OUT of its previous frame.
+        if ((origin.el as any).type !== "frame") {
+          const cx = nextX + origin.el.width / 2;
+          const cy = nextY + origin.el.height / 2;
+          const hit = framesForBinding.find((f) =>
+            cx >= f.x && cx <= f.r && cy >= f.y && cy <= f.b,
+          );
+          const currentFrameId = (origin.el as any).frameId ?? null;
+          const nextFrameId = hit ? hit.id : null;
+          if (currentFrameId !== nextFrameId) patch.frameId = nextFrameId;
+        }
         // scene.mutateElement applies the update AND bumps scene nonce via
         // triggerUpdate() — but the static-render $effect doesn't track
         // sceneNonce directly, so we bumpSceneRepaint() ourselves after
         // all mutations to force a repaint in one batch.
-        scene.mutateElement(
-          origin.el,
-          { x: origin.x + dx, y: origin.y + dy },
-          { informMutation: false, isDragging: true },
-        );
+        scene.mutateElement(origin.el, patch,
+          { informMutation: false, isDragging: true });
         // Re-route arrows bound to this element so connectors follow as
         // the shape moves. No-op if the element has no bound arrows.
         try {
