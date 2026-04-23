@@ -1987,26 +1987,74 @@
     if (!scene) return;
     const elements = scene.getNonDeletedElements();
 
-    // Build simple layer array for now (no grouping yet - that's Feature 2+)
-    const newLayers: LayerItem[] = [];
-    for (let idx = 0; idx < elements.length; idx++) {
-      const el = elements[idx];
-      newLayers.push({
-        id: el.id,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        name: (el as any).customLayerName || getLayerName(el),
-        visible: !el.isDeleted,
-        locked: el.locked || false,
-        opacity: el.opacity ?? 1,
-        type: 'element' as const,
-        order: idx,
-      });
+    // Check if element count changed - if not, skip rebuild
+    const currentElementIds = new Set(layers.filter(l => l.type === 'element').map(l => l.id));
+    const newElementIds = new Set(elements.map(el => el.id));
+
+    let hasChanges = currentElementIds.size !== newElementIds.size;
+    if (!hasChanges) {
+      for (const id of newElementIds) {
+        if (!currentElementIds.has(id)) {
+          hasChanges = true;
+          break;
+        }
+      }
     }
 
-    // Only update if content actually changed to avoid infinite loops
-    if (JSON.stringify(layers.map(l => l.id)) !== JSON.stringify(newLayers.map(l => l.id))) {
-      layers = newLayers;
+    if (!hasChanges) return; // Skip rebuild if nothing changed
+
+    // Build flat layer array for ungrouped elements only
+    const newLayers: LayerItem[] = [];
+
+    // First, add existing groups
+    for (const layer of layers) {
+      if (layer.type === 'group') {
+        newLayers.push(layer);
+      }
     }
+
+    // Add ungrouped elements
+    for (let idx = 0; idx < elements.length; idx++) {
+      const el = elements[idx];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const groupId = (el as any).__layerGroupId;
+      if (!groupId) {
+        newLayers.push({
+          id: el.id,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          name: (el as any).customLayerName || getLayerName(el),
+          visible: !el.isDeleted,
+          locked: el.locked || false,
+          opacity: el.opacity ?? 1,
+          type: 'element' as const,
+          order: idx,
+        });
+      }
+    }
+
+    // Add grouped elements as children
+    for (const layer of newLayers) {
+      if (layer.type === 'group' && layer.children) {
+        for (const childId of layer.children) {
+          const el = elements.find(e => e.id === childId);
+          if (el) {
+            newLayers.push({
+              id: el.id,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              name: (el as any).customLayerName || getLayerName(el),
+              visible: !el.isDeleted,
+              locked: el.locked || false,
+              opacity: el.opacity ?? 1,
+              type: 'element' as const,
+              parentId: layer.id,
+              order: newLayers.length,
+            });
+          }
+        }
+      }
+    }
+
+    layers = newLayers;
   };
 
   const handleLayerSelect = (layerId: string) => {
@@ -2055,18 +2103,65 @@
   };
 
   const handleCreateGroup = () => {
-    // Feature 2 - TBD: Group selected elements
     if (!scene) return;
     const selected = getSelectedElements();
-    if (selected.length < 2) {
-      console.log('Select 2+ elements to create a group');
-      return;
+    if (selected.length === 0) return;
+
+    // Create a group with a unique ID
+    const groupId = randomId();
+    const groupName = `Group ${layers.filter(l => l.type === 'group').length + 1}`;
+
+    // Mark all selected elements with parentId
+    for (const el of selected) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (el as any).__layerGroupId = groupId;
     }
-    // Group creation logic will be implemented in Feature 2
+
+    // Store group metadata in a map (since elements don't have a direct "group" type in Excalidraw)
+    // For now, we'll track groups in the layers array itself
+    layers = [
+      {
+        id: groupId,
+        name: groupName,
+        visible: true,
+        locked: false,
+        opacity: 1,
+        type: 'group' as const,
+        children: selected.map(el => el.id),
+        order: 0,
+      },
+      ...layers,
+    ];
+
+    pushHistory();
+    bumpSceneRepaint();
+    expandedGroups.add(groupId);
   };
 
   const handleDeleteGroup = (groupId: string) => {
-    // Feature 2 - TBD: Delete group and promote children
+    if (!scene) return;
+
+    // Find the group
+    const groupIndex = layers.findIndex(l => l.id === groupId && l.type === 'group');
+    if (groupIndex === -1) return;
+
+    const group = layers[groupIndex];
+
+    // Remove parentId from all child elements (promote to root)
+    for (const el of scene.getNonDeletedElements()) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((el as any).__layerGroupId === groupId) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        delete (el as any).__layerGroupId;
+      }
+    }
+
+    // Remove the group from layers
+    layers = layers.filter(l => l.id !== groupId);
+    expandedGroups.delete(groupId);
+
+    pushHistory();
+    bumpSceneRepaint();
   };
 
   // ── Z-order: bring forward / send backward / to front / to back ─────
