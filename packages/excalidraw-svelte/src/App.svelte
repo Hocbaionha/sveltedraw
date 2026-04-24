@@ -156,6 +156,7 @@
   import CanvasContextMenu from "./components/CanvasContextMenu.svelte";
   import CanvasHintOverlay from "./components/CanvasHintOverlay.svelte";
   import UtilityBar from "./components/UtilityBar.svelte";
+  import ZoomControls from "./components/ZoomControls.svelte";
   import type { HistoryState } from "./history/types.js";
   import { createHistoryStore } from "./history/store.js";
   import { triggerDownload } from "./data/download.js";
@@ -5138,32 +5139,13 @@
     </button>
   </div>
 
-  <!-- Zoom controls — bottom-right. −, percent (reset on click), +. -->
-  <div class="sveltedraw-zoom-ctrls" role="toolbar" aria-label="Zoom">
-    <button
-      type="button"
-      class="sveltedraw-zoom-btn"
-      aria-label="Zoom out"
-      title="Zoom out (Ctrl+-)"
-      onclick={() => zoomCentered(((appState.zoom as any).value || 1) - ZOOM_STEP)}
-    >−</button>
-    <button
-      type="button"
-      class="sveltedraw-zoom-btn sveltedraw-zoom-reset"
-      aria-label="Reset zoom"
-      title="Reset zoom (Ctrl+0)"
-      onclick={resetZoom}
-    >
-      {Math.round(((appState.zoom as any).value || 1) * 100)}%
-    </button>
-    <button
-      type="button"
-      class="sveltedraw-zoom-btn"
-      aria-label="Zoom in"
-      title="Zoom in (Ctrl++)"
-      onclick={() => zoomCentered(((appState.zoom as any).value || 1) + ZOOM_STEP)}
-    >+</button>
-  </div>
+  <!-- Zoom controls — see components/ZoomControls.svelte. -->
+  <ZoomControls
+    zoom={((appState.zoom as any).value || 1)}
+    onZoomIn={() => zoomCentered(((appState.zoom as any).value || 1) + ZOOM_STEP)}
+    onZoomOut={() => zoomCentered(((appState.zoom as any).value || 1) - ZOOM_STEP)}
+    onReset={resetZoom}
+  />
 
   <!-- Top-right utility bar — see components/UtilityBar.svelte. -->
   <UtilityBar
@@ -6293,55 +6275,7 @@
     height: 20px;
   }
 
-  .sveltedraw-zoom-ctrls {
-    position: absolute;
-    bottom: 16px;
-    right: 16px;
-    display: flex;
-    align-items: stretch;
-    background: #fff;
-    border: 1px solid #d1d4da;
-    border-radius: 8px;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-    z-index: 50;
-    overflow: hidden;
-  }
-  :global(.excalidraw.theme--dark) .sveltedraw-zoom-ctrls {
-    background: #232329;
-    border-color: #363636;
-  }
-  .sveltedraw-zoom-ctrls .sveltedraw-zoom-btn {
-    width: 32px;
-    height: 30px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    background: transparent;
-    border: none;
-    border-left: 1px solid #e5e7ea;
-    cursor: pointer;
-    font-size: 16px;
-    color: #1e1e1e;
-    font-variant-numeric: tabular-nums;
-  }
-  .sveltedraw-zoom-ctrls .sveltedraw-zoom-btn:first-child {
-    border-left: none;
-  }
-  .sveltedraw-zoom-ctrls .sveltedraw-zoom-btn:hover {
-    background: #f1f3f5;
-  }
-  .sveltedraw-zoom-ctrls .sveltedraw-zoom-reset {
-    min-width: 52px;
-    font-size: 12px;
-  }
-  :global(.excalidraw.theme--dark) .sveltedraw-zoom-ctrls .sveltedraw-zoom-btn {
-    color: #e5e7ea;
-    border-left-color: #363636;
-  }
-  :global(.excalidraw.theme--dark) .sveltedraw-zoom-ctrls .sveltedraw-zoom-btn:hover {
-    background: #2e2e36;
-  }
+  /* Zoom controls styles live with components/ZoomControls.svelte. */
 
   /* Main menu styles live with the component at components/MainMenu.svelte. */
 
