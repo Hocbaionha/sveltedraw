@@ -155,6 +155,7 @@
   import MainMenu from "./components/MainMenu.svelte";
   import CanvasContextMenu from "./components/CanvasContextMenu.svelte";
   import CanvasHintOverlay from "./components/CanvasHintOverlay.svelte";
+  import UtilityBar from "./components/UtilityBar.svelte";
   import type { HistoryState } from "./history/types.js";
   import { createHistoryStore } from "./history/store.js";
   import { triggerDownload } from "./data/download.js";
@@ -5164,190 +5165,36 @@
     >+</button>
   </div>
 
-  <div class="sveltedraw-utility-bar">
-    <button
-      type="button"
-      class="sveltedraw-util-btn"
-      class:active={libraryPanelOpen}
-      aria-label={t("toolBar.library")}
-      title={t("toolBar.library")}
-      onclick={() => (libraryPanelOpen = !libraryPanelOpen)}
-    >
-      📚
-    </button>
-    <button
-      type="button"
-      class="sveltedraw-util-btn"
-      aria-label="New from template"
-      title="New from template (Ctrl+N)"
-      onclick={() => (showTemplateSelector = true)}
-    >
-      📋
-    </button>
-    <button
-      type="button"
-      class="sveltedraw-util-btn"
-      aria-label="Recent files"
-      title="Recent files (Ctrl+R)"
-      onclick={() => (showRecentFiles = true)}
-    >
-      🕐
-    </button>
-    <button
-      type="button"
-      class="sveltedraw-util-btn"
-      aria-label="Settings"
-      title="Settings (Ctrl+,)"
-      onclick={() => (showSettings = true)}
-    >
-      ⚙️
-    </button>
-    <button
-      type="button"
-      class="sveltedraw-util-btn"
-      class:active={connectorToolActive}
-      aria-label="Connector tool"
-      title="Connector tool (Ctrl+Shift+C)"
-      onclick={() => (connectorToolActive = !connectorToolActive)}
-    >
-      ⚡
-    </button>
-    <button
-      type="button"
-      class="sveltedraw-util-btn"
-      class:active={laserActive}
-      aria-label="Laser pointer"
-      title="Laser pointer (K, L in presentation)"
-      onclick={toggleLaser}
-    >
-      ✦
-    </button>
-    <button
-      type="button"
-      class="sveltedraw-util-btn"
-      aria-label="Create frame"
-      title="New frame (Ctrl+Shift+F)"
-      onclick={createFrameAtCenter}
-    >
-      ⬛
-    </button>
-    <button
-      type="button"
-      class="sveltedraw-util-btn"
-      class:active={alignmentPanelActive}
-      aria-label="Alignment tool"
-      title="Alignment & Distribution (Ctrl+Alt+L, etc)"
-      onclick={() => toggleSidePanel("alignment")}
-    >
-      ◫
-    </button>
-    <button
-      type="button"
-      class="sveltedraw-util-btn"
-      class:active={measurementPanelActive}
-      aria-label="Measurements"
-      title="Measurements & Dimensions (Ctrl+M)"
-      onclick={() => toggleSidePanel("measurement")}
-    >
-      📏
-    </button>
-    <button
-      type="button"
-      class="sveltedraw-util-btn"
-      class:active={autoLayoutPanelActive}
-      aria-label="Auto Layout"
-      title="Auto Layout (Ctrl+L)"
-      onclick={() => toggleSidePanel("autolayout")}
-    >
-      🎯
-    </button>
-    <button
-      type="button"
-      class="sveltedraw-util-btn"
-      class:active={gridPanelActive}
-      aria-label="Grid & Snap"
-      title="Grid & Snap Settings"
-      onclick={() => toggleSidePanel("grid")}
-    >
-      ⊞
-    </button>
-    <button
-      type="button"
-      class="sveltedraw-util-btn"
-      class:active={layerPanelActive}
-      aria-label="Layers"
-      title="Layer Management"
-      onclick={() => toggleSidePanel("layer")}
-    >
-      📑
-    </button>
-    <button
-      type="button"
-      class="sveltedraw-util-btn"
-      class:active={historyPanelActive}
-      aria-label="History"
-      title="Undo/Redo History"
-      onclick={() => toggleSidePanel("history")}
-    >
-      ⏮
-    </button>
-    <button
-      type="button"
-      class="sveltedraw-util-btn"
-      class:active={libraryPanelActive}
-      aria-label="Shape Library"
-      title="Shape Library & Components"
-      onclick={() => toggleSidePanel("library")}
-    >
-      📚
-    </button>
-    <button
-      type="button"
-      class="sveltedraw-util-btn"
-      aria-label="Presentation"
-      title="Start Presentation Mode"
-      onclick={handleStartPresentation}
-    >
-      🎬
-    </button>
-    <button
-      type="button"
-      class="sveltedraw-util-btn"
-      aria-label="Export"
-      title="Export Drawing"
-      onclick={() => (exportPanelActive = true)}
-    >
-      💾
-    </button>
-    <button
-      type="button"
-      class="sveltedraw-util-btn"
-      aria-label="Toggle dark mode"
-      title="Toggle dark mode"
-      onclick={toggleTheme}
-    >
-      {#if (appState as any).theme === "dark"}☀{:else}☾{/if}
-    </button>
-    <select
-      class="sveltedraw-util-btn sveltedraw-lang-select"
-      aria-label="Language"
-      value={currentLangCode}
-      onchange={(e) => setLanguage((e.currentTarget as HTMLSelectElement).value)}
-    >
-      {#each availableLanguages as lang (lang.code)}
-        <option value={lang.code}>{lang.label}</option>
-      {/each}
-    </select>
-    <button
-      type="button"
-      class="sveltedraw-util-btn"
-      aria-label="Help"
-      title="Help (F1)"
-      onclick={() => (showHelpPanel = true)}
-    >
-      ❓
-    </button>
-  </div>
+  <!-- Top-right utility bar — see components/UtilityBar.svelte. -->
+  <UtilityBar
+    libraryPanelOpen={libraryPanelOpen}
+    connectorToolActive={connectorToolActive}
+    laserActive={laserActive}
+    alignmentPanelActive={alignmentPanelActive}
+    measurementPanelActive={measurementPanelActive}
+    autoLayoutPanelActive={autoLayoutPanelActive}
+    gridPanelActive={gridPanelActive}
+    layerPanelActive={layerPanelActive}
+    historyPanelActive={historyPanelActive}
+    shapeLibraryPanelActive={libraryPanelActive}
+    theme={(appState as any).theme}
+    libraryLabel={t("toolBar.library")}
+    currentLangCode={currentLangCode}
+    availableLanguages={availableLanguages}
+    onToggleLibraryPanel={() => (libraryPanelOpen = !libraryPanelOpen)}
+    onOpenTemplates={() => (showTemplateSelector = true)}
+    onOpenRecent={() => (showRecentFiles = true)}
+    onOpenSettings={() => (showSettings = true)}
+    onToggleConnector={() => (connectorToolActive = !connectorToolActive)}
+    onToggleLaser={toggleLaser}
+    onCreateFrame={createFrameAtCenter}
+    onToggleSidePanel={toggleSidePanel}
+    onStartPresentation={handleStartPresentation}
+    onOpenExport={() => (exportPanelActive = true)}
+    onToggleTheme={toggleTheme}
+    onSetLanguage={setLanguage}
+    onOpenHelp={() => (showHelpPanel = true)}
+  />
 
   <!-- Connector tool panel — Phase 13 -->
   {#if connectorToolActive}
@@ -6550,48 +6397,7 @@
     border: 1.5px solid #6965db;
   }
 
-  .sveltedraw-utility-bar {
-    position: absolute;
-    top: 64px;
-    right: 12px;
-    display: flex;
-    gap: 6px;
-    z-index: 50;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    max-width: calc(100vw - 24px);
-  }
-  .sveltedraw-utility-bar .sveltedraw-util-btn {
-    height: 30px;
-    padding: 0 10px;
-    background: #fff;
-    border: 1px solid #d1d4da;
-    border-radius: 6px;
-    cursor: pointer;
-    color: #1e1e1e;
-    font-size: 14px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .sveltedraw-utility-bar .sveltedraw-util-btn:hover {
-    background: #f1f3f5;
-  }
-  :global(.excalidraw.theme--dark) .sveltedraw-utility-bar .sveltedraw-util-btn {
-    background: #232329;
-    border-color: #363636;
-    color: #e5e7ea;
-  }
-  :global(.excalidraw.theme--dark) .sveltedraw-utility-bar .sveltedraw-util-btn:hover {
-    background: #2e2e36;
-  }
-  .sveltedraw-utility-bar .sveltedraw-lang-select {
-    min-width: 120px;
-  }
-  .sveltedraw-utility-bar .sveltedraw-util-btn.active {
-    background: #eeedfa;
-    border-color: #6965db;
-  }
+  /* Utility bar styles live with components/UtilityBar.svelte. */
 
   .sveltedraw-library-panel {
     position: absolute;
