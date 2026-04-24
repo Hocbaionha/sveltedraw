@@ -157,6 +157,7 @@
   import CanvasHintOverlay from "./components/CanvasHintOverlay.svelte";
   import UtilityBar from "./components/UtilityBar.svelte";
   import ZoomControls from "./components/ZoomControls.svelte";
+  import FloatingLibraryPanel from "./components/FloatingLibraryPanel.svelte";
   import type { HistoryState } from "./history/types.js";
   import { createHistoryStore } from "./history/store.js";
   import { triggerDownload } from "./data/download.js";
@@ -5328,49 +5329,14 @@
     />
   {/if}
 
-  <!-- Library panel — floats bottom-left. Each item is a button that
-       inserts the saved elements at viewport center. The × closes
-       the panel; the ×-per-item deletes that specific item. -->
+  <!-- Floating bottom-left library panel — see components/FloatingLibraryPanel.svelte. -->
   {#if libraryPanelOpen}
-    <div class="sveltedraw-library-panel" role="region" aria-label={t("toolBar.library")}>
-      <div class="lib-header">
-        <strong>{t("toolBar.library")}</strong>
-        <button
-          type="button"
-          class="lib-close"
-          aria-label="Close library"
-          onclick={() => (libraryPanelOpen = false)}
-        >×</button>
-      </div>
-      {#if libraryItems.length === 0}
-        <div class="lib-empty">
-          {t("library.hint_emptyLibrary", undefined, "Select elements, right-click → Save to library.")}
-        </div>
-      {:else}
-        <div class="lib-items">
-          {#each libraryItems as item (item.id)}
-            <div class="lib-item">
-              <button
-                type="button"
-                class="lib-item-insert"
-                title={`Insert ${item.name}`}
-                onclick={() => insertLibraryItem(item)}
-              >
-                <span class="lib-item-name">{item.name}</span>
-                <span class="lib-item-count">{item.elements.length}</span>
-              </button>
-              <button
-                type="button"
-                class="lib-item-del"
-                aria-label={`Delete ${item.name}`}
-                title="Remove from library"
-                onclick={() => deleteLibraryItem(item.id)}
-              >×</button>
-            </div>
-          {/each}
-        </div>
-      {/if}
-    </div>
+    <FloatingLibraryPanel
+      items={libraryItems}
+      onInsert={(item) => insertLibraryItem(item as any)}
+      onDelete={deleteLibraryItem}
+      onClose={() => (libraryPanelOpen = false)}
+    />
   {/if}
 
   <!-- Template selector — modal for choosing pre-made templates. -->
@@ -6333,105 +6299,7 @@
 
   /* Utility bar styles live with components/UtilityBar.svelte. */
 
-  .sveltedraw-library-panel {
-    position: absolute;
-    bottom: 16px;
-    left: 16px;
-    width: 260px;
-    max-height: 60vh;
-    background: #fff;
-    border: 1px solid #d1d4da;
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    display: flex;
-    flex-direction: column;
-    z-index: 40;
-    font-size: 13px;
-  }
-  :global(.excalidraw.theme--dark) .sveltedraw-library-panel {
-    background: #232329;
-    border-color: #363636;
-    color: #e5e7ea;
-  }
-  .sveltedraw-library-panel .lib-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 12px;
-    border-bottom: 1px solid #e5e7ea;
-  }
-  :global(.excalidraw.theme--dark) .sveltedraw-library-panel .lib-header {
-    border-bottom-color: #363636;
-  }
-  .sveltedraw-library-panel .lib-close {
-    background: transparent;
-    border: none;
-    font-size: 18px;
-    line-height: 1;
-    cursor: pointer;
-    color: inherit;
-    padding: 0 4px;
-  }
-  .sveltedraw-library-panel .lib-empty {
-    padding: 16px 12px;
-    color: #6b7280;
-    font-size: 12px;
-  }
-  .sveltedraw-library-panel .lib-items {
-    overflow-y: auto;
-    padding: 4px;
-  }
-  .sveltedraw-library-panel .lib-item {
-    display: flex;
-    align-items: stretch;
-    gap: 2px;
-    margin-bottom: 2px;
-  }
-  .sveltedraw-library-panel .lib-item-insert {
-    flex: 1;
-    text-align: left;
-    padding: 6px 10px;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    cursor: pointer;
-    color: inherit;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .sveltedraw-library-panel .lib-item-insert:hover {
-    background: #f1f3f5;
-  }
-  :global(.excalidraw.theme--dark) .sveltedraw-library-panel .lib-item-insert:hover {
-    background: #2e2e36;
-  }
-  .sveltedraw-library-panel .lib-item-name {
-    font-weight: 500;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .sveltedraw-library-panel .lib-item-count {
-    color: #9ca3af;
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
-    margin-left: 8px;
-  }
-  .sveltedraw-library-panel .lib-item-del {
-    width: 26px;
-    background: transparent;
-    border: none;
-    color: #9ca3af;
-    cursor: pointer;
-    font-size: 16px;
-    line-height: 1;
-  }
-  .sveltedraw-library-panel .lib-item-del:hover {
-    color: #e03131;
-    background: #fff5f5;
-    border-radius: 4px;
-  }
+  /* FloatingLibraryPanel styles live with components/FloatingLibraryPanel.svelte. */
 
   .sveltedraw-connector-panel {
     position: absolute;
