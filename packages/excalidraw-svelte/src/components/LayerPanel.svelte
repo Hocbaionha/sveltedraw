@@ -9,7 +9,8 @@
     onLayerVisibilityChange: (layerId: string, visible: boolean) => void;
     onLayerLockChange: (layerId: string, locked: boolean) => void;
     onLayerOpacityChange: (layerId: string, opacity: number) => void;
-    onCreateGroup?: (layerIds: string[]) => void;
+    // Group creation uses the current selection from appState — no args needed.
+    onCreateGroup?: () => void;
     onDeleteGroup?: (groupId: string) => void;
     onRenameLayer?: (layerId: string, name: string) => void;
     onReorderLayers?: (fromId: string, toId: string) => void;
@@ -26,7 +27,7 @@
     onDeleteGroup,
     onRenameLayer,
     onReorderLayers
-  } = $props();
+  }: Props = $props();
 
   let expandedGroups = $state<Set<string>>(new Set());
   let draggedLayerId = $state<string | null>(null);

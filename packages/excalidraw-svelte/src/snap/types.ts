@@ -62,7 +62,7 @@ export function createSnapConfig(overrides?: Partial<SnapConfig>): SnapConfig {
 }
 
 export function calculateSnapPoints(
-  element: { x: number; y: number; width: number; height: number },
+  element: { id?: string; x: number; y: number; width: number; height: number },
   allElements: Array<{ id: string; x: number; y: number; width: number; height: number }>,
   threshold: number,
 ): SnapPoint {

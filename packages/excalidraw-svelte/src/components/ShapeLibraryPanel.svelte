@@ -26,7 +26,7 @@
     onSearchChange,
     onExportLibrary,
     onImportLibrary,
-  } = $props() as Props;
+  }: Props = $props();
 
   let filteredComponents = $derived.by(() => {
     let result = filterComponentsByCategory(components, selectedCategoryId);

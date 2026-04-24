@@ -9,7 +9,7 @@
     onClearHistory?: () => void;
   };
 
-  let { history = [], currentIndex, onJumpToState, onClearHistory } = $props() as Props;
+  let { history = [], currentIndex, onJumpToState, onClearHistory }: Props = $props();
 
   const isCurrentState = (index: number) => index === currentIndex;
 </script>

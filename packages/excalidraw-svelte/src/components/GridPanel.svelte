@@ -9,7 +9,7 @@
     onSnapConfigChange: (config: SnapConfig) => void;
   };
 
-  const props = $props() as Props;
+  const props: Props = $props();
 
   const gridSizes = [10, 15, 20, 25, 30, 50];
   const thresholds = [4, 6, 8, 10, 12, 16];

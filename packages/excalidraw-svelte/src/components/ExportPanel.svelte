@@ -20,7 +20,7 @@
     onOptionsChange,
     onPresetSelect,
     onClose,
-  } = $props() as Props;
+  }: Props = $props();
 
   let validationError = $derived.by(() => validateExportOptions(options));
   let estimatedSize = $derived(estimateFileSize(options, elementCount));
@@ -57,7 +57,7 @@
       <div class="ep-section">
         <label class="ep-label">Format</label>
         <div class="ep-format-grid">
-          {#each ['svg', 'png', 'pdf', 'json'] as format}
+          {#each (['svg', 'png', 'pdf', 'json'] as const) as format}
             <button
               class="ep-format-btn"
               class:active={options.format === format}
