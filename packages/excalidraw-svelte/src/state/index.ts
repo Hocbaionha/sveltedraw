@@ -66,3 +66,7 @@ export {
   colorPickerSectionStore,
 } from "./colorPickerState.svelte.js";
 export type { ActiveColorPickerSection } from "./colorPickerState.svelte.js";
+
+// localStorage scene persistence (debounced save / load)
+export { createPersistence } from "./persistence.js";
+export type { PersistenceApi } from "./persistence.js";

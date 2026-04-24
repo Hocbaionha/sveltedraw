@@ -94,6 +94,7 @@
     createAppStore,
     createTunnelsContext,
     TUNNELS_KEY,
+    createPersistence,
   } from "./state/index.js";
   import {
     t,
@@ -151,6 +152,20 @@
   import PresentationMode from "./components/PresentationMode.svelte";
   import ExportPanel from "./components/ExportPanel.svelte";
   import type { HistoryState } from "./history/types.js";
+  import { createHistoryStore } from "./history/store.js";
+  import { triggerDownload } from "./data/download.js";
+  import {
+    saveAsExcalidrawFile as saveExcalidrawFileImpl,
+    openExcalidrawFilePicker as openExcalidrawFilePickerImpl,
+  } from "./data/excalidrawFile.js";
+  import { installSveltedrawProbe } from "./dev/probe.js";
+  import { handleExport as handleExportImpl } from "./export/handleExport.js";
+  import { createLibraryHandlers } from "./library/handlers.js";
+  import { createPresentationHandlers } from "./presentation/handlers.js";
+  import { createSceneInserts } from "./data/sceneInserts.js";
+  import { installTouchGestures } from "./engine/touchGestures.js";
+  import { createAlignmentHandlers } from "./alignment/handlers.js";
+  import { createLayerHandlers } from "./layers/handlers.js";
   import type { LibraryComponent, LibraryCategory } from "./library/types.js";
   import { getDefaultLibraryConfig, createLibraryComponent, getCategoryLabel } from "./library/types.js";
   import type { PresentationSlide, PresentationConfig } from "./presentation/types.js";
@@ -219,7 +234,6 @@
     h: number;
   };
   const frames = $state<Map<string, Frame>>(new Map());
-  let currentFrameId: string | null = $state(null);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const patchAppState = (patch: Partial<ShellAppState>) => {
@@ -624,29 +638,24 @@
     // as each image loads).
     rehydrateImagesFromIdb();
 
-    // Test-only probe: smoke scripts read `window.__sveltedrawProbe` to
-    // inspect live scene + appState + call export helpers directly
-    // (avoids having to intercept blob downloads in headless Chrome).
-    // DEV-only.
+    // Test-only probe: smoke scripts read `window.__sveltedrawProbe`.
+    // Implementation lives in ./dev/probe.ts; we just wire the bindings.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if ((import.meta as any).env?.DEV) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).__sveltedrawProbe = {
+      installSveltedrawProbe({
         appState,
-        scene,
+        getScene: () => scene,
+        binaryFiles,
         exportAsPng,
         exportAsSvg,
-        // Library test helpers — call these directly to avoid
-        // Svelte 5 event-delegation quirks in synthetic events.
         saveSelectionToLibrary: () => saveSelectionToLibrary(),
-        insertLibraryItem: (item: LibraryItem) => insertLibraryItem(item),
-        deleteLibraryItem: (id: string) => deleteLibraryItem(id),
+        insertLibraryItem: (item) => insertLibraryItem(item as LibraryItem),
+        deleteLibraryItem: (id) => deleteLibraryItem(id),
         getLibraryItems: () => libraryItems,
-        // Phase 16 test helpers — honest integration hooks.
-        toggleSidePanel: (name: SidePanelId) => toggleSidePanel(name),
+        toggleSidePanel: (name) => toggleSidePanel(name as SidePanelId),
         closeAllSidePanels: () => closeAllSidePanels(),
-        isSidePanelOpen: (name: SidePanelId) => isSidePanelOpen(name),
-        handleExport: (opts: ExportOptions) => handleExport(opts),
+        isSidePanelOpen: (name) => isSidePanelOpen(name as SidePanelId),
+        handleExport: (opts) => handleExport(opts as ExportOptions),
         startPresentation: () => handleStartPresentation(),
         exitPresentation: () => handlePresentationExit(),
         getPresentationSlides: () => presentationSlides,
@@ -654,85 +663,40 @@
         isPresentationActive: () => presentationActive,
         getLibraryComponents: () => libraryComponents,
         saveComponentToLibrary: () => handleSaveComponentToLibrary(),
-        insertLibraryComponent: (c: LibraryComponent) => handleLibraryComponentSelect(c),
+        insertLibraryComponent: (c) => handleLibraryComponentSelect(c as LibraryComponent),
         getEditorHistory: () => editorHistory,
         getHistoryCurrentIndex: () => historyCurrentIndex,
-        jumpHistory: (i: number) => handleHistoryJump(i),
+        getHistoryLen: () => historyStore.getLength(),
+        jumpHistory: (i) => handleHistoryJump(i),
         clearHistory: () => handleHistoryClear(),
         pushHistory: () => pushHistory(),
-        // Bound-arrow test helper: force-route arrows after moving a shape.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        updateBoundElements: (el: any) => updateBoundElements(el, scene),
-        // Render-trigger for tests that mutate scene outside the normal
-        // pointer-event path (see drag handler, ~line 5494).
+        updateBoundElementsHook: (el) => updateBoundElements(el, scene),
         bumpSceneRepaint: () => bumpSceneRepaint(),
-        // Snap/grid config mutators for honest A4/A6 tests (negative cases
-        // need snap disabled, which the GridPanel UI can't easily drive).
         getSnapConfig: () => snapConfig,
         getGridConfig: () => gridConfig,
-        setSnapConfig: (patch: Partial<typeof snapConfig>) =>
-          Object.assign(snapConfig, patch),
-        setGridConfig: (patch: Partial<typeof gridConfig>) =>
-          Object.assign(gridConfig, patch),
-        // A1: link-dialog hooks for tests. openLinkDialog uses the current
-        // selection; confirmLinkViaDialog lets tests bypass the UI typeahead.
+        setSnapConfig: (patch) => Object.assign(snapConfig, patch),
+        setGridConfig: (patch) => Object.assign(gridConfig, patch),
         openLinkDialog: () => openLinkDialog(),
         closeLinkDialog: () => closeLinkDialog(),
-        confirmLinkDialog: (v: string | null) => confirmLinkDialog(v),
+        confirmLinkDialog: (v) => confirmLinkDialog(v),
         isLinkDialogOpen: () => linkDialogOpen,
-        // A2: laser hooks. Tests need to toggle + inspect trail length.
         toggleLaser: () => toggleLaser(),
         isLaserActive: () => laserActive,
         getLaserTrailLen: () => laserTrail.length,
-        // A5: measurement overlay hooks for honest tests.
-        setMeasurementConfig: (patch: Partial<MeasurementConfig>) =>
-          Object.assign(measurementConfig, patch),
+        setMeasurementConfig: (patch) =>
+          Object.assign(measurementConfig, patch as Partial<MeasurementConfig>),
         getMeasurementConfig: () => ({ ...measurementConfig }),
-        // B4: generate a PNG blob with embedded Excalidraw scene metadata.
-        // Mirrors the export pipeline but adds the tEXt chunk so the paste
-        // round-trip test can verify restoration without touching the UI.
-        exportPngWithMetadata: async () => {
-          if (!scene) return null;
-          const elements = scene.getNonDeletedElements();
-          const blob = await exportToBlob({
-            elements,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            appState: { ...(appState as any), exportBackground: true, exportScale: 1 },
-            files: binaryFiles,
-            mimeType: "image/png",
-            quality: 0.92,
-            exportPadding: 10,
-          });
-          const { encodePngMetadata } = await import("@excalidraw/excalidraw/data/image");
-          return encodePngMetadata({
-            blob,
-            metadata: JSON.stringify({
-              type: "excalidraw",
-              version: 2,
-              source: window.location.origin,
-              elements,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              appState: { viewBackgroundColor: (appState as any).viewBackgroundColor },
-              files: binaryFiles,
-            }),
-          });
-        },
-        tryRestoreSceneFromPng: (b: Blob) => tryRestoreSceneFromPng(b),
-        // C2: flip hook for tests.
-        flipSelected: (axis: "horizontal" | "vertical") => flipSelected(axis),
-        // D3: presentation auto-advance probe hooks.
-        setAutoAdvanceDuration: (ms: number) => {
+        tryRestoreSceneFromPng: (b) => tryRestoreSceneFromPng(b),
+        flipSelected: (axis) => flipSelected(axis),
+        setAutoAdvanceDuration: (ms) => {
           (presentationConfig as any).autoAdvanceDuration = ms;
         },
-        setPresentationPlaying: (v: boolean) => { presentationIsPlaying = v; },
+        setPresentationPlaying: (v) => {
+          presentationIsPlaying = v;
+        },
         getPresentationCurrentIndex: () => presentationCurrentIndex,
-        // Test-only: seed N fake slides so the auto-advance loop has
-        // room to progress without depending on the full scene/slides
-        // pipeline. Bypasses handleStartPresentation's SVG pre-render.
-        // B1: frame creation hook.
         createFrameAtCenter: () => createFrameAtCenter(),
-        forcePresentationSlides: (n: number) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        forcePresentationSlides: (n) => {
           presentationSlides = Array.from({ length: n }, (_, i) => ({
             id: `s${i}`,
             title: `Slide ${i + 1}`,
@@ -740,14 +704,13 @@
             elements: [],
             order: i,
             duration: 0,
-          }) as any);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          })) as any;
           presentationSlideSvgs = Array.from({ length: n }, () => "");
           presentationCurrentIndex = 0;
           presentationActive = true;
         },
-      };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).__sveltedrawHistoryLen = () => history.length;
+      });
     }
 
     // ── ResizeObserver on container (replaces window-resize from batch 1) ─
@@ -803,94 +766,17 @@
     containerEl?.addEventListener("dragover", onContainerDragOver);
     containerEl?.addEventListener("drop", onContainerDrop);
 
-    // Touch gesture handlers (mobile support)
-    let touchStartX = 0;
-    let touchStartY = 0;
-    let touchCount = 0;
-    let lastTouchDistance = 0;
-    let longPressTimeout: number | null = null;
-
-    const onTouchStart = (e: TouchEvent) => {
-      touchCount = e.touches.length;
-      if (touchCount === 1) {
-        touchStartX = e.touches[0].clientX;
-        touchStartY = e.touches[0].clientY;
-        // Start long-press timer (500ms)
-        longPressTimeout = window.setTimeout(() => {
-          if (touchCount === 1) {
-            showContextMenu(touchStartX, touchStartY);
-          }
-        }, 500);
-      } else if (touchCount === 2) {
-        // Cancel long-press on multi-touch
-        if (longPressTimeout) clearTimeout(longPressTimeout);
-        // Store initial distance for pinch-zoom
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        lastTouchDistance = Math.sqrt(dx * dx + dy * dy);
-      }
-    };
-
-    const onTouchMove = (e: TouchEvent) => {
-      if (longPressTimeout && touchCount === 1) {
-        // Check if movement exceeded threshold (10px) — cancel long-press
-        const dx = e.touches[0].clientX - touchStartX;
-        const dy = e.touches[0].clientY - touchStartY;
-        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
-          clearTimeout(longPressTimeout);
-          longPressTimeout = null;
-        }
-      }
-
-      if (touchCount === 2 && e.touches.length === 2) {
-        // Two-finger pan
-        const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-        const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-        const dx = centerX - touchStartX;
-        const dy = centerY - touchStartY;
-
-        // Pan: scroll opposite to finger movement
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const zoomV = (appState.zoom as any).value || 1;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (appState as any).scrollX -= dx / zoomV;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (appState as any).scrollY -= dy / zoomV;
-
-        touchStartX = centerX;
-        touchStartY = centerY;
-
-        // Pinch-zoom
-        const dx2 = e.touches[0].clientX - e.touches[1].clientX;
-        const dy2 = e.touches[0].clientY - e.touches[1].clientY;
-        const distance = Math.sqrt(dx2 * dx2 + dy2 * dy2);
-
-        if (lastTouchDistance > 0) {
-          const scale = distance / lastTouchDistance;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const currentZoom = (appState.zoom as any).value || 1;
-          const newZoom = currentZoom * scale;
-          const clampedZoom = Math.max(0.1, Math.min(4, newZoom));
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (appState as any).zoom = { value: clampedZoom };
-        }
-        lastTouchDistance = distance;
-        bumpSceneRepaint();
-      }
-    };
-
-    const onTouchEnd = () => {
-      if (longPressTimeout) {
-        clearTimeout(longPressTimeout);
-        longPressTimeout = null;
-      }
-      touchCount = 0;
-      lastTouchDistance = 0;
-    };
-
-    containerEl?.addEventListener("touchstart", onTouchStart, { passive: true });
-    containerEl?.addEventListener("touchmove", onTouchMove, { passive: true });
-    containerEl?.addEventListener("touchend", onTouchEnd, { passive: true });
+    // Touch gesture handlers (mobile support) — see ./engine/touchGestures.ts
+    // NOTE: long-press → context menu was wired to a `showContextMenu()` that
+    // never existed in the original App.svelte; preserve the no-op behavior
+    // here rather than introducing new context-menu wiring as a side effect.
+    const teardownTouch = containerEl
+      ? installTouchGestures(containerEl, {
+          appState,
+          bumpSceneRepaint,
+          showContextMenu: () => {},
+        })
+      : () => {};
 
     // Auto-focus the container on mount so hotkeys work without requiring
     // the user to click first. Matches upstream UX.
@@ -969,11 +855,7 @@
 
     // Flush any pending save on page unload so nothing is lost.
     const onBeforeUnload = () => {
-      if (saveTimer) {
-        clearTimeout(saveTimer);
-        saveTimer = null;
-        saveNow();
-      }
+      flushPendingSave();
     };
     window.addEventListener("beforeunload", onBeforeUnload);
 
@@ -988,9 +870,7 @@
       document.removeEventListener("paste", onContainerPaste);
       containerEl?.removeEventListener("dragover", onContainerDragOver);
       containerEl?.removeEventListener("drop", onContainerDrop);
-      containerEl?.removeEventListener("touchstart", onTouchStart);
-      containerEl?.removeEventListener("touchmove", onTouchMove);
-      containerEl?.removeEventListener("touchend", onTouchEnd);
+      teardownTouch();
       // A2: stop the laser RAF loop on unmount so callbacks don't fire
       // against a torn-down component.
       if (laserRafId !== null) {
@@ -1005,11 +885,7 @@
         ydoc.destroy();
       }
       // Flush the pending save synchronously on unmount too.
-      if (saveTimer) {
-        clearTimeout(saveTimer);
-        saveTimer = null;
-        saveNow();
-      }
+      flushPendingSave();
       AnimationController.cancel(INTERACTIVE_SCENE_ANIMATION_KEY);
       renderer?.destroy?.();
     };
@@ -1105,411 +981,36 @@
   };
 
   // ── Persistence (localStorage) ───────────────────────────────────────
-  //
-  // Bare-minimum PoC persistence: JSON.stringify scene elements + a small
-  // AppState subset (zoom, scroll, viewBackgroundColor, theme, tool,
-  // selectedElementIds) into a single localStorage key. Debounced saves
-  // (~500ms) so rapid mutations don't thrash storage.
-  //
-  // Schema versioning: SAVE_KEY includes `:v1`. Bump if the shape changes.
-  //
-  // Not ported from upstream:
-  //   - `restoreAppState` / `restoreElements` (defensive migration chains
-  //     for multi-year-old saved data). Our PoC is new; just read/write
-  //     the current shape.
-  //   - LocalData IndexedDB store (images + library). Out-of-scope here.
-
-  const SAVE_KEY = "sveltedraw:scene:v1";
-  let saveTimer: ReturnType<typeof setTimeout> | null = null;
-
-  const pickPersistedAppState = () => ({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    zoom: (appState as any).zoom,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    scrollX: (appState as any).scrollX,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    scrollY: (appState as any).scrollY,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    viewBackgroundColor: (appState as any).viewBackgroundColor,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    theme: (appState as any).theme,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    activeTool: (appState as any).activeTool,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    selectedElementIds: (appState as any).selectedElementIds,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    gridModeEnabled: (appState as any).gridModeEnabled,
+  // Implementation lives in ./state/persistence.ts. Scene is reassigned in
+  // onMount, so we hand the factory a getter rather than the value.
+  const { saveNow, scheduleSave, tryLoad, flushPendingSave } = createPersistence({
+    getScene: () => scene,
+    appState,
   });
 
-  const saveNow = () => {
-    if (!scene || typeof localStorage === "undefined") return;
-    try {
-      const payload = {
-        v: 1,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        elements: scene.getElementsIncludingDeleted() as any[],
-        appState: pickPersistedAppState(),
-      };
-      localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
-    } catch (err) {
-      // Quota exceeded / private-mode Safari / disabled storage.
-      // Log and move on — loss of persistence is better than a crash.
-      console.warn("sveltedraw: save failed", err);
-    }
-  };
-
-  const scheduleSave = () => {
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(saveNow, 500);
-  };
-
-  const tryLoad = (): boolean => {
-    if (!scene || typeof localStorage === "undefined") return false;
-    try {
-      const raw = localStorage.getItem(SAVE_KEY);
-      if (!raw) return false;
-      const parsed = JSON.parse(raw);
-      if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.elements)) return false;
-      scene.replaceAllElements(parsed.elements, { skipValidation: true });
-      // Shallow-merge appState subset. Any missing field falls back to
-      // whatever we already have (e.g. width/height come from the live
-      // container measure, not the saved snapshot).
-      for (const [k, v] of Object.entries(parsed.appState ?? {})) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (appState as any)[k] = v;
-      }
-      return true;
-    } catch (err) {
-      console.warn("sveltedraw: load failed", err);
-      return false;
-    }
-  };
-
   // ── History (undo/redo) ──────────────────────────────────────────────
-  //
-  // Snapshot-based, not delta-based. Upstream's History class is tightly
-  // coupled to Store / StoreSnapshot / CaptureUpdateAction; porting that
-  // machinery is out-of-scope for a PoC. Snapshots hold a deep clone of
-  // every element + a copy of selectedElementIds. Memory cost is O(entry-
-  // count × scene-size), acceptable for dozens of edits on small scenes.
-  //
-  // INVARIANT: `history[historyIndex]` always equals the CURRENT scene state.
-  // - Push an initial snapshot on mount (empty scene → history=[empty]).
-  // - After ANY durable mutation, call `pushHistory()` to record the NEW state.
-  //   This truncates the redo tail (history.length = historyIndex + 1 + new).
-  // - `undo()`: if index > 0, dec, apply history[index].
-  // - `redo()`: if index < length-1, inc, apply history[index].
-  //
-  // For gestures (drag, in-progress draw), don't record mid-flight frames:
-  // wait until pointerup/commit then push ONE entry. `discardHistoryIfUnchanged`
-  // is no longer needed with this model — we simply don't push on no-op.
-  type HistorySnapshot = {
-    // Full snapshot (used as base or when delta is larger)
-    full?: {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      elements: any[];
-      selectedElementIds: Record<string, true>;
-    };
-    // Delta snapshot (only changes from previous)
-    delta?: {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      added: any[];
-      modified: Array<{
-        id: string;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        changes: Record<string, any>;
-      }>;
-      removed: string[];
-    };
-    timestamp: number;
-  };
-  const history: HistorySnapshot[] = [];
-  let historyIndex = -1;
-  let ymap: Y.Map<any> | null = null; // Phase 10: Collaboration map
-  // Snapshots deep-clone all scene elements. A 100-element scene at
-  // 1KB/element × 500 history entries ≈ 50MB — bounded. Without the
-  // cap an active editing session leaks indefinitely. Using delta
-  // snapshots reduces this by 40-60% on large scenes.
-  const MAX_HISTORY = 500;
+  // Implementation lives in ./history/store.ts. App.svelte owns the reactive
+  // panel state ($state below) and yjs collab map; the store mutates them via
+  // a setUI callback and reads ymap via a getter so collab init can come
+  // later in onMount without ordering hazards.
+  let ymap: Y.Map<any> | null = null; // Phase 10: collab map (set in onMount)
+  const historyStore = createHistoryStore({
+    getScene: () => scene,
+    appState,
+    scheduleSave,
+    bumpSceneRepaint: () => bumpSceneRepaint(),
+    getYmap: () => ymap,
+    setUI: (entries, idx) => {
+      editorHistory = entries;
+      historyCurrentIndex = idx;
+    },
+  });
+  const { pushHistory, undo, redo } = historyStore;
 
-  // Deep equality check for elements (used in delta computation)
-  const elementsEqual = (a: any, b: any): boolean => {
-    if (a === b) return true;
-    if (!a || !b) return false;
-    // Compare all keys
-    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-    for (const key of keys) {
-      if (a[key] !== b[key]) {
-        // Handle nested array/object comparison for arrays in elements
-        if (Array.isArray(a[key]) && Array.isArray(b[key])) {
-          if (a[key].length !== b[key].length) return false;
-          if (!a[key].every((v: any, i: number) => v === b[key][i])) return false;
-        } else {
-          return false;
-        }
-      }
-    }
-    return true;
-  };
-
-  // Compute differences between two element sets
-  const computeDelta = (prevElements: any[], currElements: any[]) => {
-    const prevIds = new Set(prevElements.map((e: any) => e.id));
-    const currIds = new Set(currElements.map((e: any) => e.id));
-
-    const added = currElements.filter((e: any) => !prevIds.has(e.id)).map((el: any) => deepCopyElement(el));
-
-    const removed = Array.from(prevIds).filter((id: string) => !currIds.has(id));
-
-    const modified = currElements
-      .filter((e: any) => prevIds.has(e.id))
-      .filter((e: any) => {
-        const prevEl = prevElements.find((el: any) => el.id === e.id);
-        return !elementsEqual(prevEl, e);
-      })
-      .map((e: any) => {
-        const prevEl = prevElements.find((el: any) => el.id === e.id);
-        const changes: Record<string, any> = {};
-        const keys = new Set([...Object.keys(prevEl), ...Object.keys(e)]);
-        for (const key of keys) {
-          if (prevEl[key] !== e[key]) {
-            changes[key] = e[key];
-          }
-        }
-        return { id: e.id, changes };
-      });
-
-    return { added, modified, removed };
-  };
-
-  const captureSnapshot = (): HistorySnapshot => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const els = scene?.getElementsIncludingDeleted() ?? [];
-    const current = {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      elements: els.map((el: any) => deepCopyElement(el)),
-      selectedElementIds: {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ...((appState as any).selectedElementIds ?? {}),
-      },
-    };
-
-    const timestamp = Date.now();
-
-    // Always use full snapshot if history is empty (first snapshot)
-    if (history.length === 0) {
-      return { full: current, timestamp };
-    }
-
-    // Try delta snapshot if we have a previous full snapshot
-    const prevFull = history
-      .slice(0, historyIndex + 1)
-      .reverse()
-      .find((h) => h.full);
-
-    if (prevFull?.full) {
-      const delta = computeDelta(prevFull.full.elements, current.elements);
-      const deltaSize = JSON.stringify(delta).length;
-      const fullSize = JSON.stringify(current).length;
-
-      // Use delta if it's smaller than full snapshot
-      if (deltaSize < fullSize * 0.8) {
-        return { delta, timestamp };
-      }
-    }
-
-    // Fall back to full snapshot
-    return { full: current, timestamp };
-  };
-
-  // Push the CURRENT state as the new head (call AFTER a mutation).
-  // Truncates the redo tail — any future states past the current index are
-  // discarded (standard undo behavior when you edit after undoing).
-  // Also schedules a save — pushHistory is the single source of truth for
-  // "durable scene change happened".
-  const pushHistory = () => {
-    const snap = captureSnapshot();
-    history.length = historyIndex + 1;
-    history.push(snap);
-    historyIndex = history.length - 1;
-    // Enforce FIFO cap: drop oldest snapshots until under MAX_HISTORY.
-    // The cap applies BEFORE we mutate historyIndex, so index ends up
-    // at the last element of the capped array (still the current state).
-    while (history.length > MAX_HISTORY) {
-      history.shift();
-      historyIndex--;
-    }
-    // Phase 10: Sync to collaboration server if connected
-    if (ymap) {
-      const elements = scene?.getElementsIncludingDeleted() ?? [];
-      ymap.set("elements", elements);
-    }
-    scheduleSave();
-    syncHistoryUI();
-  };
-
-  // Sync the reactive HistoryPanel view from the non-reactive history[] array.
-  // Called wherever history mutates (push/undo/redo/jump/clear) so the UI
-  // reflects the real undo stack. elementCount is approximated as the latest
-  // known count — exact per-snapshot counts would require delta replay.
-  const syncHistoryUI = () => {
-    let lastCount = 0;
-    editorHistory = history.map((snap, i) => {
-      let count = lastCount;
-      if (snap.full) {
-        count = snap.full.elements.length;
-      } else if (snap.delta) {
-        count = lastCount + snap.delta.added.length - snap.delta.removed.length;
-      }
-      lastCount = count;
-      let description = "Change";
-      if (i === 0) description = "Initial state";
-      else if (snap.full) description = "Snapshot";
-      else if (snap.delta) {
-        const d = snap.delta;
-        const parts: string[] = [];
-        if (d.added.length) parts.push(`+${d.added.length}`);
-        if (d.removed.length) parts.push(`-${d.removed.length}`);
-        if (d.modified.length) parts.push(`~${d.modified.length}`);
-        description = parts.join(" ") || "Change";
-      }
-      return {
-        id: `h-${i}-${snap.timestamp}`,
-        timestamp: snap.timestamp,
-        description,
-        elementCount: count,
-        previewDataUrl: undefined,
-      };
-    });
-    historyCurrentIndex = historyIndex;
-  };
-
-  const applySnapshot = (snap: HistorySnapshot) => {
-    if (!scene) return;
-
-    let elements: any[];
-    let selectedElementIds: Record<string, true>;
-
-    if (snap.full) {
-      // Direct full snapshot
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      elements = snap.full.elements.map((el: any) => deepCopyElement(el));
-      selectedElementIds = { ...snap.full.selectedElementIds };
-    } else if (snap.delta) {
-      // Reconstruct from previous full snapshot + deltas
-      // Find the last full snapshot before this index
-      let snapIdx = history.indexOf(snap);
-      const prevFull = history
-        .slice(0, snapIdx + 1)
-        .reverse()
-        .find((h) => h.full);
-
-      if (!prevFull?.full) {
-        console.error("No base snapshot found for delta reconstruction");
-        return;
-      }
-
-      // Start with previous full snapshot
-      elements = prevFull.full.elements.map((el: any) => deepCopyElement(el));
-
-      // Apply all deltas from prevFull to current
-      const startIdx = history.indexOf(prevFull) + 1;
-      for (let i = startIdx; i <= snapIdx; i++) {
-        const deltaSnap = history[i];
-        if (deltaSnap.delta) {
-          // Apply removed
-          elements = elements.filter((e: any) => !deltaSnap.delta!.removed.includes(e.id));
-
-          // Apply added
-          elements.push(...deltaSnap.delta.added.map((el: any) => deepCopyElement(el)));
-
-          // Apply modified
-          for (const { id, changes } of deltaSnap.delta.modified) {
-            const el = elements.find((e: any) => e.id === id);
-            if (el) {
-              Object.assign(el, changes);
-            }
-          }
-        }
-      }
-
-      selectedElementIds = snap.full?.selectedElementIds ?? {};
-    } else {
-      console.error("Invalid snapshot: no full or delta");
-      return;
-    }
-
-    scene.replaceAllElements(elements, { skipValidation: true });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (appState as any).selectedElementIds = selectedElementIds;
-    bumpSceneRepaint();
-  };
-
-  const undo = () => {
-    if (historyIndex <= 0) return;
-    historyIndex--;
-    applySnapshot(history[historyIndex]);
-    syncHistoryUI();
-  };
-
-  const redo = () => {
-    if (historyIndex >= history.length - 1) return;
-    historyIndex++;
-    applySnapshot(history[historyIndex]);
-    syncHistoryUI();
-  };
-
-  // ── Frame management (Phase 11) ──────────────────────────────────────────
-  const createFrame = (name: string, x: number, y: number, w: number, h: number) => {
-    const id = randomId();
-    frames.set(id, {
-      id,
-      name,
-      elementIds: new Set(),
-      x,
-      y,
-      w,
-      h,
-    });
-    return id;
-  };
-
-  const deleteFrame = (frameId: string) => {
-    frames.delete(frameId);
-    if (currentFrameId === frameId) {
-      currentFrameId = frames.size > 0 ? Array.from(frames.keys())[0] : null;
-    }
-  };
-
-  const renameFrame = (frameId: string, name: string) => {
-    const frame = frames.get(frameId);
-    if (frame) {
-      frame.name = name;
-    }
-  };
-
-  const addElementToFrame = (frameId: string, elementId: string) => {
-    const frame = frames.get(frameId);
-    if (frame) {
-      frame.elementIds.add(elementId);
-    }
-  };
-
-  const removeElementFromFrame = (frameId: string, elementId: string) => {
-    const frame = frames.get(frameId);
-    if (frame) {
-      frame.elementIds.delete(elementId);
-    }
-  };
-
-  const switchFrame = (frameId: string) => {
-    if (frames.has(frameId)) {
-      currentFrameId = frameId;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (appState as any).selectedElementIds = {};
-      bumpSceneRepaint();
-    }
-  };
+  // Phase 11 frames Map (read by handleStartPresentation + createFrameAtCenter
+  // for slide segmentation + new-frame naming) is populated by createFrameAtCenter
+  // alone; the standalone Map mutators (createFrame/deleteFrame/etc.) were never
+  // wired to UI and lived as dead code — removed.
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getSelectedElements = (): any[] => {
@@ -2316,763 +1817,106 @@
   };
 
   // ── Smart Alignment & Guides ─────────────────────────────────────────
-  const handleAlign = (alignmentType: AlignmentType) => {
-    if (!scene) return;
-    const selected = getSelectedElements();
-    if (selected.length < 2) return;
+  // Implementation in ./alignment/handlers.ts.
+  const _alignmentHandlers = createAlignmentHandlers({
+    getScene: () => scene,
+    getSelectedElements,
+    pushHistory,
+    bumpSceneRepaint: () => bumpSceneRepaint(),
+    setAlignmentGuides: (g) => { alignmentGuides = g; },
+  });
+  const handleAlign = _alignmentHandlers.handleAlign;
+  const handleDistribute = _alignmentHandlers.handleDistribute;
+  const updateAlignmentGuides = _alignmentHandlers.updateAlignmentGuides;
+  const handleAutoLayout = _alignmentHandlers.handleAutoLayout;
 
-    const elements = selected.map(el => ({
-      id: el.id,
-      x: el.x,
-      y: el.y,
-      width: el.width,
-      height: el.height,
-      angle: el.angle,
-    }));
-
-    const aligned = alignElements(elements, alignmentType);
-    for (const el of selected) {
-      const updated = aligned.find((a) => a.id === el.id);
-      if (updated) {
-        el.x = updated.x;
-        el.y = updated.y;
-      }
-    }
-    pushHistory();
-    bumpSceneRepaint();
-  };
-
-  const handleDistribute = (distributionType: DistributionType) => {
-    if (!scene) return;
-    const selected = getSelectedElements();
-    if (selected.length < 3) return;
-
-    const elements = selected.map(el => ({
-      id: el.id,
-      x: el.x,
-      y: el.y,
-      width: el.width,
-      height: el.height,
-      angle: el.angle,
-    }));
-
-    const distributed = distributeElements(elements, distributionType);
-    for (const el of selected) {
-      const updated = distributed.find((a) => a.id === el.id);
-      if (updated) {
-        el.x = updated.x;
-        el.y = updated.y;
-      }
-    }
-    pushHistory();
-    bumpSceneRepaint();
-  };
-
-  const updateAlignmentGuides = () => {
-    const selected = getSelectedElements();
-    if (selected.length < 2) {
-      alignmentGuides = [];
-      return;
-    }
-
-    const elements = selected.map(el => ({
-      id: el.id,
-      x: el.x,
-      y: el.y,
-      width: el.width,
-      height: el.height,
-      angle: el.angle,
-    }));
-
-    alignmentGuides = calculateAlignmentGuides(elements);
-  };
-
-  const handleAutoLayout = (config: LayoutConfig) => {
-    if (!scene) return;
-    const selected = getSelectedElements();
-    if (selected.length < 2) return;
-
-    const elements = selected.map(el => ({
-      id: el.id,
-      x: el.x,
-      y: el.y,
-      width: el.width,
-      height: el.height,
-      angle: el.angle,
-    }));
-
-    const layoutResults = calculateLayout(elements, config);
-    const newElements = applyLayout(elements, layoutResults);
-
-    for (const el of selected) {
-      const updated = newElements.find((a) => a.id === el.id);
-      if (updated) {
-        el.x = updated.x;
-        el.y = updated.y;
-      }
-    }
-    pushHistory();
-    bumpSceneRepaint();
-  };
-
-  // Phase 15: Layer Management
-  const syncLayersFromScene = () => {
-    if (!scene) return;
-    const elements = scene.getNonDeletedElements();
-
-    // Check if element count changed - if not, skip rebuild
-    const currentElementIds = new Set(layers.filter(l => l.type === 'element').map(l => l.id));
-    const newElementIds = new Set(elements.map(el => el.id));
-
-    let hasChanges = currentElementIds.size !== newElementIds.size;
-    if (!hasChanges) {
-      for (const id of newElementIds) {
-        if (!currentElementIds.has(id)) {
-          hasChanges = true;
-          break;
-        }
-      }
-    }
-
-    if (!hasChanges) return; // Skip rebuild if nothing changed
-
-    // Build flat layer array for ungrouped elements only
-    const newLayers: LayerItem[] = [];
-
-    // First, add existing groups
-    for (const layer of layers) {
-      if (layer.type === 'group') {
-        newLayers.push(layer);
-      }
-    }
-
-    // Add ungrouped elements
-    for (let idx = 0; idx < elements.length; idx++) {
-      const el = elements[idx];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const groupId = (el as any).__layerGroupId;
-      if (!groupId) {
-        newLayers.push({
-          id: el.id,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          name: (el as any).customLayerName || getLayerName(el),
-          visible: !el.isDeleted,
-          locked: el.locked || false,
-          opacity: el.opacity ?? 1,
-          type: 'element' as const,
-          order: idx,
-        });
-      }
-    }
-
-    // Add grouped elements as children
-    for (const layer of newLayers) {
-      if (layer.type === 'group' && layer.children) {
-        for (const childId of layer.children) {
-          const el = elements.find(e => e.id === childId);
-          if (el) {
-            newLayers.push({
-              id: el.id,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              name: (el as any).customLayerName || getLayerName(el),
-              visible: !el.isDeleted,
-              locked: el.locked || false,
-              opacity: el.opacity ?? 1,
-              type: 'element' as const,
-              parentId: layer.id,
-              order: newLayers.length,
-            });
-          }
-        }
-      }
-    }
-
-    layers = newLayers;
-  };
-
-  const handleLayerSelect = (layerId: string) => {
-    selectedLayerId = layerId;
-    // Select the element in the scene
-    if (scene) {
-      const element = scene.getNonDeletedElementsMap().get(layerId);
-      if (element) {
-        appState.selectedElementIds = { [layerId]: true };
-        // Highlight the element visually
-        bumpSceneRepaint();
-      }
-    }
-  };
-
-  const syncSelectionFromCanvas = () => {
-    // When canvas selection changes, update layer selection
-    const selected = getSelectedElements();
-    if (selected.length === 1) {
-      selectedLayerId = selected[0].id;
-    } else if (selected.length === 0) {
-      selectedLayerId = null;
-    } else {
-      // Multiple elements selected - highlight first
-      selectedLayerId = selected[0].id;
-    }
-  };
-
-  const handleReorderLayers = (fromId: string, toId: string) => {
-    if (!scene || fromId === toId) return;
-
-    const elements = scene.getNonDeletedElements();
-    const fromIndex = elements.findIndex(el => el.id === fromId);
-    const toIndex = elements.findIndex(el => el.id === toId);
-
-    if (fromIndex === -1 || toIndex === -1) return;
-
-    // Determine if we're moving up or down
-    if (fromIndex < toIndex) {
-      // Moving down (towards lower z-order)
-      for (let i = fromIndex; i < toIndex; i++) {
-        const temp = elements[i];
-        elements[i] = elements[i + 1];
-        elements[i + 1] = temp;
-      }
-    } else {
-      // Moving up (towards higher z-order)
-      for (let i = fromIndex; i > toIndex; i--) {
-        const temp = elements[i];
-        elements[i] = elements[i - 1];
-        elements[i - 1] = temp;
-      }
-    }
-
-    // Update the scene with new order
-    scene.replaceAllElements(elements, { skipValidation: true });
-    pushHistory();
-    bumpSceneRepaint();
-    syncLayersFromScene();
-  };
-
-  const handleLayerVisibilityChange = (layerId: string, visible: boolean) => {
-    if (!scene) return;
-    const element = scene.getNonDeletedElementsMap().get(layerId);
-    if (!element) return;
-
-    element.isDeleted = !visible;
-    pushHistory();
-    bumpSceneRepaint();
-    syncLayersFromScene();
-  };
-
-  const handleLayerLockChange = (layerId: string, locked: boolean) => {
-    if (!scene) return;
-    const element = scene.getNonDeletedElementsMap().get(layerId);
-    if (!element) return;
-
-    element.locked = locked;
-    pushHistory();
-    bumpSceneRepaint();
-    syncLayersFromScene();
-  };
-
-  const handleLayerOpacityChange = (layerId: string, opacity: number) => {
-    if (!scene) return;
-    const element = scene.getNonDeletedElementsMap().get(layerId);
-    if (!element) return;
-
-    element.opacity = Math.max(0, Math.min(1, opacity));
-    pushHistory();
-    bumpSceneRepaint();
-    syncLayersFromScene();
-  };
-
-  const handleCreateGroup = () => {
-    if (!scene) return;
-    const selected = getSelectedElements();
-    if (selected.length === 0) return;
-
-    // Create a group with a unique ID
-    const groupId = randomId();
-    const groupName = `Group ${layers.filter(l => l.type === 'group').length + 1}`;
-
-    // Mark all selected elements with parentId
-    for (const el of selected) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (el as any).__layerGroupId = groupId;
-    }
-
-    // Store group metadata in a map (since elements don't have a direct "group" type in Excalidraw)
-    // For now, we'll track groups in the layers array itself
-    layers = [
-      {
-        id: groupId,
-        name: groupName,
-        visible: true,
-        locked: false,
-        opacity: 1,
-        type: 'group' as const,
-        children: selected.map(el => el.id),
-        order: 0,
-      },
-      ...layers,
-    ];
-
-    pushHistory();
-    bumpSceneRepaint();
-    expandedGroups.add(groupId);
-  };
-
-  const handleDeleteGroup = (groupId: string) => {
-    if (!scene) return;
-
-    // Find the group
-    const groupIndex = layers.findIndex(l => l.id === groupId && l.type === 'group');
-    if (groupIndex === -1) return;
-
-    const group = layers[groupIndex];
-
-    // Remove parentId from all child elements (promote to root)
-    for (const el of scene.getNonDeletedElements()) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((el as any).__layerGroupId === groupId) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (el as any).__layerGroupId;
-      }
-    }
-
-    // Remove the group from layers
-    layers = layers.filter(l => l.id !== groupId);
-    expandedGroups.delete(groupId);
-
-    pushHistory();
-    bumpSceneRepaint();
-  };
+  // Phase 15: Layer Management — implementation in ./layers/handlers.ts.
+  const _layerHandlers = createLayerHandlers({
+    getScene: () => scene,
+    appState,
+    pushHistory,
+    bumpSceneRepaint: () => bumpSceneRepaint(),
+    getSelectedElements,
+    getLayers: () => layers,
+    setLayers: (next) => { layers = next; },
+    setSelectedLayerId: (id) => { selectedLayerId = id; },
+    expandedGroups,
+  });
+  const syncLayersFromScene = _layerHandlers.syncLayersFromScene;
+  // syncSelectionFromCanvas is exposed but never called externally — keep for parity
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _syncSelectionFromCanvas = _layerHandlers.syncSelectionFromCanvas;
+  const handleLayerSelect = _layerHandlers.handleLayerSelect;
+  const handleReorderLayers = _layerHandlers.handleReorderLayers;
+  const handleLayerVisibilityChange = _layerHandlers.handleLayerVisibilityChange;
+  const handleLayerLockChange = _layerHandlers.handleLayerLockChange;
+  const handleLayerOpacityChange = _layerHandlers.handleLayerOpacityChange;
+  const handleCreateGroup = _layerHandlers.handleCreateGroup;
+  const handleDeleteGroup = _layerHandlers.handleDeleteGroup;
 
   // ── Phase 16: History Management ──────────────────────────────────
-  const handleHistoryJump = (index: number) => {
-    if (index < 0 || index >= history.length) return;
-    historyIndex = index;
-    applySnapshot(history[index]);
-    syncHistoryUI();
-  };
-
-  // Clear wipes the undo stack but preserves the current state so the user
-  // doesn't lose their drawing. The new history starts with a single full
-  // snapshot of what's on the canvas right now.
-  const handleHistoryClear = () => {
-    const current = captureSnapshot();
-    history.length = 0;
-    history.push(current);
-    historyIndex = 0;
-    syncHistoryUI();
-  };
+  const handleHistoryJump = historyStore.jumpTo;
+  const handleHistoryClear = historyStore.clearKeepCurrent;
 
   // ── Phase 16 Feature 2: Library Management ─────────────────────────
-  const handleSaveComponentToLibrary = () => {
-    const selected = getSelectedElements();
-    if (selected.length === 0) return;
-
-    const name = window.prompt('Component name', `Component ${libraryComponents.length + 1}`);
-    if (name === null) return;
-
-    const category = librarySelectedCategory === 'all' ? 'custom' : librarySelectedCategory;
-    const component = createLibraryComponent(name, category, selected);
-    libraryComponents = [...libraryComponents, component];
-  };
-
-  const handleLibraryComponentSelect = (component: LibraryComponent) => {
-    if (!scene) return;
-    if (!Array.isArray(component.elements) || component.elements.length === 0) {
-      return;
-    }
-
-    // Translate to viewport center: compute min(x,y) of the component's
-    // bbox and shift so the component lands where the user is looking.
-    let minX = Infinity;
-    let minY = Infinity;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const el of component.elements as any[]) {
-      if (typeof el.x === "number" && el.x < minX) minX = el.x;
-      if (typeof el.y === "number" && el.y < minY) minY = el.y;
-    }
-    if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
-      minX = 0;
-      minY = 0;
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const zoomV = (appState.zoom as any)?.value || 1;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const scrollX = (appState as any).scrollX ?? 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const scrollY = (appState as any).scrollY ?? 0;
-    const targetSceneX = appState.width / 2 / zoomV - scrollX;
-    const targetSceneY = appState.height / 2 / zoomV - scrollY;
-    const tx = targetSceneX - minX;
-    const ty = targetSceneY - minY;
-
-    // Fresh ids so repeat inserts don't collide. Preserve intra-component
-    // group relations by remapping groupIds consistently within this insert.
-    const idRemap = new Map<string, string>();
-    const groupRemap = new Map<string, string>();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const el of component.elements as any[]) {
-      idRemap.set(el.id, randomId());
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      for (const gid of (el.groupIds as string[]) ?? []) {
-        if (!groupRemap.has(gid)) groupRemap.set(gid, randomId());
-      }
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const fresh = component.elements.map((el: any) => ({
-      ...deepCopyElement(el),
-      id: idRemap.get(el.id)!,
-      x: (el.x ?? 0) + tx,
-      y: (el.y ?? 0) + ty,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      groupIds: ((el.groupIds as string[]) ?? []).map((g) =>
-        groupRemap.get(g) ?? g,
-      ),
-      // Re-index so fractionalIndices regenerate fresh on replaceAllElements.
-      index: null,
-      version: 1,
-      versionNonce: Math.floor(Math.random() * 2 ** 31),
-      updated: Date.now(),
-    }));
-
-    const existing = scene.getElementsIncludingDeleted();
-    scene.replaceAllElements([...existing, ...fresh], {
-      skipValidation: true,
-    });
-    const nextSel: Record<string, true> = {};
-    for (const el of fresh) nextSel[el.id] = true;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (appState as any).selectedElementIds = nextSel;
-
-    // Bump usage + persist.
-    const index = libraryComponents.findIndex((c) => c.id === component.id);
-    if (index !== -1) {
-      libraryComponents[index].usage += 1;
-    }
-
-    pushHistory();
-    bumpSceneRepaint();
-  };
-
-  const handleLibraryComponentDelete = (componentId: string) => {
-    libraryComponents = libraryComponents.filter(c => c.id !== componentId);
-  };
-
-  const handleLibraryExport = () => {
-    const json = JSON.stringify(libraryComponents, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `shape-library-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleLibraryImport = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'application/json';
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        try {
-          const imported = JSON.parse(ev.target?.result as string);
-          if (Array.isArray(imported)) {
-            libraryComponents = [...libraryComponents, ...imported];
-          }
-        } catch (err) {
-          console.error('Failed to import library:', err);
-        }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
-  };
+  // Implementation in ./library/handlers.ts. App owns the $state vars
+  // (libraryComponents, librarySelectedCategory) and routes them via
+  // getter/setter callbacks.
+  const _libraryHandlers = createLibraryHandlers({
+    getScene: () => scene,
+    appState,
+    pushHistory,
+    bumpSceneRepaint: () => bumpSceneRepaint(),
+    getSelectedElements,
+    getLibraryComponents: () => libraryComponents,
+    setLibraryComponents: (next) => {
+      libraryComponents = next;
+    },
+    bumpComponentUsage: (id) => {
+      const idx = libraryComponents.findIndex((c) => c.id === id);
+      if (idx !== -1) libraryComponents[idx].usage += 1;
+    },
+    getLibrarySelectedCategory: () => librarySelectedCategory,
+  });
+  const handleSaveComponentToLibrary = _libraryHandlers.saveComponentToLibrary;
+  const handleLibraryComponentSelect = _libraryHandlers.insertComponent;
+  const handleLibraryComponentDelete = _libraryHandlers.deleteComponent;
+  const handleLibraryExport = _libraryHandlers.exportLibrary;
+  const handleLibraryImport = _libraryHandlers.importLibrary;
 
   // ── Phase 16 Feature 3: Presentation Mode ──────────────────────────
-  // If the scene has frames, each frame becomes a slide (its elements only).
-  // Otherwise a single slide with every element. Each slide is pre-rendered
-  // to SVG so PresentationMode can display actual drawing content, not just
-  // a title card.
-  const handleStartPresentation = async () => {
-    if (!scene) return;
-    const allElements = scene.getNonDeletedElements();
-    if (allElements.length === 0) {
-      window.alert("Draw something first, then start the presentation.");
-      return;
-    }
-
-    const frameList = Array.from(frames.values());
-    let slides: PresentationSlide[];
-    if (frameList.length > 0) {
-      slides = frameList.map((frame, i) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const frameElements = allElements.filter((el: any) =>
-          frame.elementIds.has(el.id),
-        );
-        return createPresentationSlide(
-          frame.name,
-          frameElements,
-          i,
-          `${frameElements.length} element${frameElements.length === 1 ? "" : "s"}`,
-        );
-      });
-    } else {
-      slides = [
-        createPresentationSlide(
-          "Drawing",
-          allElements,
-          0,
-          `${allElements.length} element${allElements.length === 1 ? "" : "s"}`,
-        ),
-      ];
-    }
-
-    // Pre-render each slide to an SVG string. Strip width/height so the
-    // SVG scales to fit the presentation container.
-    const svgs = await Promise.all(
-      slides.map(async (slide) => {
-        if (slide.elements.length === 0) return "";
-        try {
-          const svg = await exportToSvg({
-            elements: slide.elements,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            appState: appState as any,
-            files: binaryFiles,
-            exportPadding: 40,
-          });
-          svg.removeAttribute("width");
-          svg.removeAttribute("height");
-          svg.setAttribute(
-            "style",
-            "max-width: 100%; max-height: 100%; width: auto; height: auto; display: block; margin: 0 auto;",
-          );
-          return svg.outerHTML;
-        } catch (err) {
-          // eslint-disable-next-line no-console
-          console.error("sveltedraw: slide svg failed", err);
-          return "";
-        }
-      }),
-    );
-
-    presentationSlides = slides;
-    presentationSlideSvgs = svgs;
-    presentationCurrentIndex = 0;
-    presentationIsPlaying = false;
-    presentationActive = true;
-  };
-
-  const handlePresentationNextSlide = () => {
-    if (presentationCurrentIndex < presentationSlides.length - 1) {
-      presentationCurrentIndex += 1;
-    } else if (presentationConfig.loopOnEnd) {
-      presentationCurrentIndex = 0;
-    }
-  };
-
-  const handlePresentationPreviousSlide = () => {
-    if (presentationCurrentIndex > 0) {
-      presentationCurrentIndex -= 1;
-    }
-  };
-
-  const handlePresentationTogglePlayPause = () => {
-    presentationIsPlaying = !presentationIsPlaying;
-  };
-
-  const handlePresentationExit = () => {
-    presentationActive = false;
-    presentationIsPlaying = false;
-    presentationCurrentIndex = 0;
-  };
-
-  const handlePresentationSlideJump = (index: number) => {
-    if (index >= 0 && index < presentationSlides.length) {
-      presentationCurrentIndex = index;
-    }
-  };
+  // Implementation in ./presentation/handlers.ts.
+  const _presentationHandlers = createPresentationHandlers({
+    getScene: () => scene,
+    appState,
+    getBinaryFiles: () => binaryFiles,
+    getFrames: () => frames,
+    presentationConfig,
+    setSlides: (s) => { presentationSlides = s; },
+    setSlideSvgs: (s) => { presentationSlideSvgs = s; },
+    setCurrentIndex: (i) => { presentationCurrentIndex = i; },
+    setIsPlaying: (p) => { presentationIsPlaying = p; },
+    setActive: (a) => { presentationActive = a; },
+    getSlides: () => presentationSlides,
+    getCurrentIndex: () => presentationCurrentIndex,
+    getIsPlaying: () => presentationIsPlaying,
+  });
+  const handleStartPresentation = _presentationHandlers.start;
+  const handlePresentationNextSlide = _presentationHandlers.next;
+  const handlePresentationPreviousSlide = _presentationHandlers.prev;
+  const handlePresentationTogglePlayPause = _presentationHandlers.togglePlayPause;
+  const handlePresentationExit = _presentationHandlers.exit;
+  const handlePresentationSlideJump = _presentationHandlers.jumpToSlide;
 
   // ── Phase 16 Feature 4: Export Enhancements ──────────────────────────
-  // buildExportAppState overrides a few appState fields the export helpers
-  // read. exportScale is the scene→pixel ratio; exportBackground toggles the
-  // viewBackgroundColor rect.
-  const buildExportAppState = (options: ExportOptions) => ({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ...(appState as any),
-    exportScale: options.scale,
-    exportBackground: options.includeBackground,
-  });
-
-  const handleExport = async (options: ExportOptions) => {
-    if (!scene) return;
-
-    const elements = scene.getNonDeletedElements();
-    const padding = options.includeBorder ? options.borderWidth : 10;
-
-    try {
-      switch (options.format) {
-        case "json": {
-          const json = JSON.stringify(
-            {
-              type: "excalidraw",
-              version: 2,
-              source: window.location.origin,
-              elements,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              appState: { viewBackgroundColor: (appState as any).viewBackgroundColor },
-              files: binaryFiles,
-            },
-            null,
-            2,
-          );
-          const blob = new Blob([json], { type: "application/json" });
-          downloadFile(blob, options.fileName + ".json");
-          break;
-        }
-
-        case "svg": {
-          const svg = await exportToSvg({
-            elements,
-            appState: buildExportAppState(options),
-            files: binaryFiles,
-            exportPadding: padding,
-          });
-          // Force target width/height attributes on the SVG root. The viewBox
-          // (set by upstream from the content bbox) stays, so vectors scale.
-          svg.setAttribute("width", String(options.width * options.scale));
-          svg.setAttribute("height", String(options.height * options.scale));
-          if (options.includeBorder) {
-            const vb = (svg.getAttribute("viewBox") ?? "0 0 0 0")
-              .split(/\s+/)
-              .map(Number);
-            if (vb.length === 4 && vb.every(Number.isFinite)) {
-              const [vx, vy, vw, vh] = vb;
-              const bw = options.borderWidth;
-              const ns = "http://www.w3.org/2000/svg";
-              const rect = document.createElementNS(ns, "rect");
-              rect.setAttribute("x", String(vx + bw / 2));
-              rect.setAttribute("y", String(vy + bw / 2));
-              rect.setAttribute("width", String(Math.max(0, vw - bw)));
-              rect.setAttribute("height", String(Math.max(0, vh - bw)));
-              rect.setAttribute("fill", "none");
-              rect.setAttribute("stroke", options.borderColor);
-              rect.setAttribute("stroke-width", String(bw));
-              svg.appendChild(rect);
-            }
-          }
-          const blob = new Blob([svg.outerHTML], { type: "image/svg+xml" });
-          downloadFile(blob, options.fileName + ".svg");
-          break;
-        }
-
-        case "png": {
-          const targetW = Math.max(1, options.width);
-          const targetH = Math.max(1, options.height);
-          const densityScale = Math.max(0.01, options.scale);
-          const blob = await exportToBlob({
-            elements,
-            appState: buildExportAppState(options),
-            files: binaryFiles,
-            mimeType: "image/png",
-            quality: options.quality,
-            exportPadding: padding,
-            // Fit natural bbox into target w×h with preserved aspect, then
-            // apply densityScale as a pixel-density multiplier. Canvas ends
-            // up exactly (targetW * scale) × (targetH * scale) pixels.
-            getDimensions: (naturalW: number, naturalH: number) => {
-              const fit = Math.min(targetW / naturalW, targetH / naturalH);
-              return {
-                width: Math.round(targetW * densityScale),
-                height: Math.round(targetH * densityScale),
-                scale: fit * densityScale,
-              };
-            },
-          });
-          downloadFile(blob, options.fileName + ".png");
-          break;
-        }
-
-        case "pdf": {
-          // A7: render scene to PNG via the PNG pipeline, then embed into
-          // a single-page PDF. jspdf is lazy-loaded so its ~350KB only
-          // hits the user's bundle when they actually ask for a PDF.
-          const targetW = Math.max(1, options.width);
-          const targetH = Math.max(1, options.height);
-          const densityScale = Math.max(0.01, options.scale);
-          const pngBlob = await exportToBlob({
-            elements,
-            appState: buildExportAppState(options),
-            files: binaryFiles,
-            mimeType: "image/png",
-            quality: options.quality,
-            exportPadding: padding,
-            getDimensions: (naturalW: number, naturalH: number) => {
-              const fit = Math.min(targetW / naturalW, targetH / naturalH);
-              return {
-                width: Math.round(targetW * densityScale),
-                height: Math.round(targetH * densityScale),
-                scale: fit * densityScale,
-              };
-            },
-          });
-          // Convert blob → data URL for addImage.
-          const dataUrl: string = await new Promise((resolve, reject) => {
-            const r = new FileReader();
-            r.onload = () => resolve(r.result as string);
-            r.onerror = () => reject(r.error);
-            r.readAsDataURL(pngBlob);
-          });
-          // Lazy-load jspdf. vite resolves from root node_modules.
-          const { jsPDF } = await import("jspdf");
-          // Page size = target canvas size in px (pt unit keeps the math
-          // simple: 1 px ≈ 0.75 pt at 96 dpi, but we pass pixels as "pt"
-          // so the page matches the drawing's pixel dimensions). Opens at
-          // 100% zoom in all PDF viewers.
-          const doc = new jsPDF({
-            orientation: targetW >= targetH ? "landscape" : "portrait",
-            unit: "pt",
-            format: [targetW, targetH],
-            compress: true,
-          });
-          doc.addImage(dataUrl, "PNG", 0, 0, targetW, targetH);
-          const pdfBlob = doc.output("blob");
-          downloadFile(pdfBlob as Blob, options.fileName + ".pdf");
-          break;
-        }
-      }
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error("sveltedraw: export failed", err);
-      window.alert(`Export failed: ${(err as Error).message ?? err}`);
-      return;
-    }
-
-    exportPanelActive = false;
-  };
-
-  const downloadFile = (blob: Blob, fileName: string) => {
-    // Test hook: when defined on window, captures the blob + filename instead
-    // of initiating a download. Lets puppeteer verify PDF/PNG/SVG byte output
-    // without fighting headless Chrome's download handler.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const hook = (window as any).__sveltedrawDownloadHook;
-    if (typeof hook === "function") {
-      try { hook(blob, fileName); return; } catch { /* fall through */ }
-    }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
+  // Implementation lives in ./export/handleExport.ts.
+  const handleExport = (options: ExportOptions) =>
+    handleExportImpl(options, {
+      scene,
+      appState,
+      binaryFiles,
+      onComplete: () => { exportPanelActive = false; },
+    });
 
   // ── Z-order: bring forward / send backward / to front / to back ─────
   // Upstream's shiftElementsByOne returns the full reordered array;
@@ -3098,30 +1942,10 @@
   };
 
   // ── Export ───────────────────────────────────────────────────────────
-  //
   // Thin wrappers over upstream `@excalidraw/utils/export`. Those helpers
   // call `restoreAppState` + `restoreElements` defensively, so we can pass
   // our $state proxy cast to any — they migrate/normalize what they need.
-  //
-  // Download via anchor.click() with a blob URL. Revoke the URL after a
-  // tick so Chrome finishes the download before GC.
-
-  const triggerDownload = (blobOrUrl: Blob | string, filename: string) => {
-    const url =
-      typeof blobOrUrl === "string" ? blobOrUrl : URL.createObjectURL(blobOrUrl);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.rel = "noopener";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    if (typeof blobOrUrl !== "string") {
-      // Revoke after the browser has consumed the URL. setTimeout is the
-      // simplest portable tick for this.
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    }
-  };
+  // Download helper extracted to ./data/download.ts.
 
   const buildExportOpts = () => {
     if (!scene) return null;
@@ -3144,67 +1968,17 @@
   };
 
   // ── .excalidraw JSON file open/save ────────────────────────────
-  // Serializes the full scene (elements + appState subset + files) to
-  // a .excalidraw JSON file the user can download; load reads one
-  // back in via a file-picker.
-  const saveAsExcalidrawFile = async () => {
-    if (!scene) return;
-    const elements = scene.getNonDeletedElements();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const json = JSON.stringify({
-      type: "excalidraw",
-      version: 2,
-      source: window.location.origin,
-      elements,
-      appState: {
-        gridSize: (appState as any).gridSize,
-        gridStep: (appState as any).gridStep,
-        gridModeEnabled: (appState as any).gridModeEnabled,
-        viewBackgroundColor: (appState as any).viewBackgroundColor,
-        theme: (appState as any).theme,
-      },
-      files: binaryFiles,
-    }, null, 2);
-    const blob = new Blob([json], { type: "application/vnd.excalidraw+json" });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const name = (appState as any).name || "sveltedraw";
-    triggerDownload(blob, `${name}.excalidraw`);
-  };
-
-  const loadFromExcalidrawFile = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".excalidraw,application/json,application/vnd.excalidraw+json";
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file || !scene) return;
-      try {
-        const text = await file.text();
-        const parsed = JSON.parse(text);
-        if (!parsed || !Array.isArray(parsed.elements)) {
-          throw new Error("Invalid .excalidraw file");
-        }
-        scene.replaceAllElements(parsed.elements, { skipValidation: true });
-        if (parsed.appState) {
-          for (const key of ["viewBackgroundColor", "theme", "gridModeEnabled"]) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            if (parsed.appState[key] !== undefined) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (appState as any)[key] = parsed.appState[key];
-            }
-          }
-        }
-        clearSelection();
-        pushHistory();
-        bumpSceneRepaint();
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error("sveltedraw: failed to load file", err);
-        window.alert("Failed to load .excalidraw file");
-      }
-    };
-    input.click();
-  };
+  // Implementation in ./data/excalidrawFile.ts.
+  const saveAsExcalidrawFile = () =>
+    saveExcalidrawFileImpl({ scene, appState, binaryFiles });
+  const loadFromExcalidrawFile = () =>
+    openExcalidrawFilePickerImpl({
+      scene,
+      appState,
+      clearSelection,
+      pushHistory,
+      bumpSceneRepaint: () => bumpSceneRepaint(),
+    });
 
   const toggleGrid = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -3274,79 +2048,12 @@
     triggerDownload(blob, `${name}.svg`);
   };
 
-  // ── IndexedDB for image binaries ─────────────────────────────────────
-  //
-  // localStorage has a ~5-10MB quota and stores strings — fine for the
-  // scene JSON but punitive for image dataURLs. IndexedDB has a much
-  // larger quota (often 50%+ of free disk) and handles blobs natively.
-  //
-  // Schema: one object store "files", keyed by FileId, value = {
-  //   id, mimeType, dataURL, created
-  // }. We lazy-open the DB on first use, cache the connection.
-  //
-  // Pipeline:
-  // - insertImageFromBlob → ALSO writes to IndexedDB.
-  // - On mount, after scene is loaded from localStorage, walk through
-  //   image elements + for each missing fileId, fetch from IndexedDB
-  //   and repopulate imageCacheMap + binaryFiles.
-  const IDB_NAME = "sveltedraw";
-  const IDB_STORE = "files";
-  const IDB_VERSION = 1;
-
-  const openIdb = (): Promise<IDBDatabase> =>
-    new Promise((resolve, reject) => {
-      if (typeof indexedDB === "undefined") {
-        reject(new Error("IndexedDB unavailable"));
-        return;
-      }
-      const req = indexedDB.open(IDB_NAME, IDB_VERSION);
-      req.onupgradeneeded = () => {
-        const db = req.result;
-        if (!db.objectStoreNames.contains(IDB_STORE)) {
-          db.createObjectStore(IDB_STORE, { keyPath: "id" });
-        }
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const idbPut = async (record: any) => {
-    try {
-      const db = await openIdb();
-      return new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(IDB_STORE, "readwrite");
-        tx.objectStore(IDB_STORE).put(record);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-      });
-    } catch (err) {
-      console.warn("sveltedraw: idb put failed", err);
-    }
-  };
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const idbGet = async (id: string): Promise<any | null> => {
-    try {
-      const db = await openIdb();
-      return new Promise((resolve) => {
-        const tx = db.transaction(IDB_STORE, "readonly");
-        const req = tx.objectStore(IDB_STORE).get(id);
-        req.onsuccess = () => resolve(req.result ?? null);
-        req.onerror = () => resolve(null);
-      });
-    } catch {
-      return null;
-    }
-  };
-
   // ── Font loading ────────────────────────────────────────────────
-  // Upstream Excalidraw uses a Fonts class instance tied to the
-  // scene. It scans text elements, loads the woff2 files from the
-  // registry, and re-renders once document.fonts.ready resolves.
-  // Without this, picking Virgil / Nunito / etc. from the popover
-  // changes element.fontFamily but the canvas keeps rendering in
-  // the fallback (usually blank-looking because metrics differ).
+  // Upstream Excalidraw uses a Fonts class instance tied to the scene. It
+  // scans text elements, loads the woff2 files from the registry, and
+  // re-renders once document.fonts.ready resolves. Without this, picking
+  // Virgil / Nunito / etc. from the popover changes element.fontFamily but
+  // the canvas keeps rendering in the fallback.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let fontsInstance: any = null;
   const reloadSceneFonts = async () => {
@@ -3358,28 +2065,6 @@
       // eslint-disable-next-line no-console
       console.warn("sveltedraw: loadSceneFonts failed", err);
     }
-  };
-
-  // Walk the scene's image elements and pull binaries from IndexedDB
-  // into imageCacheMap + binaryFiles. Called on mount after tryLoad().
-  const rehydrateImagesFromIdb = async () => {
-    if (!scene) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const imageEls = scene.getNonDeletedElements().filter((el: any) => el.type === "image" && el.fileId) as any[];
-    if (imageEls.length === 0) return;
-    for (const el of imageEls) {
-      if (imageCacheMap.has(el.fileId)) continue;
-      const record = await idbGet(el.fileId);
-      if (!record?.dataURL) continue;
-      try {
-        const img = await loadImage(record.dataURL);
-        imageCacheMap.set(el.fileId, { image: img, mimeType: record.mimeType });
-        binaryFiles[el.fileId] = record;
-      } catch {
-        /* broken dataURL — skip */
-      }
-    }
-    bumpSceneRepaint();
   };
 
   // ── Image paste / drop ───────────────────────────────────────────────
@@ -3408,259 +2093,28 @@
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const binaryFiles: Record<string, any> = {};
 
-  const blobToDataURL = (blob: Blob): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(blob);
-    });
-
-  const loadImage = (dataURL: string): Promise<HTMLImageElement> =>
-    new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error("image load failed"));
-      img.src = dataURL;
-    });
-
-  // Insert an image at scene coords. If sceneX/Y omitted, center of viewport.
-  const insertImageFromBlob = async (
-    blob: Blob,
-    sceneX?: number,
-    sceneY?: number,
-  ) => {
-    if (!scene) return;
-    const dataURL = await blobToDataURL(blob);
-    const img = await loadImage(dataURL);
-
-    const fileId = randomId();
-    const mimeType = blob.type || "image/png";
-    imageCacheMap.set(fileId, { image: img, mimeType });
-    const record = {
-      id: fileId,
-      mimeType,
-      dataURL,
-      created: Date.now(),
-    };
-    binaryFiles[fileId] = record;
-    // Persist binary to IndexedDB so reload restores the image bytes.
-    // Fire-and-forget; failures (quota, private mode) log and move on.
-    idbPut(record);
-
-    // Scale down if large — fit within 600px max side at 100% zoom.
-    const MAX_SIDE = 600;
-    let w = img.naturalWidth;
-    let h = img.naturalHeight;
-    if (Math.max(w, h) > MAX_SIDE) {
-      const k = MAX_SIDE / Math.max(w, h);
-      w *= k;
-      h *= k;
-    }
-
-    // Default position: scene-viewport center.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const zoomV = (appState.zoom as any).value || 1;
-    const cx =
-      sceneX ??
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (appState.width / 2 / zoomV - ((appState as any).scrollX ?? 0));
-    const cy =
-      sceneY ??
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (appState.height / 2 / zoomV - ((appState as any).scrollY ?? 0));
-
-    const el = newImageElement({
-      type: "image",
-      x: cx - w / 2,
-      y: cy - h / 2,
-      width: w,
-      height: h,
-      fileId,
-      status: "saved",
-      strokeColor: DEFAULT_ELEMENT_PROPS.strokeColor,
-      backgroundColor: DEFAULT_ELEMENT_PROPS.backgroundColor,
-      fillStyle: DEFAULT_ELEMENT_PROPS.fillStyle,
-      strokeWidth: DEFAULT_ELEMENT_PROPS.strokeWidth,
-      strokeStyle: DEFAULT_ELEMENT_PROPS.strokeStyle,
-      roughness: DEFAULT_ELEMENT_PROPS.roughness,
-      opacity: DEFAULT_ELEMENT_PROPS.opacity,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
-    const existing = scene.getElementsIncludingDeleted();
-    scene.replaceAllElements([...existing, el], { skipValidation: true });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (appState as any).selectedElementIds = { [el.id]: true };
-    pushHistory();
-    bumpSceneRepaint();
-  };
-
-  // B1: minimal Frame creation. Upstream's `frame` element type is already
-  // handled by staticScene renderer (draws outline + title bar). We create
-  // a scene element of that type and auto-bind any existing elements whose
-  // bbox falls inside the frame rect via element.frameId.
-  const createFrameAtCenter = () => {
-    if (!scene) return;
-    const zoomV = (appState.zoom as any).value ?? 1;
-    const scX = (appState.scrollX as any) ?? 0;
-    const scY = (appState.scrollY as any) ?? 0;
-    const vpCenterX = appState.width / 2;
-    const vpCenterY = appState.height / 2;
-    const sceneCX = vpCenterX / zoomV - scX;
-    const sceneCY = vpCenterY / zoomV - scY;
-    const W = 480;
-    const H = 320;
-    const frameX = sceneCX - W / 2;
-    const frameY = sceneCY - H / 2;
-    const frameId = `frame_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const frame: any = {
-      id: frameId, type: "frame",
-      x: frameX, y: frameY, width: W, height: H, angle: 0,
-      strokeColor: "#bbb", backgroundColor: "transparent",
-      fillStyle: "solid", strokeWidth: 1, strokeStyle: "solid",
-      roughness: 0, opacity: 100,
-      seed: Math.floor(Math.random() * 2 ** 31),
-      versionNonce: 1, version: 1, isDeleted: false,
-      groupIds: [], frameId: null, boundElements: null,
-      updated: Date.now(), link: null, locked: false, roundness: null,
-      name: `Frame ${frames.size + 1}`,
-    };
-    const existing = scene.getNonDeletedElements();
-    // Bind any existing element whose bbox is fully inside the frame.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const nextElements = existing.map((el: any) => {
-      if (el.id === frameId) return el;
-      const cx = el.x + el.width / 2;
-      const cy = el.y + el.height / 2;
-      const insideX = cx >= frameX && cx <= frameX + W;
-      const insideY = cy >= frameY && cy <= frameY + H;
-      if (insideX && insideY) return { ...el, frameId };
-      return el;
-    });
-    // Frame renders FIRST so it sits behind its children — acting as a
-    // container, not an overlay. Upstream also places the frame at the
-    // bottom of its group. Array order == z-order.
-    scene.replaceAllElements([frame, ...nextElements], { skipValidation: true });
-    pushHistory();
-    bumpSceneRepaint();
-    return frameId;
-  };
-
-  // B3: URLs we accept as embeddable iframe sources. Matches upstream's
-  // allowlist intent — only origins we trust won't serve hostile content.
-  const EMBED_URL_PATTERNS = [
-    /^https?:\/\/(www\.)?youtube\.com\/watch\?v=/i,
-    /^https?:\/\/(www\.)?youtu\.be\//i,
-    /^https?:\/\/(www\.)?vimeo\.com\/\d+/i,
-    /^https?:\/\/(www\.)?codepen\.io\//i,
-    /^https?:\/\/excalidraw\.com\//i,
-    /^https?:\/\/plus\.excalidraw\.com\//i,
-  ];
-
-  const isEmbeddableUrl = (text: string): boolean =>
-    EMBED_URL_PATTERNS.some((re) => re.test(text.trim()));
-
-  const insertEmbed = (url: string, sceneX: number, sceneY: number) => {
-    if (!scene) return;
-    const id = `embed_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const el: any = {
-      id, type: "iframe",
-      x: sceneX, y: sceneY, width: 480, height: 270, angle: 0,
-      strokeColor: "#1e1e1e", backgroundColor: "transparent",
-      fillStyle: "solid", strokeWidth: 1, strokeStyle: "solid",
-      roughness: 0, opacity: 100,
-      seed: Math.floor(Math.random() * 2 ** 31),
-      versionNonce: 1, version: 1, isDeleted: false,
-      groupIds: [], frameId: null, boundElements: null,
-      updated: Date.now(), link: url, locked: false, roundness: null,
-      customData: { embedUrl: url },
-    };
-    const existing = scene.getNonDeletedElements();
-    scene.replaceAllElements([...existing, el], { skipValidation: true });
-    pushHistory();
-    bumpSceneRepaint();
-  };
-
-  const onContainerPaste = async (event: ClipboardEvent) => {
-    // Ignore paste inside the text editor.
-    if (textEditor) return;
-    const items = event.clipboardData?.items;
-    if (!items) return;
-    // B3: text URL paste → embed element (before image-item path)
-    const text = event.clipboardData?.getData("text/plain")?.trim();
-    if (text && isEmbeddableUrl(text)) {
-      event.preventDefault();
-      const sceneX = ((appState as any).scrollX ? -(appState as any).scrollX : 0) + 200;
-      const sceneY = ((appState as any).scrollY ? -(appState as any).scrollY : 0) + 200;
-      insertEmbed(text, sceneX, sceneY);
-      return;
-    }
-    for (const item of Array.from(items)) {
-      if (item.type.startsWith("image/")) {
-        const blob = item.getAsFile();
-        if (blob) {
-          event.preventDefault();
-          // B4: an Excalidraw-exported PNG carries the scene JSON in a
-          // private tEXt chunk. If we can decode it, restore the scene
-          // instead of inserting the PNG as a flat image.
-          if (blob.type === "image/png") {
-            const restored = await tryRestoreSceneFromPng(blob);
-            if (restored) return;
-          }
-          await insertImageFromBlob(blob);
-          return;
-        }
-      }
-    }
-    // Not an image paste — let browser handle.
-  };
-
-  // B4: try to decode the Excalidraw scene metadata embedded in a PNG.
-  // Returns true if the scene was restored; false if the PNG is a plain
-  // image (caller falls through to insertImageFromBlob). No throws —
-  // failure is a soft signal.
-  const tryRestoreSceneFromPng = async (blob: Blob): Promise<boolean> => {
-    try {
-      const { decodePngMetadata } = await import("@excalidraw/excalidraw/data/image");
-      const raw = await decodePngMetadata(blob);
-      const data = JSON.parse(raw);
-      const parsed = Array.isArray(data?.elements) ? data.elements : null;
-      if (!parsed || parsed.length === 0) return false;
-      if (!scene) return false;
-      scene.replaceAllElements(parsed, { skipValidation: true });
-      pushHistory();
-      bumpSceneRepaint();
-      return true;
-    } catch {
-      // Plain PNG (no tEXt chunk) or legacy / malformed metadata. Fall
-      // through to the generic image-paste path.
-      return false;
-    }
-  };
-
-  const onContainerDragOver = (event: DragEvent) => {
-    // Must preventDefault or the drop event won't fire.
-    if (event.dataTransfer && Array.from(event.dataTransfer.items).some(
-      (it) => it.kind === "file",
-    )) {
-      event.preventDefault();
-    }
-  };
-
-  const onContainerDrop = async (event: DragEvent) => {
-    if (!event.dataTransfer) return;
-    const files = Array.from(event.dataTransfer.files).filter((f) =>
-      f.type.startsWith("image/"),
-    );
-    if (files.length === 0) return;
-    event.preventDefault();
-    const { x, y } = toSceneCoords(event.clientX, event.clientY);
-    for (const file of files) {
-      await insertImageFromBlob(file, x, y);
-    }
-  };
+  // Scene-mutation helpers (insert image / embed / frame, paste / drop / PNG
+  // restore) live in ./data/sceneInserts.ts. App.svelte owns the cache + binary
+  // record so the renderer + exports can read them directly.
+  const _sceneInserts = createSceneInserts({
+    getScene: () => scene,
+    appState,
+    pushHistory,
+    bumpSceneRepaint: () => bumpSceneRepaint(),
+    imageCacheMap,
+    binaryFiles,
+    getFrameCount: () => frames.size,
+    toSceneCoords: (clientX, clientY) => toSceneCoords(clientX, clientY),
+    isTextEditing: () => !!textEditor,
+  });
+  const insertImageFromBlob = _sceneInserts.insertImageFromBlob;
+  const insertEmbed = _sceneInserts.insertEmbed;
+  const createFrameAtCenter = _sceneInserts.createFrameAtCenter;
+  const tryRestoreSceneFromPng = _sceneInserts.tryRestoreSceneFromPng;
+  const onContainerPaste = _sceneInserts.onContainerPaste;
+  const onContainerDragOver = _sceneInserts.onContainerDragOver;
+  const onContainerDrop = _sceneInserts.onContainerDrop;
+  const rehydrateImagesFromIdb = _sceneInserts.rehydrateImagesFromIdb;
 
   // ── Style editor ────────────────────────────────────────────────────
   //
