@@ -154,6 +154,7 @@
   import HelpDialog from "./components/HelpDialog.svelte";
   import MainMenu from "./components/MainMenu.svelte";
   import CanvasContextMenu from "./components/CanvasContextMenu.svelte";
+  import CanvasHintOverlay from "./components/CanvasHintOverlay.svelte";
   import type { HistoryState } from "./history/types.js";
   import { createHistoryStore } from "./history/store.js";
   import { triggerDownload } from "./data/download.js";
@@ -5083,38 +5084,12 @@
   <!-- Help dialog — keyboard shortcut reference. See components/HelpDialog.svelte. -->
   <HelpDialog open={helpDialogOpen} onClose={() => (helpDialogOpen = false)} />
 
-  <!-- Welcome screen — centered hint shown only when canvas is empty
-       and no tool is active. Disappears as soon as the user adds an
-       element or picks a non-selection tool. -->
-  {#if scene && scene.getNonDeletedElements().length === 0 && (appState.activeTool as any)?.type === "selection"}
-    <div class="sveltedraw-welcome">
-      <div class="sw-title">Sveltedraw</div>
-      <div class="sw-hint">
-        Pick a tool above or press <kbd>R</kbd> <kbd>D</kbd> <kbd>O</kbd> <kbd>L</kbd> <kbd>A</kbd> <kbd>P</kbd> <kbd>T</kbd> to start drawing.
-      </div>
-      <div class="sw-hint-alt">
-        <kbd>?</kbd> for keyboard shortcuts ·
-        <button type="button" class="sw-link" onclick={() => (helpDialogOpen = true)}>Open help</button>
-      </div>
-    </div>
-  {/if}
-
-  <!-- Hint viewer — contextual one-liner at bottom-center showing
-       what the current tool does. Upstream has richer per-state hints;
-       ours is minimal. -->
-  {#if (appState.activeTool as any)?.type && (appState.activeTool as any).type !== "selection"}
-    <div class="sveltedraw-hint">
-      {#if (appState.activeTool as any).type === "text"}
-        Click to place text, then type. <kbd>Esc</kbd> or click elsewhere to commit.
-      {:else if (appState.activeTool as any).type === "line" || (appState.activeTool as any).type === "arrow"}
-        Drag for a straight line, or click successive points + press <kbd>Enter</kbd> for a polyline.
-      {:else if (appState.activeTool as any).type === "freedraw"}
-        Draw freehand. Pressure-sensitive if your device supports it.
-      {:else}
-        Click and drag to draw a {(appState.activeTool as any).type}. <kbd>Esc</kbd> to cancel.
-      {/if}
-    </div>
-  {/if}
+  <!-- Welcome screen + tool-hint strip — see components/CanvasHintOverlay.svelte. -->
+  <CanvasHintOverlay
+    isEmptyScene={!!scene && scene.getNonDeletedElements().length === 0}
+    activeToolType={(appState.activeTool as any)?.type}
+    onOpenHelp={() => (helpDialogOpen = true)}
+  />
 
   <!-- Toolbox — top-center. Single row of shape buttons + a
        keyboard-shortcut hint. Active tool gets highlighted. -->
@@ -6545,58 +6520,9 @@
     color: #e5e7ea;
   }
 
-  .sveltedraw-welcome {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    text-align: center;
-    pointer-events: none;
-    z-index: 5;
-  }
-  .sveltedraw-welcome .sw-title {
-    font-size: 32px;
-    font-weight: 700;
-    color: #c5c7cc;
-    margin-bottom: 12px;
-    font-family: Excalifont, Xiaolai, sans-serif;
-  }
-  :global(.excalidraw.theme--dark) .sveltedraw-welcome .sw-title {
-    color: #4a4a52;
-  }
-  .sveltedraw-welcome .sw-hint {
-    color: #6b7280;
-    font-size: 14px;
-    margin-bottom: 8px;
-  }
-  .sveltedraw-welcome .sw-hint-alt {
-    color: #9ca3af;
-    font-size: 12px;
-    pointer-events: auto;
-  }
-  .sveltedraw-welcome .sw-link {
-    background: transparent;
-    border: none;
-    color: #6965db;
-    cursor: pointer;
-    text-decoration: underline;
-    font-size: 12px;
-    padding: 0;
-  }
-
-  .sveltedraw-hint {
-    position: absolute;
-    bottom: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 6px 14px;
-    background: rgba(30, 30, 30, 0.85);
-    color: #fff;
-    border-radius: 16px;
-    font-size: 12px;
-    pointer-events: none;
-    z-index: 30;
-  }
+  /* Welcome / tool-hint styles live with components/CanvasHintOverlay.svelte.
+     Shared :global(kbd) rules above still target .sveltedraw-hint and
+     .sveltedraw-welcome elements rendered by that component. */
 
   .sveltedraw-line-handle {
     position: absolute;
