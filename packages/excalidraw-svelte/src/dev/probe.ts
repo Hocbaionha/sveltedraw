@@ -92,6 +92,16 @@ export type ProbeBindings = {
 
   // B1 frame creation.
   createFrameAtCenter: () => string | undefined;
+
+  // Style-panel dispatch (same function the real <ColorPicker> / stroke
+  // buttons call). Used by honest-tests/style-persists-to-next-drawn.mjs
+  // to drive the exact `applyStyle` code path without simulating clicks.
+  applyStyle: (patch: Record<string, unknown>) => void;
+
+  // Toolbar dispatch: switches `appState.activeTool` via the same path the
+  // toolbar buttons use. Exposed for honest-tests that drive tool-switching
+  // flows (style → tool → draw).
+  setActiveTool: (type: string) => void;
 };
 
 export function installSveltedrawProbe(b: ProbeBindings): void {
@@ -178,6 +188,8 @@ export function installSveltedrawProbe(b: ProbeBindings): void {
     getPresentationCurrentIndex: b.getPresentationCurrentIndex,
     createFrameAtCenter: b.createFrameAtCenter,
     forcePresentationSlides: b.forcePresentationSlides,
+    applyStyle: b.applyStyle,
+    setActiveTool: b.setActiveTool,
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).__sveltedrawHistoryLen = b.getHistoryLen;
