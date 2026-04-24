@@ -152,6 +152,7 @@
   import PresentationMode from "./components/PresentationMode.svelte";
   import ExportPanel from "./components/ExportPanel.svelte";
   import HelpDialog from "./components/HelpDialog.svelte";
+  import MainMenu from "./components/MainMenu.svelte";
   import type { HistoryState } from "./history/types.js";
   import { createHistoryStore } from "./history/store.js";
   import { triggerDownload } from "./data/download.js";
@@ -5060,38 +5061,23 @@
 
   <!-- Top-right utility bar: theme toggle + language picker. Kept
        minimal; upstream-style MainMenu is a Phase 7 concern. -->
-  <!-- Main menu burger button — top-left. Dropdown with file +
-       view + help commands. Uses the same outside-click / Escape
-       pattern as the right-click context menu. -->
-  <button
-    type="button"
-    class="sveltedraw-main-menu-trigger"
-    aria-label="Menu"
-    title="Menu"
-    aria-expanded={mainMenuOpen}
-    onclick={() => (mainMenuOpen = !mainMenuOpen)}
-  >
-    <Icon name="HamburgerMenuIcon" />
-  </button>
-  {#if mainMenuOpen}
-    <div class="sveltedraw-main-menu" role="menu" tabindex="-1">
-      <button type="button" class="mm-item" onclick={() => { loadFromExcalidrawFile(); closeMainMenu(); }}>{t("buttons.load", undefined, "Open…")}</button>
-      <button type="button" class="mm-item" onclick={() => { saveAsExcalidrawFile(); closeMainMenu(); }}>{t("buttons.save", undefined, "Save as…")}</button>
-      <div class="mm-sep"></div>
-      <button type="button" class="mm-item" onclick={() => { downloadPng(); closeMainMenu(); }}>{t("buttons.exportImage", undefined, "Export as image")}</button>
-      <button type="button" class="mm-item" onclick={() => { downloadSvg(); closeMainMenu(); }}>{t("buttons.exportToSvg", undefined, "Export as SVG")}</button>
-      <div class="mm-sep"></div>
-      <button type="button" class="mm-item" onclick={() => { toggleGrid(); closeMainMenu(); }}>
-        {((appState as any).gridModeEnabled ? "✓ " : "")}{t("labels.showGrid", undefined, "Show grid")}
-      </button>
-      <button type="button" class="mm-item" onclick={() => { toggleTheme(); closeMainMenu(); }}>
-        {((appState as any).theme === "dark" ? "✓ " : "")}{t("buttons.darkMode", undefined, "Dark mode")}
-      </button>
-      <div class="mm-sep"></div>
-      <button type="button" class="mm-item" onclick={() => { helpDialogOpen = true; closeMainMenu(); }}>{t("helpDialog.title", undefined, "Keyboard shortcuts")}</button>
-      <button type="button" class="mm-item mm-item--danger" onclick={() => { if (window.confirm(t("alerts.clearReset", undefined, "Clear the canvas?"))) { clearCanvas(); } closeMainMenu(); }}>{t("buttons.clearReset", undefined, "Reset canvas")}</button>
-    </div>
-  {/if}
+  <!-- Main menu burger + dropdown — see components/MainMenu.svelte.
+       Outside-click / Escape handling for `mainMenuOpen` lives below in
+       the $effect; keep the .sveltedraw-main-menu / .sveltedraw-main-menu-trigger
+       class names in sync with that code. -->
+  <MainMenu
+    bind:open={mainMenuOpen}
+    theme={(appState as any).theme}
+    gridEnabled={!!(appState as any).gridModeEnabled}
+    onLoad={loadFromExcalidrawFile}
+    onSave={saveAsExcalidrawFile}
+    onExportPng={downloadPng}
+    onExportSvg={downloadSvg}
+    onToggleGrid={toggleGrid}
+    onToggleTheme={toggleTheme}
+    onOpenHelp={() => (helpDialogOpen = true)}
+    onClearCanvas={clearCanvas}
+  />
 
   <!-- Help dialog — keyboard shortcut reference. See components/HelpDialog.svelte. -->
   <HelpDialog open={helpDialogOpen} onClose={() => (helpDialogOpen = false)} />
@@ -6579,85 +6565,7 @@
     background: #2e2e36;
   }
 
-  .sveltedraw-main-menu-trigger {
-    position: absolute;
-    top: 12px;
-    left: 12px;
-    width: 36px;
-    height: 36px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    background: #fff;
-    border: 1px solid #d1d4da;
-    border-radius: 8px;
-    cursor: pointer;
-    color: #1e1e1e;
-    z-index: 50;
-  }
-  .sveltedraw-main-menu-trigger:hover {
-    background: #f1f3f5;
-  }
-  :global(.excalidraw.theme--dark) .sveltedraw-main-menu-trigger {
-    background: #232329;
-    border-color: #363636;
-    color: #e5e7ea;
-  }
-  :global(.excalidraw.theme--dark) .sveltedraw-main-menu-trigger:hover {
-    background: #2e2e36;
-  }
-  :global(.sveltedraw-main-menu-trigger svg) {
-    width: 18px;
-    height: 18px;
-  }
-
-  .sveltedraw-main-menu {
-    position: absolute;
-    top: 54px;
-    left: 12px;
-    min-width: 200px;
-    background: #fff;
-    border: 1px solid #d1d4da;
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    padding: 4px 0;
-    z-index: 60;
-    font-size: 13px;
-  }
-  :global(.excalidraw.theme--dark) .sveltedraw-main-menu {
-    background: #232329;
-    border-color: #363636;
-    color: #e5e7ea;
-  }
-  .sveltedraw-main-menu .mm-item {
-    display: block;
-    width: 100%;
-    text-align: left;
-    padding: 7px 14px;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    color: inherit;
-    font-size: 13px;
-  }
-  .sveltedraw-main-menu .mm-item:hover {
-    background: #eeedfa;
-  }
-  :global(.excalidraw.theme--dark) .sveltedraw-main-menu .mm-item:hover {
-    background: #3b3a66;
-  }
-  .sveltedraw-main-menu .mm-item--danger {
-    color: #e03131;
-  }
-  .sveltedraw-main-menu .mm-sep {
-    height: 1px;
-    background: #e5e7ea;
-    margin: 4px 0;
-  }
-  :global(.excalidraw.theme--dark) .sveltedraw-main-menu .mm-sep {
-    background: #363636;
-  }
+  /* Main menu styles live with the component at components/MainMenu.svelte. */
 
   /* Help dialog styles live with the component at components/HelpDialog.svelte.
      The shared kbd styles below still apply to help/hint/welcome via :global. */
