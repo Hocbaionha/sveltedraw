@@ -767,14 +767,15 @@
     containerEl?.addEventListener("drop", onContainerDrop);
 
     // Touch gesture handlers (mobile support) — see ./engine/touchGestures.ts
-    // NOTE: long-press → context menu was wired to a `showContextMenu()` that
-    // never existed in the original App.svelte; preserve the no-op behavior
-    // here rather than introducing new context-menu wiring as a side effect.
+    // Long-press opens the same context menu as right-click. Wrapped in a
+    // closure because `openContextMenuAtClient` is declared below this
+    // onMount call site (avoids TDZ at module-eval time).
     const teardownTouch = containerEl
       ? installTouchGestures(containerEl, {
           appState,
           bumpSceneRepaint,
-          showContextMenu: () => {},
+          showContextMenu: (clientX, clientY) =>
+            openContextMenuAtClient(clientX, clientY),
         })
       : () => {};
 
@@ -830,7 +831,10 @@
 
         // Listen for remote changes
         ymap!.observe((event: Y.YMapEvent<any>) => {
-          for (const [key, change] of event.changes.entries()) {
+          // Yjs YMapEvent.changes is `{added, deleted, keys, delta}`; the
+          // per-key change records live on `.keys` (Map<string, {action}>),
+          // not on `event.changes` itself.
+          for (const [key, change] of event.changes.keys.entries()) {
             if (key === "elements" && change.action === "update") {
               const remoteElements = ymap!.get("elements");
               if (remoteElements && Array.isArray(remoteElements)) {
@@ -1402,13 +1406,13 @@
 
   // Phase 14: Grid & Snap System
   let gridPanelActive = $state(false);
-  let gridConfig = $state({
+  let gridConfig = $state<GridConfig>({
     enabled: true,
     size: 20,
     visible: false,
     opacity: 0.15,
   });
-  let snapConfig = $state({
+  let snapConfig = $state<SnapConfig>({
     enabled: true,
     threshold: 8,
     guides: true,
@@ -1718,7 +1722,11 @@
   const selectTemplate = (template: Template) => {
     if (!scene) return;
 
-    // Convert template elements to proper excalidraw elements
+    // Convert template elements to proper excalidraw elements.
+    // NOTE: `newElement` is typed to generic shapes (rect/ellipse/diamond/
+    // selection) and does not accept `text`. Text elements should really
+    // go through `newTextElement` — falling through `as any` keeps the
+    // existing permissive template-loading behavior until that's wired up.
     const newElements = template.elements.map((templateEl: any) => {
       const el = newElement({
         type: templateEl.type || 'rectangle',
@@ -1730,7 +1738,8 @@
         backgroundColor: templateEl.backgroundColor ?? '#ffffff',
         fillStyle: templateEl.fillStyle ?? 'solid',
         strokeWidth: templateEl.strokeWidth ?? 1,
-        text: templateEl.text ?? '',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ...({ text: templateEl.text ?? '' } as any),
       });
       return el;
     });
@@ -2234,11 +2243,15 @@
   // extraction — ideally the current selection if any, else the whole
   // scene. Re-computes on scene mutations (via `sceneReady` bumps).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pickerElements = $derived.by<readonly any[]>(() => {
+  const pickerElements = $derived.by<any[]>(() => {
     void sceneReady;
     if (!scene) return [];
     const selected = getSelectedElements();
-    return selected.length > 0 ? selected : scene.getNonDeletedElements();
+    // Cast through `as any[]`: ColorRow's prop typing is mutable any[]; the
+    // engine helpers return readonly arrays, but ColorRow only reads from
+    // them, so relaxing the variance here is safe.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (selected.length > 0 ? selected : scene.getNonDeletedElements()) as any[];
   });
 
   // What to display in the panel — reflects either the last-selected
@@ -3888,10 +3901,12 @@
     bumpSceneRepaint();
   };
 
-  const onContainerContextMenu = (event: MouseEvent) => {
-    event.preventDefault();
+  // Open context menu at viewport (clientX/Y) coordinates. Shared by the
+  // right-click handler and the touch long-press handler so the mobile
+  // gesture gets the same behavior (hit-test + select-or-clear + menu).
+  const openContextMenuAtClient = (clientX: number, clientY: number) => {
     if (!scene) return;
-    const { x: sx, y: sy } = toSceneCoords(event.clientX, event.clientY);
+    const { x: sx, y: sy } = toSceneCoords(clientX, clientY);
     const hit = hitTestAt(sx, sy);
     if (hit) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -3903,13 +3918,18 @@
     // Position the menu inside the container (relative to its
     // viewport-offset origin), not the window.
     contextMenu = {
-      vpX: event.clientX - (appState.offsetLeft as number),
-      vpY: event.clientY - (appState.offsetTop as number),
+      vpX: clientX - (appState.offsetLeft as number),
+      vpY: clientY - (appState.offsetTop as number),
       hasSelection: Object.keys(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (appState as any).selectedElementIds ?? {},
       ).length > 0,
     };
+  };
+
+  const onContainerContextMenu = (event: MouseEvent) => {
+    event.preventDefault();
+    openContextMenuAtClient(event.clientX, event.clientY);
   };
 
   // ── Marquee (rubber-band) state ───────────────────────────────────
@@ -4579,8 +4599,10 @@
         const draggingIds = new Set(dragOrigins.map((o) => o.el.id));
         const others = scene
           .getNonDeletedElements()
-          .filter((el) => !draggingIds.has(el.id))
-          .map((el) => ({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .filter((el: any) => !draggingIds.has(el.id))
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .map((el: any) => ({
             id: el.id,
             x: el.x,
             y: el.y,

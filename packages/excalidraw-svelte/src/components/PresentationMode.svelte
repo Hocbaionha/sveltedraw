@@ -28,7 +28,7 @@
     onTogglePlayPause,
     onExit,
     onSlideJump,
-  } = $props() as Props;
+  }: Props = $props();
 
   let currentSlide = $derived(slides[currentSlideIndex]);
   let currentSlideSvg = $derived(slideSvgs[currentSlideIndex] ?? "");

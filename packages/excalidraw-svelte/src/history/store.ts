@@ -42,6 +42,9 @@ export type HistorySnapshot = {
     added: AnyEl[];
     modified: Array<{ id: string; changes: Record<string, AnyEl> }>;
     removed: string[];
+    // Selection at capture time. Lives on delta too (not just full) so
+    // undo/redo can restore selection correctly when landing on a delta.
+    selectedElementIds: Record<string, true>;
   };
   timestamp: number;
 };
@@ -157,10 +160,14 @@ export function createHistoryStore(opts: HistoryStoreOptions): HistoryStore {
 
     if (prevFull?.full) {
       const delta = computeDelta(prevFull.full.elements, current.elements);
-      const deltaSize = JSON.stringify(delta).length;
+      const deltaWithSel = {
+        ...delta,
+        selectedElementIds: current.selectedElementIds,
+      };
+      const deltaSize = JSON.stringify(deltaWithSel).length;
       const fullSize = JSON.stringify(current).length;
       if (deltaSize < fullSize * 0.8) {
-        return { delta, timestamp };
+        return { delta: deltaWithSel, timestamp };
       }
     }
 
@@ -244,11 +251,10 @@ export function createHistoryStore(opts: HistoryStoreOptions): HistoryStore {
         }
       }
 
-      // Snapshot of selection lives on the FULL entries; deltas don't carry
-      // their own selection set, so reuse the previous full's. (Previous
-      // implementation read snap.full?.selectedElementIds which is always
-      // undefined inside this branch — match that behavior with {}.)
-      selectedElementIds = {};
+      // Deltas now carry their own selectedElementIds (captured at push
+      // time). Fall back to {} for snapshots from older sessions that
+      // predate this field.
+      selectedElementIds = { ...(snap.delta.selectedElementIds ?? {}) };
     } else {
       // eslint-disable-next-line no-console
       console.error("Invalid snapshot: no full or delta");
