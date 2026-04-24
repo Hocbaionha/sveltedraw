@@ -400,6 +400,14 @@
   // (`zoom`, `gridSize`, `gridStep` etc.) — e.g. `appState.zoom = { ...appState.zoom, value: 2 }`.
   const staticRender = () => {
     if (!renderer || !scene || !rc) return;
+    // DEV probe: count static-render invocations so tests can verify repaint.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((import.meta as any).env?.DEV) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__sveltedrawStaticTicks =
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ((window as any).__sveltedrawStaticTicks ?? 0) + 1;
+    }
 
     // `newElementId` is used by the Renderer to bust its memoized cache on
     // first render of a freshly-created element. In batch 2 we have no
@@ -3180,11 +3188,14 @@
   // when no appState field changed (e.g. after scene.replaceAllElements).
   // The $effect tracks sceneReady; we reuse it as a generic "something
   // scene-level happened" ticker.
-  // Also fires imperativeAPI.notifyChange() so ALL callers — pointer handlers,
-  // text editor, drag, etc. — automatically reach onChange subscribers without
-  // any per-call wiring. imperativeAPI is declared before bumpSceneRepaint so
-  // the closure safely captures the binding.
+  //
+  // Also calls scene.triggerUpdate() to bump `sceneNonce`, the ONLY cache-bust
+  // signal for `Renderer.getRenderableElements`. Call sites that mutate with
+  // `{ informMutation: false }` skip Scene's internal triggerUpdate, so without
+  // this the canvas paints stale elements. Also fires imperativeAPI.notifyChange()
+  // so all callers reach onChange subscribers without per-call wiring.
   const bumpSceneRepaint = () => {
+    scene?.triggerUpdate();
     sceneReady++;
     imperativeAPI.notifyChange();
   };
