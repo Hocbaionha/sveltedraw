@@ -153,6 +153,7 @@
   import ExportPanel from "./components/ExportPanel.svelte";
   import HelpDialog from "./components/HelpDialog.svelte";
   import MainMenu from "./components/MainMenu.svelte";
+  import CanvasContextMenu from "./components/CanvasContextMenu.svelte";
   import type { HistoryState } from "./history/types.js";
   import { createHistoryStore } from "./history/store.js";
   import { triggerDownload } from "./data/download.js";
@@ -6086,56 +6087,38 @@
   <!-- Marquee rubber-band overlay. Rendered as a DOM div (not on canvas)
        to avoid touching upstream renderer configs. Position is in VIEWPORT
        coords; marqueeRect derivation factors zoom + scroll + offset. -->
-  <!-- Right-click context menu. Absolute-positioned at the click point.
-       Outside-click / Escape closes via a single-use window listener. -->
+  <!-- Canvas right-click context menu — see components/CanvasContextMenu.svelte.
+       Outside-click / Escape closing is wired via the $effect above that
+       watches `contextMenu`. -->
   {#if contextMenu}
-    <div
-      class="sveltedraw-ctx-menu"
-      style="position: absolute;
-             left: {contextMenu.vpX}px;
-             top: {contextMenu.vpY}px;
-             z-index: 100;"
-      role="menu"
-      tabindex="-1"
-      onpointerdown={(e) => e.stopPropagation()}
-    >
-      {#if contextMenu.hasSelection}
-        <button type="button" class="ctx-item" onclick={() => { copySelectedToBuffer(); closeContextMenu(); }}>{t("labels.copy")}</button>
-        <button type="button" class="ctx-item" onclick={() => {
-          copySelectedToBuffer();
-          deleteSelected();
-          closeContextMenu();
-        }}>{t("labels.cut")}</button>
-      {/if}
-      <button type="button" class="ctx-item" disabled={clipboardBuffer.length === 0} onclick={() => {
+    <CanvasContextMenu
+      menu={contextMenu}
+      clipboardEmpty={clipboardBuffer.length === 0}
+      selectedCount={getSelectedElements().length}
+      selectedHasLink={!!getSelectedElements()[0]?.link}
+      onClose={closeContextMenu}
+      onCopy={copySelectedToBuffer}
+      onCut={() => { copySelectedToBuffer(); deleteSelected(); }}
+      onPaste={() => {
         if (contextMenu) {
           const { x, y } = toSceneCoords(
-            (contextMenu.vpX + (appState.offsetLeft as number)),
-            (contextMenu.vpY + (appState.offsetTop as number)),
+            contextMenu.vpX + (appState.offsetLeft as number),
+            contextMenu.vpY + (appState.offsetTop as number),
           );
           pasteFromBuffer(x, y);
         }
-        closeContextMenu();
-      }}>{t("labels.paste")}</button>
-      {#if contextMenu.hasSelection}
-        <div class="ctx-sep"></div>
-        {#if getSelectedElements().length === 1}
-          <button type="button" class="ctx-item" onclick={() => { openLinkDialog(); closeContextMenu(); }}>
-            {getSelectedElements()[0]?.link ? "Edit link" : "Add link"}
-          </button>
-        {/if}
-        <button type="button" class="ctx-item" onclick={() => { duplicateSelected(); closeContextMenu(); }}>{t("labels.duplicateSelection")}</button>
-        <button type="button" class="ctx-item" onclick={() => { groupSelected(); closeContextMenu(); }}>{t("labels.group")}</button>
-        <button type="button" class="ctx-item" onclick={() => { ungroupSelected(); closeContextMenu(); }}>{t("labels.ungroup")}</button>
-        <button type="button" class="ctx-item" onclick={() => { saveSelectionToLibrary(); closeContextMenu(); }}>{t("toolBar.library")}</button>
-        <button type="button" class="ctx-item" onclick={() => { reorderSelected("forward"); closeContextMenu(); }}>{t("labels.bringForward")}</button>
-        <button type="button" class="ctx-item" onclick={() => { reorderSelected("front"); closeContextMenu(); }}>{t("labels.bringToFront")}</button>
-        <button type="button" class="ctx-item" onclick={() => { reorderSelected("backward"); closeContextMenu(); }}>{t("labels.sendBackward")}</button>
-        <button type="button" class="ctx-item" onclick={() => { reorderSelected("back"); closeContextMenu(); }}>{t("labels.sendToBack")}</button>
-        <div class="ctx-sep"></div>
-        <button type="button" class="ctx-item ctx-item--danger" onclick={() => { deleteSelected(); closeContextMenu(); }}>{t("labels.delete")}</button>
-      {/if}
-    </div>
+      }}
+      onOpenLink={openLinkDialog}
+      onDuplicate={duplicateSelected}
+      onGroup={groupSelected}
+      onUngroup={ungroupSelected}
+      onSaveToLibrary={saveSelectionToLibrary}
+      onBringForward={() => reorderSelected("forward")}
+      onBringToFront={() => reorderSelected("front")}
+      onSendBackward={() => reorderSelected("backward")}
+      onSendToBack={() => reorderSelected("back")}
+      onDelete={deleteSelected}
+    />
   {/if}
 
   {#if marqueeRect}
@@ -6421,35 +6404,8 @@
     height: 16px;
   }
 
-  .sveltedraw-ctx-menu {
-    background: #fff;
-    border: 1px solid #d1d4da;
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-    min-width: 160px;
-    padding: 4px 0;
-    font-size: 13px;
-  }
-  .sveltedraw-ctx-menu .ctx-item {
-    display: block;
-    width: 100%;
-    text-align: left;
-    padding: 6px 12px;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    color: #1e1e1e;
-  }
-  .sveltedraw-ctx-menu .ctx-item:hover:not([disabled]) {
-    background: #eeedfa;
-  }
-  .sveltedraw-ctx-menu .ctx-item[disabled] {
-    color: #a0a3a9;
-    cursor: not-allowed;
-  }
-  .sveltedraw-ctx-menu .ctx-item--danger {
-    color: #e03131;
-  }
+  /* Canvas context menu styles live with components/CanvasContextMenu.svelte. */
+
   .sveltedraw-toolbox {
     position: absolute;
     top: 12px;
@@ -6809,12 +6765,6 @@
     color: #e03131;
     background: #fff5f5;
     border-radius: 4px;
-  }
-
-  .sveltedraw-ctx-menu .ctx-sep {
-    height: 1px;
-    background: #e5e7ea;
-    margin: 4px 0;
   }
 
   .sveltedraw-connector-panel {
