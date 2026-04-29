@@ -2,16 +2,19 @@
   // Top-right utility bar: file/templates/settings, tool toggles,
   // side panels, presentation, export, theme, language, help.
   //
-  // All active-state flags are passed in as readonly props; the parent
-  // owns the state. All actions are plain callbacks.
+  // Built-in buttons are hardcoded (drawing/utility/view groups). Plugin
+  // buttons appended after the built-ins via PluginRegistry.toolbarItems
+  // — each item carries an icon component, title, group, and onActivate.
   //
   // Note there are TWO "library" buttons — `libraryPanelOpen` is the
   // original bottom-left library panel; `shapeLibraryPanelActive` is
   // the side-docked Shape Library panel added in Phase 16.
 
+  import { getContext } from "svelte";
+  import { PLUGIN_REGISTRY_KEY, type PluginRegistry } from "../plugins/registry.svelte.js";
+  import type { ToolbarItemDef } from "../plugins/types.js";
+
   type Language = { code: string; label: string };
-  // Mirror of App.svelte's SidePanelId. Kept duplicated rather than
-  // exported so the shared snapshot stays wherever it's used.
   type SidePanelId =
     | "alignment"
     | "measurement"
@@ -80,6 +83,25 @@
     onSetLanguage,
     onOpenHelp,
   }: Props = $props();
+
+  // Plugin-contributed toolbar items. Optional context: hosts that build
+  // a Sveltedraw editor without going through App.svelte's setContext
+  // path won't have a registry — render zero plugin items in that case.
+  const pluginRegistry =
+    getContext<PluginRegistry | undefined>(PLUGIN_REGISTRY_KEY);
+
+  // Group items so the visual ordering matches the existing groups
+  // (drawing | utility | view). Re-derived only when the toolbar list
+  // mutates (push/pop), not on item-internal state changes.
+  const drawingItems = $derived<ToolbarItemDef[]>(
+    pluginRegistry?.toolbarItems.filter((i) => i.group === "drawing") ?? [],
+  );
+  const utilityItems = $derived<ToolbarItemDef[]>(
+    pluginRegistry?.toolbarItems.filter((i) => i.group === "utility") ?? [],
+  );
+  const viewItems = $derived<ToolbarItemDef[]>(
+    pluginRegistry?.toolbarItems.filter((i) => i.group === "view") ?? [],
+  );
 </script>
 
 <div class="sveltedraw-utility-bar">
@@ -265,6 +287,56 @@
   >
     ❓
   </button>
+
+  <!-- Plugin-contributed toolbar items, grouped to match the built-in
+       layout. Each plugin's onActivate runs synchronously; isActive is
+       polled at render time, so reactivity flows through whatever
+       $state the plugin closes over. -->
+  {#each drawingItems as item (item.id)}
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
+      class:active={item.isActive?.()}
+      aria-label={item.title}
+      title={item.title}
+      onclick={item.onActivate}
+    >
+      {#if typeof item.icon === "function"}
+        {@const Icon = item.icon}
+        <Icon />
+      {/if}
+    </button>
+  {/each}
+  {#each utilityItems as item (item.id)}
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
+      class:active={item.isActive?.()}
+      aria-label={item.title}
+      title={item.title}
+      onclick={item.onActivate}
+    >
+      {#if typeof item.icon === "function"}
+        {@const Icon = item.icon}
+        <Icon />
+      {/if}
+    </button>
+  {/each}
+  {#each viewItems as item (item.id)}
+    <button
+      type="button"
+      class="sveltedraw-util-btn"
+      class:active={item.isActive?.()}
+      aria-label={item.title}
+      title={item.title}
+      onclick={item.onActivate}
+    >
+      {#if typeof item.icon === "function"}
+        {@const Icon = item.icon}
+        <Icon />
+      {/if}
+    </button>
+  {/each}
 </div>
 
 <style>
