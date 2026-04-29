@@ -114,12 +114,12 @@
       class="App-toolbar-content"
       style="display: flex; flex-direction: row; justify-content: space-between;"
     >
-      <div class="excalidraw-ui-top-left">
+      <div class="sveltedraw-ui-top-left">
         {@render renderTopLeftUI?.()}
         <TunnelOut tunnel={tunnels.MainMenuTunnel} />
       </div>
 
-      <div class="excalidraw-ui-top-right">
+      <div class="sveltedraw-ui-top-right">
         {#if renderTopRightUI}
           {@render renderTopRightUI()}
         {:else if !appState.viewModeEnabled}

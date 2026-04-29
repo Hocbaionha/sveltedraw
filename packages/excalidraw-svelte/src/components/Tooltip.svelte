@@ -26,7 +26,7 @@
     <Tooltip.Root>
       <Tooltip.Trigger>
         {#snippet child({ props })}
-          <div class="excalidraw-tooltip-wrapper" {style} {...props}>
+          <div class="sveltedraw-tooltip-wrapper" {style} {...props}>
             {@render children?.()}
           </div>
         {/snippet}
@@ -35,7 +35,7 @@
         {#snippet child({ props })}
           <div
             {...props}
-            class="excalidraw-tooltip excalidraw-tooltip--visible"
+            class="sveltedraw-tooltip excalidraw-tooltip--visible"
             style:min-width={long ? '50ch' : '10ch'}
             style:max-width={long ? '50ch' : '15ch'}
           >

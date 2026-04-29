@@ -155,14 +155,14 @@ describe("Test Transform", () => {
         strokeStyle: "dotted",
       },
     ];
-    const excalidrawElements = convertToExcalidrawElements(
+    const sveltedrawElements = convertToExcalidrawElements(
       elements as SveltedrawElementSkeleton[],
       opts,
     );
 
-    expect(excalidrawElements.length).toBe(4);
+    expect(sveltedrawElements.length).toBe(4);
 
-    excalidrawElements.forEach((ele) => {
+    sveltedrawElements.forEach((ele) => {
       expect(ele).toMatchSnapshot({
         seed: expect.any(Number),
         versionNonce: expect.any(Number),
@@ -238,14 +238,14 @@ describe("Test Transform", () => {
         },
       },
     ];
-    const excalidrawElements = convertToExcalidrawElements(
+    const sveltedrawElements = convertToExcalidrawElements(
       elements as SveltedrawElementSkeleton[],
       opts,
     );
 
-    expect(excalidrawElements.length).toBe(12);
+    expect(sveltedrawElements.length).toBe(12);
 
-    excalidrawElements.forEach((ele) => {
+    sveltedrawElements.forEach((ele) => {
       expect(ele).toMatchSnapshot({
         seed: expect.any(Number),
         versionNonce: expect.any(Number),
@@ -296,14 +296,14 @@ describe("Test Transform", () => {
         },
       },
     ];
-    const excalidrawElements = convertToExcalidrawElements(
+    const sveltedrawElements = convertToExcalidrawElements(
       elements as SveltedrawElementSkeleton[],
       opts,
     );
 
-    expect(excalidrawElements.length).toBe(8);
+    expect(sveltedrawElements.length).toBe(8);
 
-    excalidrawElements.forEach((ele) => {
+    sveltedrawElements.forEach((ele) => {
       expect(ele).toMatchSnapshot({
         seed: expect.any(Number),
         versionNonce: expect.any(Number),
@@ -345,13 +345,13 @@ describe("Test Transform", () => {
           name: "My frame",
         },
       ];
-      const excalidrawElements = convertToExcalidrawElements(
+      const sveltedrawElements = convertToExcalidrawElements(
         elementsSkeleton,
         opts,
       );
-      expect(excalidrawElements.length).toBe(4);
+      expect(sveltedrawElements.length).toBe(4);
 
-      excalidrawElements.forEach((ele) => {
+      sveltedrawElements.forEach((ele) => {
         expect(ele).toMatchObject({
           seed: expect.any(Number),
           versionNonce: expect.any(Number),
@@ -371,11 +371,11 @@ describe("Test Transform", () => {
           height: 100,
         },
       ];
-      const excalidrawElements = convertToExcalidrawElements(
+      const sveltedrawElements = convertToExcalidrawElements(
         elementsSkeleton,
         opts,
       );
-      const frame = excalidrawElements.find((ele) => ele.type === "frame")!;
+      const frame = sveltedrawElements.find((ele) => ele.type === "frame")!;
       expect(frame.width).toBe(800);
       expect(frame.height).toBe(100);
     });
@@ -391,11 +391,11 @@ describe("Test Transform", () => {
           y: 300,
         },
       ];
-      const excalidrawElements = convertToExcalidrawElements(
+      const sveltedrawElements = convertToExcalidrawElements(
         elementsSkeleton,
         opts,
       );
-      const frame = excalidrawElements.find((ele) => ele.type === "frame")!;
+      const frame = sveltedrawElements.find((ele) => ele.type === "frame")!;
       expect(frame.x).toBe(100);
       expect(frame.y).toBe(300);
     });
@@ -419,13 +419,13 @@ describe("Test Transform", () => {
           },
         },
       ];
-      const excalidrawElements = convertToExcalidrawElements(
+      const sveltedrawElements = convertToExcalidrawElements(
         elements as SveltedrawElementSkeleton[],
         opts,
       );
 
-      expect(excalidrawElements.length).toBe(4);
-      const [arrow, text, rectangle, ellipse] = excalidrawElements;
+      expect(sveltedrawElements.length).toBe(4);
+      const [arrow, text, rectangle, ellipse] = sveltedrawElements;
       expect(arrow).toMatchObject({
         type: "arrow",
         x: 255.5,
@@ -471,7 +471,7 @@ describe("Test Transform", () => {
         ],
       });
 
-      excalidrawElements.forEach((ele) => {
+      sveltedrawElements.forEach((ele) => {
         expect(ele).toMatchSnapshot({
           seed: expect.any(Number),
           versionNonce: expect.any(Number),
@@ -500,13 +500,13 @@ describe("Test Transform", () => {
         },
       ];
 
-      const excalidrawElements = convertToExcalidrawElements(
+      const sveltedrawElements = convertToExcalidrawElements(
         elements as SveltedrawElementSkeleton[],
         opts,
       );
 
-      expect(excalidrawElements.length).toBe(4);
-      const [arrow, text1, text2, text3] = excalidrawElements;
+      expect(sveltedrawElements.length).toBe(4);
+      const [arrow, text1, text2, text3] = sveltedrawElements;
 
       expect(arrow).toMatchObject({
         type: "arrow",
@@ -553,7 +553,7 @@ describe("Test Transform", () => {
         ],
       });
 
-      excalidrawElements.forEach((ele) => {
+      sveltedrawElements.forEach((ele) => {
         expect(ele).toMatchSnapshot({
           seed: expect.any(Number),
           versionNonce: expect.any(Number),
@@ -613,14 +613,14 @@ describe("Test Transform", () => {
         },
       ];
 
-      const excalidrawElements = convertToExcalidrawElements(
+      const sveltedrawElements = convertToExcalidrawElements(
         elements as SveltedrawElementSkeleton[],
         opts,
       );
 
-      expect(excalidrawElements.length).toBe(5);
+      expect(sveltedrawElements.length).toBe(5);
 
-      excalidrawElements.forEach((ele) => {
+      sveltedrawElements.forEach((ele) => {
         expect(ele).toMatchSnapshot({
           seed: expect.any(Number),
           versionNonce: expect.any(Number),
@@ -662,14 +662,14 @@ describe("Test Transform", () => {
         },
       ];
 
-      const excalidrawElements = convertToExcalidrawElements(
+      const sveltedrawElements = convertToExcalidrawElements(
         elements as SveltedrawElementSkeleton[],
         opts,
       );
 
-      expect(excalidrawElements.length).toBe(4);
+      expect(sveltedrawElements.length).toBe(4);
 
-      excalidrawElements.forEach((ele) => {
+      sveltedrawElements.forEach((ele) => {
         expect(ele).toMatchSnapshot({
           seed: expect.any(Number),
           versionNonce: expect.any(Number),
@@ -716,13 +716,13 @@ describe("Test Transform", () => {
         },
       ];
 
-      const excalidrawElements = convertToExcalidrawElements(
+      const sveltedrawElements = convertToExcalidrawElements(
         elements as SveltedrawElementSkeleton[],
         opts,
       );
 
-      expect(excalidrawElements.length).toBe(4);
-      const [, , arrow, text] = excalidrawElements;
+      expect(sveltedrawElements.length).toBe(4);
+      const [, , arrow, text] = sveltedrawElements;
       expect(arrow).toMatchObject({
         type: "arrow",
         x: 255.5,
@@ -767,12 +767,12 @@ describe("Test Transform", () => {
           backgroundColor: "#bac8ff",
         },
       ];
-      const excalidrawElements = convertToExcalidrawElements(
+      const sveltedrawElements = convertToExcalidrawElements(
         elements as SveltedrawElementSkeleton[],
         opts,
       );
-      expect(excalidrawElements.length).toBe(2);
-      const [arrow, rect] = excalidrawElements;
+      expect(sveltedrawElements.length).toBe(2);
+      const [arrow, rect] = sveltedrawElements;
       expect((arrow as SveltedrawArrowElement).endBinding).toStrictEqual({
         elementId: "rect-1",
         fixedPoint: [-2.05, 0.5001],
@@ -810,13 +810,13 @@ describe("Test Transform", () => {
         height: 200,
       },
     ];
-    const excalidrawElements = convertToExcalidrawElements(
+    const sveltedrawElements = convertToExcalidrawElements(
       elements as SveltedrawElementSkeleton[],
       opts,
     );
 
-    expect(excalidrawElements.length).toBe(1);
-    expect(excalidrawElements[0]).toMatchSnapshot({
+    expect(sveltedrawElements.length).toBe(1);
+    expect(sveltedrawElements[0]).toMatchSnapshot({
       seed: expect.any(Number),
       versionNonce: expect.any(Number),
     });
@@ -955,9 +955,9 @@ describe("Test Transform", () => {
       },
     ];
 
-    const excalidrawElements = convertToExcalidrawElements(elements, opts);
-    expect(excalidrawElements.length).toBe(12);
-    excalidrawElements.forEach((ele) => {
+    const sveltedrawElements = convertToExcalidrawElements(elements, opts);
+    expect(sveltedrawElements.length).toBe(12);
+    sveltedrawElements.forEach((ele) => {
       expect(ele).toMatchSnapshot({
         seed: expect.any(Number),
         versionNonce: expect.any(Number),

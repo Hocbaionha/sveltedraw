@@ -2,12 +2,12 @@ const fs = require("fs");
 const util = require("util");
 const exec = util.promisify(require("child_process").exec);
 
-const excalidrawDir = `${__dirname}/../packages/excalidraw`;
-const excalidrawPackage = `${excalidrawDir}/package.json`;
-const pkg = require(excalidrawPackage);
+const sveltedrawDir = `${__dirname}/../packages/excalidraw`;
+const sveltedrawPackage = `${sveltedrawDir}/package.json`;
+const pkg = require(sveltedrawPackage);
 const lastVersion = pkg.version;
 const existingChangeLog = fs.readFileSync(
-  `${excalidrawDir}/CHANGELOG.md`,
+  `${sveltedrawDir}/CHANGELOG.md`,
   "utf8",
 );
 
@@ -100,7 +100,7 @@ const updateChangelog = async (nextVersion) => {
   const currentDate = new Date().toISOString().slice(0, 10);
   const newVersion = `## ${nextVersion} (${currentDate})`;
   updatedContent = updatedContent.replace(`## Unreleased`, newVersion);
-  fs.writeFileSync(`${excalidrawDir}/CHANGELOG.md`, updatedContent, "utf8");
+  fs.writeFileSync(`${sveltedrawDir}/CHANGELOG.md`, updatedContent, "utf8");
 };
 
 module.exports = updateChangelog;

@@ -44,7 +44,7 @@
 </script>
 
 <canvas
-  class="excalidraw__canvas"
+  class="sveltedraw__canvas"
   style:width={`${appState.width}px`}
   style:height={`${appState.height}px`}
   width={appState.width * scale}

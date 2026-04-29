@@ -63,11 +63,11 @@
       if (!isMounted) {
         isMounted = true;
         w.replaceChildren(c);
-        c.classList.add("excalidraw__canvas", "static");
+        c.classList.add("sveltedraw__canvas", "static");
       }
       render({ canvas: c, scale: s, appState: state, renderConfig: cfg });
     });
   });
 </script>
 
-<div class="excalidraw__canvas-wrapper" bind:this={wrapperEl}></div>
+<div class="sveltedraw__canvas-wrapper" bind:this={wrapperEl}></div>

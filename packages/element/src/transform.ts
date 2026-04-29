@@ -481,18 +481,18 @@ const bindLinearElementToElement = (
 };
 
 class ElementStore {
-  excalidrawElements = new Map<string, SveltedrawElement>();
+  sveltedrawElements = new Map<string, SveltedrawElement>();
 
   add = (ele?: SveltedrawElement) => {
     if (!ele) {
       return;
     }
 
-    this.excalidrawElements.set(ele.id, ele);
+    this.sveltedrawElements.set(ele.id, ele);
   };
 
   getElements = () => {
-    return syncInvalidIndices(Array.from(this.excalidrawElements.values()));
+    return syncInvalidIndices(Array.from(this.sveltedrawElements.values()));
   };
 
   getElementsMap = () => {
@@ -502,7 +502,7 @@ class ElementStore {
   };
 
   getElement = (id: string) => {
-    return this.excalidrawElements.get(id);
+    return this.sveltedrawElements.get(id);
   };
 }
 
@@ -520,7 +520,7 @@ export const convertToExcalidrawElements = (
 
   // Create individual elements
   for (const element of elements) {
-    let excalidrawElement: SveltedrawElement;
+    let sveltedrawElement: SveltedrawElement;
     const originalId = element.id;
     if (opts?.regenerateIds !== false) {
       Object.assign(element, { id: randomId() });
@@ -538,7 +538,7 @@ export const convertToExcalidrawElements = (
           element?.label?.text && element.height === undefined
             ? 0
             : element?.height || DEFAULT_DIMENSION;
-        excalidrawElement = newElement({
+        sveltedrawElement = newElement({
           ...element,
           width,
           height,
@@ -549,7 +549,7 @@ export const convertToExcalidrawElements = (
       case "line": {
         const width = element.width || DEFAULT_LINEAR_ELEMENT_PROPS.width;
         const height = element.height || DEFAULT_LINEAR_ELEMENT_PROPS.height;
-        excalidrawElement = newLinearElement({
+        sveltedrawElement = newLinearElement({
           width,
           height,
           points: [pointFrom(0, 0), pointFrom(width, height)],
@@ -561,7 +561,7 @@ export const convertToExcalidrawElements = (
       case "arrow": {
         const width = element.width || DEFAULT_LINEAR_ELEMENT_PROPS.width;
         const height = element.height || DEFAULT_LINEAR_ELEMENT_PROPS.height;
-        excalidrawElement = newArrowElement({
+        sveltedrawElement = newArrowElement({
           width,
           height,
           endArrowhead: "arrow",
@@ -571,8 +571,8 @@ export const convertToExcalidrawElements = (
         });
 
         Object.assign(
-          excalidrawElement,
-          getSizeFromPoints(excalidrawElement.points),
+          sveltedrawElement,
+          getSizeFromPoints(sveltedrawElement.points),
         );
         break;
       }
@@ -588,7 +588,7 @@ export const convertToExcalidrawElements = (
           lineHeight,
         );
 
-        excalidrawElement = newTextElement({
+        sveltedrawElement = newTextElement({
           width: metrics.width,
           height: metrics.height,
           fontFamily,
@@ -598,7 +598,7 @@ export const convertToExcalidrawElements = (
         break;
       }
       case "image": {
-        excalidrawElement = newImageElement({
+        sveltedrawElement = newImageElement({
           width: element?.width || DEFAULT_DIMENSION,
           height: element?.height || DEFAULT_DIMENSION,
           ...element,
@@ -607,7 +607,7 @@ export const convertToExcalidrawElements = (
         break;
       }
       case "frame": {
-        excalidrawElement = newFrameElement({
+        sveltedrawElement = newFrameElement({
           x: 0,
           y: 0,
           ...element,
@@ -615,7 +615,7 @@ export const convertToExcalidrawElements = (
         break;
       }
       case "magicframe": {
-        excalidrawElement = newMagicFrameElement({
+        sveltedrawElement = newMagicFrameElement({
           x: 0,
           y: 0,
           ...element,
@@ -625,12 +625,12 @@ export const convertToExcalidrawElements = (
       case "freedraw":
       case "iframe":
       case "embeddable": {
-        excalidrawElement = element;
+        sveltedrawElement = element;
         break;
       }
 
       default: {
-        excalidrawElement = element;
+        sveltedrawElement = element;
         assertNever(
           element,
           `Unhandled element type "${(element as any).type}"`,
@@ -638,14 +638,14 @@ export const convertToExcalidrawElements = (
         );
       }
     }
-    const existingElement = elementStore.getElement(excalidrawElement.id);
+    const existingElement = elementStore.getElement(sveltedrawElement.id);
     if (existingElement) {
-      console.error(`Duplicate id found for ${excalidrawElement.id}`);
+      console.error(`Duplicate id found for ${sveltedrawElement.id}`);
     } else {
-      elementStore.add(excalidrawElement);
-      elementsWithIds.set(excalidrawElement.id, element);
+      elementStore.add(sveltedrawElement);
+      elementsWithIds.set(sveltedrawElement.id, element);
       if (originalId) {
-        oldToNewElementIdMap.set(originalId, excalidrawElement.id);
+        oldToNewElementIdMap.set(originalId, sveltedrawElement.id);
       }
     }
   }
@@ -656,7 +656,7 @@ export const convertToExcalidrawElements = (
 
   // Add labels and arrow bindings
   for (const [id, element] of elementsWithIds) {
-    const excalidrawElement = elementStore.getElement(id)!;
+    const sveltedrawElement = elementStore.getElement(id)!;
 
     switch (element.type) {
       case "rectangle":
@@ -665,7 +665,7 @@ export const convertToExcalidrawElements = (
       case "arrow": {
         if (element.label?.text) {
           let [container, text] = bindTextToContainer(
-            excalidrawElement,
+            sveltedrawElement,
             element?.label,
             scene,
           );
@@ -716,7 +716,7 @@ export const convertToExcalidrawElements = (
               }
               const { linearElement, startBoundElement, endBoundElement } =
                 bindLinearElementToElement(
-                  excalidrawElement as SveltedrawArrowElement,
+                  sveltedrawElement as SveltedrawArrowElement,
                   start,
                   end,
                   elementStore,

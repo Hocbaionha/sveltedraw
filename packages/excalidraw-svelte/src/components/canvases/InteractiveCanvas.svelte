@@ -75,7 +75,7 @@
 
 <canvas
   bind:this={canvasEl}
-  class="excalidraw__canvas interactive"
+  class="sveltedraw__canvas interactive"
   style:width={`${appState.width}px`}
   style:height={`${appState.height}px`}
   style:cursor={cursor}

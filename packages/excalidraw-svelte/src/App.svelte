@@ -173,7 +173,7 @@
   import {
     saveAsExcalidrawFile as saveExcalidrawFileImpl,
     openExcalidrawFilePicker as openExcalidrawFilePickerImpl,
-  } from "./data/excalidrawFile.js";
+  } from "./data/sveltedrawFile.js";
   import { createImperativeAPI } from "./api/ImperativeAPI.svelte.js";
   import { SVELTEDRAW_API_KEY, type SveltedrawAPI } from "./api/types.js";
   import { PluginRegistry, PLUGIN_REGISTRY_KEY } from "./plugins/registry.svelte.js";
@@ -2321,7 +2321,7 @@
   };
 
   // ── .excalidraw JSON file open/save ────────────────────────────
-  // Implementation in ./data/excalidrawFile.ts.
+  // Implementation in ./data/sveltedrawFile.ts.
   const saveAsExcalidrawFile = () =>
     saveExcalidrawFileImpl({ scene, appState, binaryFiles });
   const loadFromExcalidrawFile = () =>
@@ -5382,17 +5382,17 @@
   // upstream logic (dialog makes the canvas non-editable).
   const containerClass = $derived(
     [
-      "excalidraw",
-      "excalidraw-container",
+      "sveltedraw",
+      "sveltedraw-container",
       "notranslate",
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (appState as any).theme === "dark" ? "theme--dark" : "",
       appState.viewModeEnabled ||
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (appState.openDialog as any)?.name === "elementLinkSelector"
-        ? "excalidraw--view-mode"
+        ? "sveltedraw--view-mode"
         : "",
-      editorInterface.formFactor === "phone" ? "excalidraw--mobile" : "",
+      editorInterface.formFactor === "phone" ? "sveltedraw--mobile" : "",
       // A2: crosshair cursor while laser tool is active.
       laserActive ? "sveltedraw--laser" : "",
       // B2: eraser cursor hint.
@@ -5442,9 +5442,9 @@
     {onToastClose}
   />
 
-  <div class="excalidraw-textEditorContainer"></div>
-  <div class="excalidraw-contextMenuContainer"></div>
-  <div class="excalidraw-eye-dropper-container"></div>
+  <div class="sveltedraw-textEditorContainer"></div>
+  <div class="sveltedraw-contextMenuContainer"></div>
+  <div class="sveltedraw-eye-dropper-container"></div>
 
   <!-- Top-right utility bar: theme toggle + language picker. Kept
        minimal; upstream-style MainMenu is a Phase 7 concern. -->
@@ -6442,7 +6442,7 @@
     width: min(480px, 92vw);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-link-modal {
+  :global(.sveltedraw.theme--dark) .sveltedraw-link-modal {
     background: #1a1a1e;
     color: #e5e7ea;
   }
@@ -6461,58 +6461,58 @@
   /* D1: dark-mode overrides for orphan upstream components whose SCSS
      sidecars don't ship with theme--dark rules. Targets visible white-on-
      white patterns: dialogs, buttons, color pickers, dropdowns, menus. */
-  :global(.excalidraw.theme--dark .excalidraw-button) {
+  :global(.sveltedraw.theme--dark .sveltedraw-button) {
     background: #2e2e36;
     color: #e5e7ea;
     border-color: #363636;
   }
-  :global(.excalidraw.theme--dark .excalidraw-button:hover) {
+  :global(.sveltedraw.theme--dark .sveltedraw-button:hover) {
     background: #363644;
   }
-  :global(.excalidraw.theme--dark .excalidraw-button.selected) {
+  :global(.sveltedraw.theme--dark .sveltedraw-button.selected) {
     background: #6965db;
     color: #fff;
   }
-  :global(.excalidraw.theme--dark .Dialog),
-  :global(.excalidraw.theme--dark .Dialog__content) {
+  :global(.sveltedraw.theme--dark .Dialog),
+  :global(.sveltedraw.theme--dark .Dialog__content) {
     background: #232329;
     color: #e5e7ea;
     border-color: #363636;
   }
-  :global(.excalidraw.theme--dark .Dialog__title) { color: #e5e7ea; }
-  :global(.excalidraw.theme--dark .context-menu),
-  :global(.excalidraw.theme--dark .dropdown-menu-container) {
+  :global(.sveltedraw.theme--dark .Dialog__title) { color: #e5e7ea; }
+  :global(.sveltedraw.theme--dark .context-menu),
+  :global(.sveltedraw.theme--dark .dropdown-menu-container) {
     background: #232329;
     color: #e5e7ea;
     border-color: #363636;
   }
-  :global(.excalidraw.theme--dark .context-menu-option),
-  :global(.excalidraw.theme--dark .dropdown-menu-item) {
+  :global(.sveltedraw.theme--dark .context-menu-option),
+  :global(.sveltedraw.theme--dark .dropdown-menu-item) {
     color: #e5e7ea;
   }
-  :global(.excalidraw.theme--dark .context-menu-option:hover),
-  :global(.excalidraw.theme--dark .dropdown-menu-item:hover),
-  :global(.excalidraw.theme--dark .dropdown-menu-item[data-highlighted]) {
+  :global(.sveltedraw.theme--dark .context-menu-option:hover),
+  :global(.sveltedraw.theme--dark .dropdown-menu-item:hover),
+  :global(.sveltedraw.theme--dark .dropdown-menu-item[data-highlighted]) {
     background: #2e2e36;
   }
-  :global(.excalidraw.theme--dark .color-picker-container),
-  :global(.excalidraw.theme--dark .color-picker-popover-content),
-  :global(.excalidraw.theme--dark .color-picker-content),
-  :global(.excalidraw.theme--dark .Picker),
-  :global(.excalidraw.theme--dark .picker-heading),
-  :global(.excalidraw.theme--dark .shade-list),
-  :global(.excalidraw.theme--dark .top-picks) {
+  :global(.sveltedraw.theme--dark .color-picker-container),
+  :global(.sveltedraw.theme--dark .color-picker-popover-content),
+  :global(.sveltedraw.theme--dark .color-picker-content),
+  :global(.sveltedraw.theme--dark .Picker),
+  :global(.sveltedraw.theme--dark .picker-heading),
+  :global(.sveltedraw.theme--dark .shade-list),
+  :global(.sveltedraw.theme--dark .top-picks) {
     background: #232329;
     color: #e5e7ea;
     border-color: #363636;
   }
-  :global(.excalidraw.theme--dark .color-input-container),
-  :global(.excalidraw.theme--dark .color-input) {
+  :global(.sveltedraw.theme--dark .color-input-container),
+  :global(.sveltedraw.theme--dark .color-input) {
     background: #2e2e36;
     color: #e5e7ea;
     border-color: #363636;
   }
-  :global(.excalidraw.theme--dark .active-confirm-dialog) {
+  :global(.sveltedraw.theme--dark .active-confirm-dialog) {
     background: #232329;
     color: #e5e7ea;
   }
@@ -6525,7 +6525,7 @@
     z-index: 25;
   }
 
-  .excalidraw-container {
+  .sveltedraw-container {
     position: relative;
     width: 100%;
     height: 100%;
@@ -6649,7 +6649,7 @@
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
     z-index: 50;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-toolbox {
+  :global(.sveltedraw.theme--dark) .sveltedraw-toolbox {
     background: #232329;
     border-color: #363636;
   }
@@ -6659,7 +6659,7 @@
     background: #e5e7ea;
     margin: 0 4px;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-toolbox .tb-sep {
+  :global(.sveltedraw.theme--dark) .sveltedraw-toolbox .tb-sep {
     background: #363636;
   }
   .sveltedraw-toolbox .sveltedraw-tool-btn {
@@ -6683,13 +6683,13 @@
     border-color: #6965db;
     color: #5349d6;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-toolbox .sveltedraw-tool-btn {
+  :global(.sveltedraw.theme--dark) .sveltedraw-toolbox .sveltedraw-tool-btn {
     color: #e5e7ea;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-toolbox .sveltedraw-tool-btn:hover {
+  :global(.sveltedraw.theme--dark) .sveltedraw-toolbox .sveltedraw-tool-btn:hover {
     background: #2e2e36;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-toolbox .sveltedraw-tool-btn.active {
+  :global(.sveltedraw.theme--dark) .sveltedraw-toolbox .sveltedraw-tool-btn.active {
     background: #3b3a66;
     border-color: #6965db;
     color: #b5b2ee;
@@ -6717,9 +6717,9 @@
     border-radius: 3px;
     color: #1e1e1e;
   }
-  :global(.excalidraw.theme--dark .sveltedraw-help-card kbd),
-  :global(.excalidraw.theme--dark .sveltedraw-hint kbd),
-  :global(.excalidraw.theme--dark .sveltedraw-welcome kbd) {
+  :global(.sveltedraw.theme--dark .sveltedraw-help-card kbd),
+  :global(.sveltedraw.theme--dark .sveltedraw-hint kbd),
+  :global(.sveltedraw.theme--dark .sveltedraw-welcome kbd) {
     background: #2e2e36;
     border-color: #464651;
     color: #e5e7ea;
@@ -6852,7 +6852,7 @@
     z-index: 40;
     overflow-y: auto;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-connector-panel {
+  :global(.sveltedraw.theme--dark) .sveltedraw-connector-panel {
     background: #232329;
     border-color: #363636;
   }
@@ -6869,7 +6869,7 @@
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     z-index: 40;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-alignment-panel {
+  :global(.sveltedraw.theme--dark) .sveltedraw-alignment-panel {
     background: #232329;
     border-color: #363636;
   }
@@ -6886,7 +6886,7 @@
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     z-index: 40;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-measurement-panel {
+  :global(.sveltedraw.theme--dark) .sveltedraw-measurement-panel {
     background: #232329;
     border-color: #363636;
   }
@@ -6903,7 +6903,7 @@
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     z-index: 40;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-autolayout-panel {
+  :global(.sveltedraw.theme--dark) .sveltedraw-autolayout-panel {
     background: #232329;
     border-color: #363636;
   }
@@ -6920,7 +6920,7 @@
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     z-index: 40;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-grid-panel {
+  :global(.sveltedraw.theme--dark) .sveltedraw-grid-panel {
     background: #232329;
     border-color: #363636;
   }
@@ -6938,7 +6938,7 @@
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     z-index: 40;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-layer-panel {
+  :global(.sveltedraw.theme--dark) .sveltedraw-layer-panel {
     background: #232329;
     border-color: #363636;
   }
@@ -6956,7 +6956,7 @@
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     z-index: 40;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-history-panel {
+  :global(.sveltedraw.theme--dark) .sveltedraw-history-panel {
     background: #232329;
     border-color: #363636;
   }
@@ -6974,7 +6974,7 @@
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     z-index: 40;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-shape-library-panel {
+  :global(.sveltedraw.theme--dark) .sveltedraw-shape-library-panel {
     background: #232329;
     border-color: #363636;
   }

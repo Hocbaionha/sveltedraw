@@ -85,7 +85,7 @@
     ></div>
     <div
       bind:this={eyeDropperTriggerEl}
-      class={clsx("excalidraw-eye-dropper-trigger", {
+      class={clsx("sveltedraw-eye-dropper-trigger", {
         selected: eyeDropperActive,
       })}
       onclick={onEyeDropper}

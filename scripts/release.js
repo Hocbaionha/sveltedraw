@@ -69,17 +69,17 @@ const getArguments = () => {
 
   if (!version) {
     // set the next version based on the excalidraw package version + commit hash
-    const excalidrawPackageVersion = require(getPackageJsonPath(
+    const sveltedrawPackageVersion = require(getPackageJsonPath(
       "excalidraw",
     )).version;
 
     const hash = getShortCommitHash();
 
-    if (!excalidrawPackageVersion.includes(hash)) {
-      version = `${excalidrawPackageVersion}-${hash}`;
+    if (!sveltedrawPackageVersion.includes(hash)) {
+      version = `${sveltedrawPackageVersion}-${hash}`;
     } else {
       // ensuring idempotency
-      version = excalidrawPackageVersion;
+      version = sveltedrawPackageVersion;
     }
   }
 

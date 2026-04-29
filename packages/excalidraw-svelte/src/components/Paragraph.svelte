@@ -13,6 +13,6 @@
   } = $props();
 </script>
 
-<p class="excalidraw__paragraph" style={style}>
+<p class="sveltedraw__paragraph" style={style}>
   {@render children?.()}
 </p>

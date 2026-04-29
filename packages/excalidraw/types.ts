@@ -844,7 +844,7 @@ export type AppClassProperties = {
   plugins: App["plugins"];
   getEditorUIOffsets: App["getEditorUIOffsets"];
   visibleElements: App["visibleElements"];
-  excalidrawContainerValue: App["excalidrawContainerValue"];
+  sveltedrawContainerValue: App["sveltedrawContainerValue"];
 
   onPointerUpEmitter: App["onPointerUpEmitter"];
   updateEditorAtom: App["updateEditorAtom"];
@@ -928,7 +928,7 @@ export type PointerDownState = Readonly<{
 export type UnsubscribeCallback = () => void;
 
 export type SveltedrawMountPayload = {
-  excalidrawAPI: SveltedrawImperativeAPI;
+  sveltedrawAPI: SveltedrawImperativeAPI;
   /*
    *Excalidraw container.
    * should never be null, but just to be safe

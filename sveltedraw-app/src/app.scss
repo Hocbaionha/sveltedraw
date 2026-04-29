@@ -4,8 +4,9 @@
 // the same look. Excalidraw's own components import their .scss sidecars
 // per-file; the Svelte ports do not, so we aggregate all of them here once.
 //
-// All Excalidraw rules are nested under `.excalidraw` — wrap any region that
-// uses ported components in a `<div class="excalidraw">` so the rules apply.
+// All upstream-derived SCSS rules are nested under `.sveltedraw` — wrap any
+// region that uses ported components in a `<div class="sveltedraw">` so the
+// rules apply.
 //
 // NOTE: Sass requires all `@use` rules to appear BEFORE any CSS rules, so the
 // upstream imports live first and the local reset is at the bottom.

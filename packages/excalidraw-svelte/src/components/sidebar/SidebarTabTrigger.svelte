@@ -21,7 +21,7 @@
       {...props}
       {...rest}
       type="button"
-      class="excalidraw-button sidebar-tab-trigger"
+      class="sveltedraw-button sidebar-tab-trigger"
       onclick={(event) => onSelect?.(event)}
     >
       {@render children()}

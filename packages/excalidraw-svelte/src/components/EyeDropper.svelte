@@ -26,7 +26,7 @@
 
   let {
     canvas,
-    excalidrawContainer,
+    sveltedrawContainer,
     offsetLeft,
     offsetTop,
     lastViewportPosition,
@@ -37,7 +37,7 @@
     onChange,
   }: {
     canvas: HTMLCanvasElement | null;
-    excalidrawContainer: HTMLElement | null;
+    sveltedrawContainer: HTMLElement | null;
     offsetLeft: number;
     offsetTop: number;
     /** Last known pointer position — used to initialise the color preview
@@ -122,7 +122,7 @@
     function onPointerUp(event: PointerEvent) {
       isHoldingPointerDown = false;
       // Re-focus the editor; otherwise focus lands on <body>.
-      excalidrawContainer?.focus();
+      sveltedrawContainer?.focus();
       event.stopImmediatePropagation();
       event.preventDefault();
       onSelect(getCurrentColor(event), event);
@@ -186,8 +186,8 @@
 <Portal to=".excalidraw-eye-dropper-container, body">
   <div
     bind:this={backdropEl}
-    class="excalidraw-eye-dropper-backdrop"
+    class="sveltedraw-eye-dropper-backdrop"
   >
-    <div bind:this={previewEl} class="excalidraw-eye-dropper-preview"></div>
+    <div bind:this={previewEl} class="sveltedraw-eye-dropper-preview"></div>
   </div>
 </Portal>
