@@ -1,4 +1,4 @@
-import { isFiniteNumber, pointFrom } from "@excalidraw/math";
+import { isFiniteNumber, pointFrom } from "@sveltedraw/math";
 
 import {
   type CombineBrandsIfNeeded,
@@ -18,7 +18,7 @@ import {
   getSizeFromPoints,
   normalizeLink,
   getLineHeight,
-} from "@excalidraw/common";
+} from "@sveltedraw/common";
 import {
   calculateFixedPointForNonElbowArrowBinding,
   getNonDeletedElements,
@@ -26,16 +26,16 @@ import {
   isPointInElement,
   isValidPolygon,
   projectFixedPointOntoDiagonal,
-} from "@excalidraw/element";
-import { normalizeFixedPoint } from "@excalidraw/element";
+} from "@sveltedraw/element";
+import { normalizeFixedPoint } from "@sveltedraw/element";
 import {
   updateElbowArrowPoints,
   validateElbowPoints,
-} from "@excalidraw/element";
-import { LinearElementEditor } from "@excalidraw/element";
-import { bumpVersion } from "@excalidraw/element";
-import { getContainerElement } from "@excalidraw/element";
-import { detectLineHeight } from "@excalidraw/element";
+} from "@sveltedraw/element";
+import { LinearElementEditor } from "@sveltedraw/element";
+import { bumpVersion } from "@sveltedraw/element";
+import { getContainerElement } from "@sveltedraw/element";
+import { detectLineHeight } from "@sveltedraw/element";
 import {
   isArrowBoundToElement,
   isArrowElement,
@@ -44,17 +44,17 @@ import {
   isLineElement,
   isTextElement,
   isUsingAdaptiveRadius,
-} from "@excalidraw/element";
+} from "@sveltedraw/element";
 
-import { syncInvalidIndices } from "@excalidraw/element";
+import { syncInvalidIndices } from "@sveltedraw/element";
 
-import { refreshTextDimensions } from "@excalidraw/element";
+import { refreshTextDimensions } from "@sveltedraw/element";
 
-import { getNormalizedDimensions } from "@excalidraw/element";
+import { getNormalizedDimensions } from "@sveltedraw/element";
 
-import { isInvisiblySmallElement } from "@excalidraw/element";
+import { isInvisiblySmallElement } from "@sveltedraw/element";
 
-import type { LocalPoint, Radians } from "@excalidraw/math";
+import type { LocalPoint, Radians } from "@sveltedraw/math";
 
 import type {
   ElementsMap,
@@ -71,9 +71,9 @@ import type {
   NonDeletedSceneElementsMap,
   OrderedExcalidrawElement,
   StrokeRoundness,
-} from "@excalidraw/element/types";
+} from "@sveltedraw/element/types";
 
-import type { MarkOptional, Mutable } from "@excalidraw/common/utility-types";
+import type { MarkOptional, Mutable } from "@sveltedraw/common/utility-types";
 
 import { getDefaultAppState } from "../appState";
 

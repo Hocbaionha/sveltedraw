@@ -1,16 +1,16 @@
-import { arrayToMap, isShallowEqual, type Bounds } from "@excalidraw/common";
+import { arrayToMap, isShallowEqual, type Bounds } from "@sveltedraw/common";
 import {
   lineSegment,
   pointFrom,
   pointRotateRads,
   type GlobalPoint,
-} from "@excalidraw/math";
+} from "@sveltedraw/math";
 
 import type {
   AppState,
   BoxSelectionMode,
   InteractiveCanvasAppState,
-} from "@excalidraw/excalidraw/types";
+} from "@sveltedraw/engine/types";
 
 import {
   boundsContainBounds,

@@ -29,7 +29,7 @@
 // @ts-ignore — upstream, resolved via Vite alias; tsconfig path mapping
 // lives in packages/tsconfig.base.json but sveltedraw-app's tsconfig does
 // not extend from it.
-import type { AppEngineContext } from "@excalidraw/excalidraw/engine/AppEngineContext";
+import type { AppEngineContext } from "@sveltedraw/engine/engine/AppEngineContext";
 
 /**
  * Runtime refs owned by App.svelte and handed to the factory.

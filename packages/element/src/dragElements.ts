@@ -4,16 +4,16 @@ import {
   getGridPoint,
   getFontString,
   DRAGGING_THRESHOLD,
-} from "@excalidraw/common";
+} from "@sveltedraw/common";
 
 import type {
   AppState,
   NormalizedZoomValue,
   NullableGridSize,
   PointerDownState,
-} from "@excalidraw/excalidraw/types";
+} from "@sveltedraw/engine/types";
 
-import type { NonDeletedExcalidrawElement } from "@excalidraw/element/types";
+import type { NonDeletedExcalidrawElement } from "@sveltedraw/element/types";
 
 import { unbindBindingElement, updateBoundElements } from "./binding";
 import { getCommonBounds } from "./bounds";

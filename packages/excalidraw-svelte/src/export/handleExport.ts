@@ -7,7 +7,7 @@
 // handler.
 
 // @ts-ignore — upstream, resolved via Vite alias
-import { exportToBlob, exportToSvg } from "@excalidraw/utils/export";
+import { exportToBlob, exportToSvg } from "@sveltedraw/utils/export";
 import type { ExportOptions } from "./types.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

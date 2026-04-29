@@ -1,6 +1,6 @@
-import { pointFrom, type GlobalPoint, type LocalPoint } from "@excalidraw/math";
+import { pointFrom, type GlobalPoint, type LocalPoint } from "@sveltedraw/math";
 
-import { THEME } from "@excalidraw/common";
+import { THEME } from "@sveltedraw/common";
 
 import type { PointSnapLine, PointerSnapLine } from "../snapping";
 import type { InteractiveCanvasAppState } from "../types";

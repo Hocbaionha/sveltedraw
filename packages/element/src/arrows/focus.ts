@@ -1,7 +1,7 @@
-import { pointDistance, pointFrom, type GlobalPoint } from "@excalidraw/math";
-import { invariant } from "@excalidraw/common";
+import { pointDistance, pointFrom, type GlobalPoint } from "@sveltedraw/math";
+import { invariant } from "@sveltedraw/common";
 
-import type { AppState, NullableGridSize } from "@excalidraw/excalidraw/types";
+import type { AppState, NullableGridSize } from "@sveltedraw/engine/types";
 
 import {
   bindBindingElement,

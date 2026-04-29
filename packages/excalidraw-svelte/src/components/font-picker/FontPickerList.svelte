@@ -15,7 +15,7 @@
   import { onMount } from "svelte";
   import { getContext } from "svelte";
   // @ts-ignore upstream
-  import { KEYS } from "@excalidraw/common";
+  import { KEYS } from "@sveltedraw/common";
   import PropertiesPopover from "../PropertiesPopover.svelte";
   import QuickSearch from "../QuickSearch.svelte";
   import ScrollableList from "../ScrollableList.svelte";

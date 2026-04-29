@@ -3,12 +3,12 @@
 // section value directly (no functional-update form).
 
 // @ts-ignore upstream package
-import { COLORS_PER_ROW, COLOR_PALETTE, KEYS } from "@excalidraw/common";
+import { COLORS_PER_ROW, COLOR_PALETTE, KEYS } from "@sveltedraw/common";
 import type {
   ColorPickerColor,
   ColorPalette,
   ColorPaletteCustom,
-} from "@excalidraw/common";
+} from "@sveltedraw/common";
 
 import {
   colorPickerHotkeyBindings,

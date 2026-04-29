@@ -3,17 +3,17 @@ import {
   pointOnLineSegment,
   pointRotateRads,
   type Radians,
-} from "@excalidraw/math";
+} from "@sveltedraw/math";
 
 import {
   SIDE_RESIZING_THRESHOLD,
   type EditorInterface,
-} from "@excalidraw/common";
+} from "@sveltedraw/common";
 
-import type { GlobalPoint, LineSegment, LocalPoint } from "@excalidraw/math";
+import type { GlobalPoint, LineSegment, LocalPoint } from "@sveltedraw/math";
 
-import type { AppState, Zoom } from "@excalidraw/excalidraw/types";
-import type { Bounds } from "@excalidraw/common";
+import type { AppState, Zoom } from "@sveltedraw/engine/types";
+import type { Bounds } from "@sveltedraw/common";
 
 import { getElementAbsoluteCoords } from "./bounds";
 import {

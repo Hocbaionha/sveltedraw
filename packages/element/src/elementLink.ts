@@ -2,9 +2,9 @@
  * Create and link between shapes.
  */
 
-import { ELEMENT_LINK_KEY, normalizeLink } from "@excalidraw/common";
+import { ELEMENT_LINK_KEY, normalizeLink } from "@sveltedraw/common";
 
-import type { AppProps, AppState } from "@excalidraw/excalidraw/types";
+import type { AppProps, AppState } from "@sveltedraw/engine/types";
 
 import { elementsAreInSameGroup } from "./groups";
 

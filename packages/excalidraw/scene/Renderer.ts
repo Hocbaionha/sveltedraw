@@ -1,14 +1,14 @@
-import { isElementInViewport } from "@excalidraw/element";
+import { isElementInViewport } from "@sveltedraw/element";
 
-import { memoize, toBrandedType } from "@excalidraw/common";
+import { memoize, toBrandedType } from "@sveltedraw/common";
 
 import type {
   ExcalidrawElement,
   NonDeletedElementsMap,
   NonDeletedExcalidrawElement,
-} from "@excalidraw/element/types";
+} from "@sveltedraw/element/types";
 
-import type { Scene } from "@excalidraw/element";
+import type { Scene } from "@sveltedraw/element";
 
 import { renderStaticSceneThrottled } from "../renderer/staticScene";
 

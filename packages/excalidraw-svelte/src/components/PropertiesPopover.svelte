@@ -8,8 +8,8 @@
   import clsx from "clsx";
   import { Popover as BitsPopover } from "bits-ui";
   // @ts-ignore upstream package
-  import { isInteractive } from "@excalidraw/common";
-  import type { EditorInterface } from "@excalidraw/common";
+  import { isInteractive } from "@sveltedraw/common";
+  import type { EditorInterface } from "@sveltedraw/common";
   import { EDITOR_INTERFACE_KEY } from "../state/index.js";
   import Island from "./Island.svelte";
 

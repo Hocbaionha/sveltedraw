@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Theme } from "@excalidraw/element/types";
+  import type { Theme } from "@sveltedraw/element/types";
   interface Props { theme?: Theme; }
   let { theme: _theme }: Props = $props();
 </script>

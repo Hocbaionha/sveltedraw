@@ -19,16 +19,16 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
-      "@excalidraw/common": ["./packages/common/src/index.ts"],
-      "@excalidraw/common/*": ["./packages/common/src/*"],
-      "@excalidraw/excalidraw": ["./packages/excalidraw/index.tsx"],
-      "@excalidraw/excalidraw/*": ["./packages/excalidraw/*"],
-      "@excalidraw/element": ["./packages/element/src/index.ts"],
-      "@excalidraw/element/*": ["./packages/element/src/*"],
-      "@excalidraw/math": ["./packages/math/src/index.ts"],
-      "@excalidraw/math/*": ["./packages/math/src/*"],
-      "@excalidraw/utils": ["./packages/utils/src/index.ts"],
-      "@excalidraw/utils/*": ["./packages/utils/src/*"]
+      "@sveltedraw/common": ["./packages/common/src/index.ts"],
+      "@sveltedraw/common/*": ["./packages/common/src/*"],
+      "@sveltedraw/engine": ["./packages/excalidraw/index.tsx"],
+      "@sveltedraw/engine/*": ["./packages/excalidraw/*"],
+      "@sveltedraw/element": ["./packages/element/src/index.ts"],
+      "@sveltedraw/element/*": ["./packages/element/src/*"],
+      "@sveltedraw/math": ["./packages/math/src/index.ts"],
+      "@sveltedraw/math/*": ["./packages/math/src/*"],
+      "@sveltedraw/utils": ["./packages/utils/src/index.ts"],
+      "@sveltedraw/utils/*": ["./packages/utils/src/*"]
     }
   },
   "include": ["packages", "excalidraw-app"],

@@ -7,19 +7,19 @@ import {
   cloneJSON,
   SVG_DOCUMENT_PREAMBLE,
   arrayToMap,
-} from "@excalidraw/common";
+} from "@sveltedraw/common";
 
-import { getNonDeletedElements } from "@excalidraw/element";
+import { getNonDeletedElements } from "@sveltedraw/element";
 
-import { isFrameLikeElement } from "@excalidraw/element";
+import { isFrameLikeElement } from "@sveltedraw/element";
 
-import { getElementsOverlappingFrame } from "@excalidraw/element";
+import { getElementsOverlappingFrame } from "@sveltedraw/element";
 
 import type {
   ExcalidrawElement,
   ExcalidrawFrameLikeElement,
   NonDeletedExcalidrawElement,
-} from "@excalidraw/element/types";
+} from "@sveltedraw/element/types";
 
 import {
   copyBlobToClipboardAsPng,

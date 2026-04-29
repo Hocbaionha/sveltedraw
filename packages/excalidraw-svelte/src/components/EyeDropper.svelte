@@ -8,8 +8,8 @@
   // is NOT owned here; caller conditionally mounts/unmounts this component.
 
   // @ts-ignore upstream
-  import type { ColorPickerType } from "@excalidraw/common";
-  import type { ExcalidrawElement } from "@excalidraw/element/types";
+  import type { ColorPickerType } from "@sveltedraw/common";
+  import type { ExcalidrawElement } from "@sveltedraw/element/types";
 
   export type EyeDropperChangeArgs = {
     type: ColorPickerType;
@@ -22,7 +22,7 @@
 <script lang="ts">
   import { Portal } from "bits-ui";
   // @ts-ignore upstream
-  import { EVENT, KEYS, rgbToHex } from "@excalidraw/common";
+  import { EVENT, KEYS, rgbToHex } from "@sveltedraw/common";
 
   let {
     canvas,

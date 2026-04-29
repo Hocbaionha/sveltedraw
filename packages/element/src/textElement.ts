@@ -8,13 +8,13 @@ import {
   getFontString,
   isProdEnv,
   invariant,
-} from "@excalidraw/common";
+} from "@sveltedraw/common";
 
-import { pointFrom, pointRotateRads, type Radians } from "@excalidraw/math";
+import { pointFrom, pointRotateRads, type Radians } from "@sveltedraw/math";
 
-import type { AppState } from "@excalidraw/excalidraw/types";
+import type { AppState } from "@sveltedraw/engine/types";
 
-import type { ExtractSetType } from "@excalidraw/common/utility-types";
+import type { ExtractSetType } from "@sveltedraw/common/utility-types";
 
 import {
   resetOriginalContainerCache,

@@ -11,16 +11,16 @@
     "jsx": "react-jsx",
     "emitDeclarationOnly": true,
     "paths": {
-      "@excalidraw/common": ["./common/src/index.ts"],
-      "@excalidraw/common/*": ["./common/src/*"],
-      "@excalidraw/element": ["./element/src/index.ts"],
-      "@excalidraw/element/*": ["./element/src/*"],
-      "@excalidraw/excalidraw": ["./excalidraw/index.tsx"],
-      "@excalidraw/excalidraw/*": ["./excalidraw/*"],
-      "@excalidraw/math": ["./math/src/index.ts"],
-      "@excalidraw/math/*": ["./math/src/*"],
-      "@excalidraw/utils": ["./utils/src/index.ts"],
-      "@excalidraw/utils/*": ["./utils/src/*"]
+      "@sveltedraw/common": ["./common/src/index.ts"],
+      "@sveltedraw/common/*": ["./common/src/*"],
+      "@sveltedraw/element": ["./element/src/index.ts"],
+      "@sveltedraw/element/*": ["./element/src/*"],
+      "@sveltedraw/engine": ["./excalidraw/index.tsx"],
+      "@sveltedraw/engine/*": ["./excalidraw/*"],
+      "@sveltedraw/math": ["./math/src/index.ts"],
+      "@sveltedraw/math/*": ["./math/src/*"],
+      "@sveltedraw/utils": ["./utils/src/index.ts"],
+      "@sveltedraw/utils/*": ["./utils/src/*"]
     }
   }
 }

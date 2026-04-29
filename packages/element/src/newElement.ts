@@ -10,11 +10,11 @@ import {
   getFontString,
   getUpdatedTimestamp,
   getLineHeight,
-} from "@excalidraw/common";
+} from "@sveltedraw/common";
 
-import type { Radians } from "@excalidraw/math";
+import type { Radians } from "@sveltedraw/math";
 
-import type { MarkOptional, Merge } from "@excalidraw/common/utility-types";
+import type { MarkOptional, Merge } from "@sveltedraw/common/utility-types";
 
 import {
   getElementAbsoluteCoords,

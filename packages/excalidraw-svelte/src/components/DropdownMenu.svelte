@@ -9,7 +9,7 @@
 
   import type { Snippet } from 'svelte';
   // @ts-ignore upstream package
-  import { CLASSES } from '@excalidraw/common';
+  import { CLASSES } from '@sveltedraw/common';
   import { DropdownMenu as BitsDropdownMenu } from 'bits-ui';
 
   let {

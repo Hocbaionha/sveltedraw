@@ -14,8 +14,8 @@
   import { getContext, setContext, onDestroy } from "svelte";
   import clsx from "clsx";
   // @ts-ignore upstream package
-  import { CLASSES, EVENT, KEYS } from "@excalidraw/common";
-  import type { EditorInterface } from "@excalidraw/common";
+  import { CLASSES, EVENT, KEYS } from "@sveltedraw/common";
+  import type { EditorInterface } from "@sveltedraw/common";
   import Island from "../Island.svelte";
   import { EDITOR_INTERFACE_KEY } from "../../state/index.js";
   import {

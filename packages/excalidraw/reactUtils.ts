@@ -9,7 +9,7 @@
 // react-dom back in. Those .ts files may still be under packages/
 // excalidraw/ but unused at runtime by the Svelte app.
 
-import { throttleRAF } from "@excalidraw/common";
+import { throttleRAF } from "@sveltedraw/common";
 
 /** No-op wrapper. Identity: returns the function unchanged. */
 export const withBatchedUpdates = <

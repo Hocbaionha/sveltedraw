@@ -66,8 +66,8 @@
   import { getContext, setContext } from "svelte";
   import clsx from "clsx";
   // @ts-ignore upstream
-  import { DEFAULT_SIDEBAR } from "@excalidraw/common";
-  import type { EditorInterface } from "@excalidraw/common";
+  import { DEFAULT_SIDEBAR } from "@sveltedraw/common";
+  import type { EditorInterface } from "@sveltedraw/common";
   import {
     TUNNELS_KEY,
     createTunnelsContext,

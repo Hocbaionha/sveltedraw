@@ -18,7 +18,7 @@
 // wait until pointerup/commit then push ONE entry.
 
 // @ts-ignore — upstream, resolved via Vite alias
-import { deepCopyElement } from "@excalidraw/element";
+import { deepCopyElement } from "@sveltedraw/element";
 import type { HistoryState } from "./types.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

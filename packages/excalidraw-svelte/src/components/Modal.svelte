@@ -6,7 +6,7 @@
 
   import type { Snippet } from 'svelte';
   // @ts-ignore upstream package
-  import { KEYS } from '@excalidraw/common';
+  import { KEYS } from '@sveltedraw/common';
   import { Portal } from 'bits-ui';
   import clsx from 'clsx';
 

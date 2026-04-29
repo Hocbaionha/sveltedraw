@@ -42,9 +42,9 @@
   import { onMount } from "svelte";
   import clsx from "clsx";
   // @ts-ignore upstream package
-  import { EVENT, KEYS, cloneJSON } from "@excalidraw/common";
+  import { EVENT, KEYS, cloneJSON } from "@sveltedraw/common";
   // @ts-ignore upstream package
-  import { CaptureUpdateAction, deepCopyElement } from "@excalidraw/element";
+  import { CaptureUpdateAction, deepCopyElement } from "@sveltedraw/element";
   import InlineIcon from "../InlineIcon.svelte";
 
   type StructuralApp = App & {

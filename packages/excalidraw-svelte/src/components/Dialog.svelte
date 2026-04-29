@@ -29,8 +29,8 @@
   import { getContext } from "svelte";
   import clsx from "clsx";
   // @ts-ignore upstream package
-  import { KEYS, queryFocusableElements } from "@excalidraw/common";
-  import type { EditorInterface } from "@excalidraw/common";
+  import { KEYS, queryFocusableElements } from "@sveltedraw/common";
+  import type { EditorInterface } from "@sveltedraw/common";
   import { EDITOR_INTERFACE_KEY, EXCAL_ID_KEY } from "../state/index.js";
   import Modal from "./Modal.svelte";
   import Island from "./Island.svelte";

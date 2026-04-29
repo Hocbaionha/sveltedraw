@@ -1,7 +1,7 @@
 <script lang="ts">
   // `theme` prop preserved for API parity; currently unused because
   // iconFillColor() collapses to a CSS variable for both light and dark.
-  import type { Theme } from "@excalidraw/element/types";
+  import type { Theme } from "@sveltedraw/element/types";
   interface Props { theme?: Theme; }
   let { theme: _theme }: Props = $props();
 </script>

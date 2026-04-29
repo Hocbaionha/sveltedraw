@@ -8,7 +8,7 @@
 
   import { getContext } from "svelte";
   // @ts-ignore upstream package
-  import { KEYS } from "@excalidraw/common";
+  import { KEYS } from "@sveltedraw/common";
   import DialogActionButton from "./DialogActionButton.svelte";
   import TextField from "./TextField.svelte";
   import ToolButton from "./ToolButton.svelte";

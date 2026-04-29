@@ -17,9 +17,9 @@
   import type { Snippet } from "svelte";
   import clsx from "clsx";
   // @ts-ignore upstream
-  import { COLOR_PALETTE } from "@excalidraw/common";
-  import type { ColorTuple, ColorPaletteCustom } from "@excalidraw/common";
-  import type { ExcalidrawElement } from "@excalidraw/element/types";
+  import { COLOR_PALETTE } from "@sveltedraw/common";
+  import type { ColorTuple, ColorPaletteCustom } from "@sveltedraw/common";
+  import type { ExcalidrawElement } from "@sveltedraw/element/types";
   import { Popover as BitsPopover } from "bits-ui";
   import ButtonSeparator from "../ButtonSeparator.svelte";
   import PropertiesPopover from "../PropertiesPopover.svelte";

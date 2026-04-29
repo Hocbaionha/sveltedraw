@@ -1,6 +1,6 @@
 <script lang="ts">
   // @ts-ignore upstream package
-  import { isColorDark } from "@excalidraw/common";
+  import { isColorDark } from "@sveltedraw/common";
 
   let {
     color,

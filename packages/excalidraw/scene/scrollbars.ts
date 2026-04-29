@@ -1,6 +1,6 @@
-import { getGlobalCSSVariable } from "@excalidraw/common";
+import { getGlobalCSSVariable } from "@sveltedraw/common";
 
-import { getCommonBounds } from "@excalidraw/element";
+import { getCommonBounds } from "@sveltedraw/element";
 
 import { getLanguage } from "../i18n";
 

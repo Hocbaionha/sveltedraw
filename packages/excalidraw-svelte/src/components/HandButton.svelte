@@ -2,7 +2,7 @@
   // Port of packages/excalidraw/components/HandButton.tsx
   import clsx from "clsx";
   // @ts-ignore upstream package
-  import { KEYS } from "@excalidraw/common";
+  import { KEYS } from "@sveltedraw/common";
   import ToolButton from "./ToolButton.svelte";
   import Icon from "../icons/Icon.svelte";
 

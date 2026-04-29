@@ -3,7 +3,7 @@
 // intercept blob downloads in headless Chrome). Tree-shaken in production.
 
 // @ts-ignore — upstream, resolved via Vite alias
-import { exportToBlob } from "@excalidraw/utils/export";
+import { exportToBlob } from "@sveltedraw/utils/export";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyEl = any;
@@ -132,7 +132,7 @@ export function installSveltedrawProbe(b: ProbeBindings): void {
       quality: 0.92,
       exportPadding: 10,
     });
-    const { encodePngMetadata } = await import("@excalidraw/excalidraw/data/image");
+    const { encodePngMetadata } = await import("@sveltedraw/engine/data/image");
     return encodePngMetadata({
       blob,
       metadata: JSON.stringify({

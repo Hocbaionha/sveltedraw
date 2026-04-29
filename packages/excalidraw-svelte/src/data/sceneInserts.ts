@@ -6,9 +6,9 @@
 // Image insertion also writes the blob to IndexedDB (fire-and-forget).
 
 // @ts-ignore — upstream
-import { newImageElement } from "@excalidraw/element";
+import { newImageElement } from "@sveltedraw/element";
 // @ts-ignore — upstream
-import { randomId, DEFAULT_ELEMENT_PROPS } from "@excalidraw/common";
+import { randomId, DEFAULT_ELEMENT_PROPS } from "@sveltedraw/common";
 import { idbGet, idbPut } from "./idb.js";
 import { blobToDataURL, loadImage } from "./imageHelpers.js";
 import { isEmbeddableUrl } from "./embedUrls.js";
@@ -219,7 +219,7 @@ export function createSceneInserts(deps: SceneInsertsDeps): SceneInsertsApi {
     const scene = getScene();
     if (!scene) return false;
     try {
-      const { decodePngMetadata } = await import("@excalidraw/excalidraw/data/image");
+      const { decodePngMetadata } = await import("@sveltedraw/engine/data/image");
       const raw = await decodePngMetadata(blob);
       const data = JSON.parse(raw);
       const parsed = Array.isArray(data?.elements) ? data.elements : null;

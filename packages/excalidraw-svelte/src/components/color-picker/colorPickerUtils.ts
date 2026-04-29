@@ -6,10 +6,10 @@
 import type {
   ColorPickerColor,
   ColorPaletteCustom,
-} from "@excalidraw/common";
+} from "@sveltedraw/common";
 // @ts-ignore
-import { MAX_CUSTOM_COLORS_USED_IN_CANVAS } from "@excalidraw/common";
-import type { ExcalidrawElement } from "@excalidraw/element/types";
+import { MAX_CUSTOM_COLORS_USED_IN_CANVAS } from "@sveltedraw/common";
+import type { ExcalidrawElement } from "@sveltedraw/element/types";
 
 export type ColorPickerType =
   | "canvasBackground"

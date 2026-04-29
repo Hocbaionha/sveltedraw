@@ -1,14 +1,14 @@
-import { getVisibleElements } from "@excalidraw/element";
+import { getVisibleElements } from "@sveltedraw/element";
 import {
   sceneCoordsToViewportCoords,
   viewportCoordsToSceneCoords,
-} from "@excalidraw/common";
+} from "@sveltedraw/common";
 
-import { getClosestElementBounds } from "@excalidraw/element";
+import { getClosestElementBounds } from "@sveltedraw/element";
 
-import { getCommonBounds } from "@excalidraw/element";
+import { getCommonBounds } from "@sveltedraw/element";
 
-import type { ExcalidrawElement } from "@excalidraw/element/types";
+import type { ExcalidrawElement } from "@sveltedraw/element/types";
 
 import type { AppState, Offsets, PointerCoords, Zoom } from "../types";
 

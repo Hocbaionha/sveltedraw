@@ -11,7 +11,7 @@
   import {
     type EditorInterface,
     MQ_MIN_WIDTH_DESKTOP,
-  } from "@excalidraw/common";
+  } from "@sveltedraw/common";
   import { EDITOR_INTERFACE_KEY } from "../state/index.js";
   import Button from "./Button.svelte";
   import Icon from "../icons/Icon.svelte";

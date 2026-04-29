@@ -104,18 +104,18 @@ export default defineConfig({
     // condition without this hint.
     conditions: ['svelte', 'browser', 'module', 'import', 'default'],
     alias: [
-      // Bare `@excalidraw/excalidraw` is no longer exported (index.tsx
+      // Bare `@sveltedraw/excalidraw` is no longer exported (index.tsx
       // was the React entry, deleted in Phase 9). Only subpath imports
       // like `/scene/Renderer` work.
-      { find: /^@excalidraw\/excalidraw\/(.*)/, replacement: resolve('../packages/excalidraw/$1') },
-      { find: /^@excalidraw\/common$/, replacement: resolve('../packages/common/src/index.ts') },
-      { find: /^@excalidraw\/common\/(.*)/, replacement: resolve('../packages/common/src/$1') },
-      { find: /^@excalidraw\/element$/, replacement: resolve('../packages/element/src/index.ts') },
-      { find: /^@excalidraw\/element\/(.*)/, replacement: resolve('../packages/element/src/$1') },
-      { find: /^@excalidraw\/math$/, replacement: resolve('../packages/math/src/index.ts') },
-      { find: /^@excalidraw\/math\/(.*)/, replacement: resolve('../packages/math/src/$1') },
-      { find: /^@excalidraw\/utils$/, replacement: resolve('../packages/utils/src/index.ts') },
-      { find: /^@excalidraw\/utils\/(.*)/, replacement: resolve('../packages/utils/src/$1') },
+      { find: /^@sveltedraw\/engine\/(.*)/, replacement: resolve('../packages/excalidraw/$1') },
+      { find: /^@sveltedraw\/common$/, replacement: resolve('../packages/common/src/index.ts') },
+      { find: /^@sveltedraw\/common\/(.*)/, replacement: resolve('../packages/common/src/$1') },
+      { find: /^@sveltedraw\/element$/, replacement: resolve('../packages/element/src/index.ts') },
+      { find: /^@sveltedraw\/element\/(.*)/, replacement: resolve('../packages/element/src/$1') },
+      { find: /^@sveltedraw\/math$/, replacement: resolve('../packages/math/src/index.ts') },
+      { find: /^@sveltedraw\/math\/(.*)/, replacement: resolve('../packages/math/src/$1') },
+      { find: /^@sveltedraw\/utils$/, replacement: resolve('../packages/utils/src/index.ts') },
+      { find: /^@sveltedraw\/utils\/(.*)/, replacement: resolve('../packages/utils/src/$1') },
       { find: /^@sveltedraw\/excalidraw$/, replacement: resolve('../packages/excalidraw-svelte/src/index.ts') },
     ],
   },

@@ -24,7 +24,7 @@
   import { Popover as BitsPopover } from "bits-ui";
   import clsx from "clsx";
   // @ts-ignore upstream package
-  import { isArrowKey, KEYS } from "@excalidraw/common";
+  import { isArrowKey, KEYS } from "@sveltedraw/common";
   import Collapsible from "./Collapsible.svelte";
 
   const PICKER_COLUMNS = 4;

@@ -2,7 +2,7 @@
   // Port of packages/excalidraw/components/SVGLayer.tsx
   // SCSS sidecar (SVGLayer.scss) loaded globally by host app.
   //
-  // `Trail` from @excalidraw/excalidraw/animated-trail carries a `.start(svg)`
+  // `Trail` from @sveltedraw/engine/animated-trail carries a `.start(svg)`
   // and `.stop()` API. We treat the trail array as opaque here — any object
   // shape with those two methods works.
 

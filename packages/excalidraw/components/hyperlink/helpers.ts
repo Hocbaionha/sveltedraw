@@ -1,16 +1,16 @@
-import { pointFrom, pointRotateRads } from "@excalidraw/math";
+import { pointFrom, pointRotateRads } from "@sveltedraw/math";
 
-import { MIME_TYPES } from "@excalidraw/common";
-import { getElementAbsoluteCoords } from "@excalidraw/element";
-import { hitElementBoundingBox } from "@excalidraw/element";
+import { MIME_TYPES } from "@sveltedraw/common";
+import { getElementAbsoluteCoords } from "@sveltedraw/element";
+import { hitElementBoundingBox } from "@sveltedraw/element";
 
-import type { GlobalPoint, Radians } from "@excalidraw/math";
+import type { GlobalPoint, Radians } from "@sveltedraw/math";
 
-import type { Bounds } from "@excalidraw/common";
+import type { Bounds } from "@sveltedraw/common";
 import type {
   ElementsMap,
   NonDeletedExcalidrawElement,
-} from "@excalidraw/element/types";
+} from "@sveltedraw/element/types";
 
 import type { AppState, UIAppState } from "../../types";
 

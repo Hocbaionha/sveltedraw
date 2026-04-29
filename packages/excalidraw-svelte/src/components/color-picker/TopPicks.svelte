@@ -7,7 +7,7 @@
     DEFAULT_ELEMENT_BACKGROUND_PICKS,
     DEFAULT_ELEMENT_STROKE_PICKS,
     isColorDark,
-  } from "@excalidraw/common";
+  } from "@sveltedraw/common";
   import type { ColorPickerType } from "./colorPickerUtils.js";
 
   let {

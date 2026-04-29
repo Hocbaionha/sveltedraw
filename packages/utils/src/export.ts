@@ -1,27 +1,27 @@
-import { MIME_TYPES } from "@excalidraw/common";
-import { getDefaultAppState } from "@excalidraw/excalidraw/appState";
+import { MIME_TYPES } from "@sveltedraw/common";
+import { getDefaultAppState } from "@sveltedraw/engine/appState";
 import {
   copyBlobToClipboardAsPng,
   copyTextToSystemClipboard,
   copyToClipboard,
-} from "@excalidraw/excalidraw/clipboard";
-import { encodePngMetadata } from "@excalidraw/excalidraw/data/image";
-import { serializeAsJSON } from "@excalidraw/excalidraw/data/json";
+} from "@sveltedraw/engine/clipboard";
+import { encodePngMetadata } from "@sveltedraw/engine/data/image";
+import { serializeAsJSON } from "@sveltedraw/engine/data/json";
 import {
   restoreAppState,
   restoreElements,
-} from "@excalidraw/excalidraw/data/restore";
+} from "@sveltedraw/engine/data/restore";
 import {
   exportToCanvas as _exportToCanvas,
   exportToSvg as _exportToSvg,
-} from "@excalidraw/excalidraw/scene/export";
+} from "@sveltedraw/engine/scene/export";
 
 import type {
   ExcalidrawElement,
   ExcalidrawFrameLikeElement,
   NonDeleted,
-} from "@excalidraw/element/types";
-import type { AppState, BinaryFiles } from "@excalidraw/excalidraw/types";
+} from "@sveltedraw/element/types";
+import type { AppState, BinaryFiles } from "@sveltedraw/engine/types";
 
 export { MIME_TYPES };
 

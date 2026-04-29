@@ -6,24 +6,24 @@ import {
   isMemberOf,
   isPromiseLike,
   EVENT,
-} from "@excalidraw/common";
+} from "@sveltedraw/common";
 
-import { mutateElement } from "@excalidraw/element";
-import { deepCopyElement } from "@excalidraw/element";
+import { mutateElement } from "@sveltedraw/element";
+import { deepCopyElement } from "@sveltedraw/element";
 import {
   isFrameLikeElement,
   isInitializedImageElement,
-} from "@excalidraw/element";
+} from "@sveltedraw/element";
 
-import { getContainingFrame } from "@excalidraw/element";
+import { getContainingFrame } from "@sveltedraw/element";
 
-import type { ValueOf } from "@excalidraw/common/utility-types";
+import type { ValueOf } from "@sveltedraw/common/utility-types";
 
-import type { IMAGE_MIME_TYPES, STRING_MIME_TYPES } from "@excalidraw/common";
+import type { IMAGE_MIME_TYPES, STRING_MIME_TYPES } from "@sveltedraw/common";
 import type {
   ExcalidrawElement,
   NonDeletedExcalidrawElement,
-} from "@excalidraw/element/types";
+} from "@sveltedraw/element/types";
 
 import { ExcalidrawError } from "./errors";
 import {

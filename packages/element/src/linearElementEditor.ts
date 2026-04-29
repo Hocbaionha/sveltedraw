@@ -9,9 +9,9 @@ import {
   vectorFromPoint,
   curveLength,
   curvePointAtLength,
-} from "@excalidraw/math";
+} from "@sveltedraw/math";
 
-import { getCurvePathOps } from "@excalidraw/utils/shape";
+import { getCurvePathOps } from "@sveltedraw/utils/shape";
 
 import {
   DRAGGING_THRESHOLD,
@@ -21,7 +21,7 @@ import {
   invariant,
   isShallowEqual,
   getFeatureFlag,
-} from "@excalidraw/common";
+} from "@sveltedraw/common";
 
 import {
   deconstructLinearOrFreeDrawElement,
@@ -30,9 +30,9 @@ import {
   moveArrowAboveBindable,
   projectFixedPointOntoDiagonal,
   type Store,
-} from "@excalidraw/element";
+} from "@sveltedraw/element";
 
-import type { Radians } from "@excalidraw/math";
+import type { Radians } from "@sveltedraw/math";
 
 import type {
   AppState,
@@ -41,8 +41,8 @@ import type {
   AppClassProperties,
   NullableGridSize,
   Zoom,
-} from "@excalidraw/excalidraw/types";
-import type { Bounds } from "@excalidraw/common";
+} from "@sveltedraw/engine/types";
+import type { Bounds } from "@sveltedraw/common";
 
 import {
   calculateFixedPointForNonElbowArrowBinding,

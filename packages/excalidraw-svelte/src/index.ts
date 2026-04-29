@@ -1,4 +1,4 @@
-// @sveltedraw/excalidraw — Svelte 5 port of @excalidraw/excalidraw
+// @sveltedraw/excalidraw — Svelte 5 port of @sveltedraw/excalidraw
 
 export * from './components/index.js';
 export * from './icons/index.js';

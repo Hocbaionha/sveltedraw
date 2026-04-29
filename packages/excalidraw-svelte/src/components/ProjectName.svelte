@@ -4,7 +4,7 @@
 
   import { getContext } from "svelte";
   // @ts-ignore upstream package
-  import { focusNearestParent, KEYS } from "@excalidraw/common";
+  import { focusNearestParent, KEYS } from "@sveltedraw/common";
   import { EXCAL_ID_KEY } from "../state/index.js";
 
   let {

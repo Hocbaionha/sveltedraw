@@ -2,13 +2,13 @@
 // ExcalidrawImageElement & related helpers
 // -----------------------------------------------------------------------------
 
-import { MIME_TYPES, SVG_NS } from "@excalidraw/common";
+import { MIME_TYPES, SVG_NS } from "@sveltedraw/common";
 
 import type {
   AppClassProperties,
   DataURL,
   BinaryFiles,
-} from "@excalidraw/excalidraw/types";
+} from "@sveltedraw/engine/types";
 
 import { isInitializedImageElement } from "./typeChecks";
 

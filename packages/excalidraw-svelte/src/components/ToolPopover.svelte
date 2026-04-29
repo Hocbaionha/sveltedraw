@@ -19,7 +19,7 @@
   import clsx from "clsx";
   import { Popover as BitsPopover } from "bits-ui";
   // @ts-ignore upstream package
-  import { capitalizeString } from "@excalidraw/common";
+  import { capitalizeString } from "@sveltedraw/common";
   import ToolButton from "./ToolButton.svelte";
 
   type Emitter = {

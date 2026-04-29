@@ -6,43 +6,43 @@ export default defineConfig({
   resolve: {
     alias: [
       {
-        find: /^@excalidraw\/common$/,
+        find: /^@sveltedraw\/common$/,
         replacement: path.resolve(__dirname, "./packages/common/src/index.ts"),
       },
       {
-        find: /^@excalidraw\/common\/(.*?)/,
+        find: /^@sveltedraw\/common\/(.*?)/,
         replacement: path.resolve(__dirname, "./packages/common/src/$1"),
       },
       {
-        find: /^@excalidraw\/element$/,
+        find: /^@sveltedraw\/element$/,
         replacement: path.resolve(__dirname, "./packages/element/src/index.ts"),
       },
       {
-        find: /^@excalidraw\/element\/(.*?)/,
+        find: /^@sveltedraw\/element\/(.*?)/,
         replacement: path.resolve(__dirname, "./packages/element/src/$1"),
       },
       {
-        find: /^@excalidraw\/excalidraw$/,
+        find: /^@sveltedraw\/excalidraw$/,
         replacement: path.resolve(__dirname, "./packages/excalidraw/index.tsx"),
       },
       {
-        find: /^@excalidraw\/excalidraw\/(.*?)/,
+        find: /^@sveltedraw\/engine\/(.*?)/,
         replacement: path.resolve(__dirname, "./packages/excalidraw/$1"),
       },
       {
-        find: /^@excalidraw\/math$/,
+        find: /^@sveltedraw\/math$/,
         replacement: path.resolve(__dirname, "./packages/math/src/index.ts"),
       },
       {
-        find: /^@excalidraw\/math\/(.*?)/,
+        find: /^@sveltedraw\/math\/(.*?)/,
         replacement: path.resolve(__dirname, "./packages/math/src/$1"),
       },
       {
-        find: /^@excalidraw\/utils$/,
+        find: /^@sveltedraw\/utils$/,
         replacement: path.resolve(__dirname, "./packages/utils/src/index.ts"),
       },
       {
-        find: /^@excalidraw\/utils\/(.*?)/,
+        find: /^@sveltedraw\/utils\/(.*?)/,
         replacement: path.resolve(__dirname, "./packages/utils/src/$1"),
       },
     ],

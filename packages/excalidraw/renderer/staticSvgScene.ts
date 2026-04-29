@@ -10,37 +10,37 @@ import {
   getVerticalOffset,
   applyDarkModeFilter,
   MIME_TYPES,
-} from "@excalidraw/common";
-import { normalizeLink, toValidURL } from "@excalidraw/common";
-import { hashString } from "@excalidraw/element";
-import { getUncroppedWidthAndHeight } from "@excalidraw/element";
+} from "@sveltedraw/common";
+import { normalizeLink, toValidURL } from "@sveltedraw/common";
+import { hashString } from "@sveltedraw/element";
+import { getUncroppedWidthAndHeight } from "@sveltedraw/element";
 import {
   createPlaceholderEmbeddableLabel,
   getEmbedLink,
-} from "@excalidraw/element";
-import { LinearElementEditor } from "@excalidraw/element";
-import { getBoundTextElement, getContainerElement } from "@excalidraw/element";
-import { getLineHeightInPx } from "@excalidraw/element";
+} from "@sveltedraw/element";
+import { LinearElementEditor } from "@sveltedraw/element";
+import { getBoundTextElement, getContainerElement } from "@sveltedraw/element";
+import { getLineHeightInPx } from "@sveltedraw/element";
 import {
   isArrowElement,
   isIframeLikeElement,
   isInitializedImageElement,
   isTextElement,
-} from "@excalidraw/element";
+} from "@sveltedraw/element";
 
-import { getContainingFrame } from "@excalidraw/element";
+import { getContainingFrame } from "@sveltedraw/element";
 
-import { getCornerRadius, isPathALoop } from "@excalidraw/element";
+import { getCornerRadius, isPathALoop } from "@sveltedraw/element";
 
-import { ShapeCache } from "@excalidraw/element";
+import { ShapeCache } from "@sveltedraw/element";
 
-import { getElementAbsoluteCoords } from "@excalidraw/element";
+import { getElementAbsoluteCoords } from "@sveltedraw/element";
 
 import type {
   ExcalidrawElement,
   ExcalidrawTextElementWithContainer,
   NonDeletedExcalidrawElement,
-} from "@excalidraw/element/types";
+} from "@sveltedraw/element/types";
 
 import type { RenderableElementsMap, SVGRenderConfig } from "../scene/types";
 import type { AppState, BinaryFiles } from "../types";

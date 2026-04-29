@@ -25,7 +25,7 @@
 <script lang="ts" generics="State extends InteractiveCanvasAppStateLike">
   import { untrack } from "svelte";
   // @ts-ignore upstream
-  import { CURSOR_TYPE } from "@excalidraw/common";
+  import { CURSOR_TYPE } from "@sveltedraw/common";
 
   let {
     appState,

@@ -7,7 +7,7 @@
   import Spinner from './Spinner.svelte';
   import { t } from '../state/i18n.svelte.js';
 
-  const THEME_DARK = 'dark'; // matches THEME.DARK from @excalidraw/common
+  const THEME_DARK = 'dark'; // matches THEME.DARK from @sveltedraw/common
 
   let {
     delay,

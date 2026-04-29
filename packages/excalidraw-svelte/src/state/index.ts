@@ -28,7 +28,7 @@ export const APP_STORE_KEY: unique symbol = Symbol("appStore");
 
 /**
  * Svelte context key for EditorInterface (formFactor, desktopUIMode, …).
- * Value type is EditorInterface from @excalidraw/common.
+ * Value type is EditorInterface from @sveltedraw/common.
  */
 export const EDITOR_INTERFACE_KEY: unique symbol = Symbol("editorInterface");
 

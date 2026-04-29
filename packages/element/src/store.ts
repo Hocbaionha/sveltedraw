@@ -6,15 +6,15 @@ import {
   randomId,
   Emitter,
   toIterable,
-} from "@excalidraw/common";
+} from "@sveltedraw/common";
 
 // Post-Phase-9: components/App deleted; this was a type-only import.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type App = any;
 
-import type { DTO, ValueOf } from "@excalidraw/common/utility-types";
+import type { DTO, ValueOf } from "@sveltedraw/common/utility-types";
 
-import type { AppState, ObservedAppState } from "@excalidraw/excalidraw/types";
+import type { AppState, ObservedAppState } from "@sveltedraw/engine/types";
 
 import { deepCopyElement } from "./duplicate";
 import { newElementWith } from "./mutateElement";

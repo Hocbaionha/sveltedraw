@@ -1,7 +1,7 @@
 <script lang="ts">
   import clsx from "clsx";
   // @ts-ignore upstream
-  import { COLOR_OUTLINE_CONTRAST_THRESHOLD, isColorDark } from "@excalidraw/common";
+  import { COLOR_OUTLINE_CONTRAST_THRESHOLD, isColorDark } from "@sveltedraw/common";
   import { Popover as BitsPopover } from "bits-ui";
   import Icon from "../../icons/Icon.svelte";
   import type { ColorPickerType } from "./colorPickerUtils.js";

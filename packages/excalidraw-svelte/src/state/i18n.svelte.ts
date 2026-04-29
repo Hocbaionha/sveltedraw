@@ -14,7 +14,7 @@
 
 // eslint-disable-next-line import/no-unresolved
 // @ts-ignore — upstream JSON, resolved via Vite alias
-import fallbackLangData from "@excalidraw/excalidraw/locales/en.json";
+import fallbackLangData from "@sveltedraw/engine/locales/en.json";
 
 export type Language = {
   code: string;

@@ -3,9 +3,9 @@
 // center, delete, JSON export/import.
 
 // @ts-ignore — upstream
-import { deepCopyElement } from "@excalidraw/element";
+import { deepCopyElement } from "@sveltedraw/element";
 // @ts-ignore — upstream
-import { randomId } from "@excalidraw/common";
+import { randomId } from "@sveltedraw/common";
 import {
   createLibraryComponent,
   type LibraryComponent,

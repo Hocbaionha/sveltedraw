@@ -15,9 +15,9 @@
     DEFAULT_ELEMENT_STROKE_COLOR_INDEX,
     EVENT,
     KEYS,
-  } from "@excalidraw/common";
-  import type { ColorPaletteCustom } from "@excalidraw/common";
-  import type { ExcalidrawElement } from "@excalidraw/element/types";
+  } from "@sveltedraw/common";
+  import type { ColorPaletteCustom } from "@sveltedraw/common";
+  import type { ExcalidrawElement } from "@sveltedraw/element/types";
   import {
     colorPickerSectionStore,
     type ActiveColorPickerSection,

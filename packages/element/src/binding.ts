@@ -3,7 +3,7 @@ import {
   getFeatureFlag,
   invariant,
   isTransparent,
-} from "@excalidraw/common";
+} from "@sveltedraw/common";
 
 import {
   PRECISION,
@@ -19,12 +19,12 @@ import {
   vectorNormalize,
   vectorScale,
   type GlobalPoint,
-} from "@excalidraw/math";
+} from "@sveltedraw/math";
 
-import type { LineSegment, LocalPoint, Radians } from "@excalidraw/math";
-import type { AppState } from "@excalidraw/excalidraw/types";
-import type { MapEntry, Mutable } from "@excalidraw/common/utility-types";
-import type { Bounds } from "@excalidraw/common";
+import type { LineSegment, LocalPoint, Radians } from "@sveltedraw/math";
+import type { AppState } from "@sveltedraw/engine/types";
+import type { MapEntry, Mutable } from "@sveltedraw/common/utility-types";
+import type { Bounds } from "@sveltedraw/common";
 
 import { getCenterForBounds } from "./bounds";
 import {

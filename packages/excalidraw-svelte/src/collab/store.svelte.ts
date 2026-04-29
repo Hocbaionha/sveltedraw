@@ -9,7 +9,7 @@
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 // @ts-ignore — resolved via Vite alias to packages/element/src
-import { deepCopyElement } from "@excalidraw/element";
+import { deepCopyElement } from "@sveltedraw/element";
 import type { SveltedrawAPI } from "../api/types.js";
 
 // Sentinel attached as the `origin` of every Y.Doc transaction we initiate

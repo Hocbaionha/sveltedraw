@@ -8,8 +8,8 @@
   import clsx from "clsx";
   import { getContext } from "svelte";
   // @ts-ignore upstream
-  import { KEYS, normalizeInputColor } from "@excalidraw/common";
-  import type { EditorInterface } from "@excalidraw/common";
+  import { KEYS, normalizeInputColor } from "@sveltedraw/common";
+  import type { EditorInterface } from "@sveltedraw/common";
   import { EDITOR_INTERFACE_KEY } from "../../state/index.js";
   import { colorPickerSectionStore } from "../../state/colorPickerState.svelte.js";
   import Icon from "../../icons/Icon.svelte";

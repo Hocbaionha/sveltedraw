@@ -29,7 +29,7 @@
   import type { Snippet } from "svelte";
   import clsx from "clsx";
   // @ts-ignore upstream package
-  import { supportsResizeObserver } from "@excalidraw/common";
+  import { supportsResizeObserver } from "@sveltedraw/common";
   import { Popover as BitsPopover } from "bits-ui";
   import Island from "./Island.svelte";
   import QuickSearch from "./QuickSearch.svelte";

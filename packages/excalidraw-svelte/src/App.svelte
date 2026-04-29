@@ -22,7 +22,7 @@
 
   // @ts-ignore — upstream, resolved via Vite alias; tsconfig path mapping
   // only exists in the excalidraw-svelte package, not sveltedraw-app.
-  import type { EditorInterface } from "@excalidraw/common";
+  import type { EditorInterface } from "@sveltedraw/common";
   import type { LayerUIAppStateLike } from "./components/LayerUI.svelte";
 
   /**
@@ -42,46 +42,46 @@
 <script lang="ts">
   import { setContext, untrack, onMount } from "svelte";
   // @ts-ignore — upstream, resolved via Vite alias
-  import { getDefaultAppState } from "@excalidraw/excalidraw/appState";
+  import { getDefaultAppState } from "@sveltedraw/engine/appState";
   // @ts-ignore — upstream
-  import { Scene } from "@excalidraw/element";
+  import { Scene } from "@sveltedraw/element";
   // @ts-ignore — upstream
-  import { Renderer } from "@excalidraw/excalidraw/scene/Renderer";
+  import { Renderer } from "@sveltedraw/engine/scene/Renderer";
   // @ts-ignore — upstream
-  import { renderStaticScene } from "@excalidraw/excalidraw/renderer/staticScene";
+  import { renderStaticScene } from "@sveltedraw/engine/renderer/staticScene";
   // @ts-ignore — upstream
-  import { renderNewElementScene } from "@excalidraw/excalidraw/renderer/renderNewElementScene";
+  import { renderNewElementScene } from "@sveltedraw/engine/renderer/renderNewElementScene";
   // @ts-ignore — upstream
-  import { renderInteractiveScene } from "@excalidraw/excalidraw/renderer/interactiveScene";
+  import { renderInteractiveScene } from "@sveltedraw/engine/renderer/interactiveScene";
   // @ts-ignore — upstream
-  import { AnimationController } from "@excalidraw/excalidraw/renderer/animation";
-  // Inline to avoid pulling @excalidraw/excalidraw/components/canvases/InteractiveCanvas.tsx
+  import { AnimationController } from "@sveltedraw/engine/renderer/animation";
+  // Inline to avoid pulling @sveltedraw/engine/components/canvases/InteractiveCanvas.tsx
   // (which imports from "react"). Upstream value confirmed identical.
   const INTERACTIVE_SCENE_ANIMATION_KEY = "animateInteractiveScene";
   // @ts-ignore — upstream
   import rough from "roughjs/bin/rough";
   // @ts-ignore — upstream
-  import { Fonts } from "@excalidraw/excalidraw/fonts/Fonts";
+  import { Fonts } from "@sveltedraw/engine/fonts/Fonts";
   // @ts-ignore — upstream, resolved via Vite alias
   // prettier-ignore
-  import { getFormFactor, createUserAgentDescriptor, MQ_RIGHT_SIDEBAR_MIN_WIDTH, supportsResizeObserver, POINTER_EVENTS, randomId, viewportCoordsToSceneCoords, DEFAULT_ELEMENT_PROPS, DEFAULT_FONT_FAMILY, FONT_FAMILY } from "@excalidraw/common";
+  import { getFormFactor, createUserAgentDescriptor, MQ_RIGHT_SIDEBAR_MIN_WIDTH, supportsResizeObserver, POINTER_EVENTS, randomId, viewportCoordsToSceneCoords, DEFAULT_ELEMENT_PROPS, DEFAULT_FONT_FAMILY, FONT_FAMILY } from "@sveltedraw/common";
   // @ts-ignore — upstream
-  import { newElement, newLinearElement, newArrowElement, newFreeDrawElement, newTextElement, newImageElement, hitElementItself, duplicateElements, deepCopyElement, moveOneLeft, moveOneRight, moveAllLeft, moveAllRight } from "@excalidraw/element";
+  import { newElement, newLinearElement, newArrowElement, newFreeDrawElement, newTextElement, newImageElement, hitElementItself, duplicateElements, deepCopyElement, moveOneLeft, moveOneRight, moveAllLeft, moveAllRight } from "@sveltedraw/element";
   // @ts-ignore — upstream
-  import { updateBoundElements } from "@excalidraw/element";
+  import { updateBoundElements } from "@sveltedraw/element";
   // @ts-ignore — upstream
-  import { DEFAULT_FONT_SIZE, getFontFamilyString } from "@excalidraw/common";
+  import { DEFAULT_FONT_SIZE, getFontFamilyString } from "@sveltedraw/common";
   // @ts-ignore — upstream, resolved via Vite alias
-  import { exportToBlob, exportToSvg } from "@excalidraw/utils/export";
+  import { exportToBlob, exportToSvg } from "@sveltedraw/utils/export";
   // @ts-ignore — upstream, resolved via Vite alias
   // prettier-ignore
-  import { DEFAULT_COLLISION_THRESHOLD, ELEMENT_TRANSLATE_AMOUNT, ELEMENT_SHIFT_TRANSLATE_AMOUNT, ZOOM_STEP, STROKE_WIDTH, COLOR_PALETTE, ROUGHNESS } from "@excalidraw/common";
+  import { DEFAULT_COLLISION_THRESHOLD, ELEMENT_TRANSLATE_AMOUNT, ELEMENT_SHIFT_TRANSLATE_AMOUNT, ZOOM_STEP, STROKE_WIDTH, COLOR_PALETTE, ROUGHNESS } from "@sveltedraw/common";
   // @ts-ignore — upstream
-  import { getStateForZoom } from "@excalidraw/excalidraw/scene/zoom";
+  import { getStateForZoom } from "@sveltedraw/engine/scene/zoom";
   // @ts-ignore — upstream
-  import { getNormalizedZoom } from "@excalidraw/excalidraw/scene/normalize";
+  import { getNormalizedZoom } from "@sveltedraw/engine/scene/normalize";
   // @ts-ignore — upstream
-  import { pointFrom } from "@excalidraw/math";
+  import { pointFrom } from "@sveltedraw/math";
 
   import {
     EDITOR_STORE_KEY,
@@ -750,7 +750,7 @@
 
     // Initialize the upstream Fonts loader. It takes a scene object
     // with getNonDeletedElements + triggerUpdate(). Scene from
-    // @excalidraw/element already has both. After construction,
+    // @sveltedraw/element already has both. After construction,
     // kick off a load for the current scene so text elements that
     // were restored from localStorage get their woff2 downloaded
     // and rendered on top of the fallback.
@@ -2295,7 +2295,7 @@
   };
 
   // ── Export ───────────────────────────────────────────────────────────
-  // Thin wrappers over upstream `@excalidraw/utils/export`. Those helpers
+  // Thin wrappers over upstream `@sveltedraw/utils/export`. Those helpers
   // call `restoreAppState` + `restoreElements` defensively, so we can pass
   // our $state proxy cast to any — they migrate/normalize what they need.
   // Download helper extracted to ./data/download.ts.
@@ -3907,7 +3907,7 @@
     if (!scene) return null;
     const elements = scene.getNonDeletedElements();
     const elementsMap = scene.getNonDeletedElementsMap();
-    // @excalidraw/math's pointFrom returns `GlobalPoint | LocalPoint`
+    // @sveltedraw/math's pointFrom returns `GlobalPoint | LocalPoint`
     // (branded types). hitElementItself expects GlobalPoint. Cast is safe —
     // scene coords ARE global coords by definition.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

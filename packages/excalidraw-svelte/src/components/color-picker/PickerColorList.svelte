@@ -1,7 +1,7 @@
 <script lang="ts">
   import clsx from "clsx";
   // @ts-ignore upstream
-  import type { ColorPaletteCustom } from "@excalidraw/common";
+  import type { ColorPaletteCustom } from "@sveltedraw/common";
   import HotkeyLabel from "./HotkeyLabel.svelte";
   import {
     colorPickerHotkeyBindings,

@@ -8,7 +8,7 @@ import {
   bezierEquation,
   pointRotateRads,
   pointDistance,
-} from "@excalidraw/math";
+} from "@sveltedraw/math";
 
 import {
   arrayToMap,
@@ -18,7 +18,7 @@ import {
   getFeatureFlag,
   invariant,
   THEME,
-} from "@excalidraw/common";
+} from "@sveltedraw/common";
 
 import {
   deconstructDiamondElement,
@@ -42,29 +42,29 @@ import {
   isTextElement,
   LinearElementEditor,
   getActiveTextElement,
-} from "@excalidraw/element";
+} from "@sveltedraw/element";
 
-import { renderSelectionElement } from "@excalidraw/element";
+import { renderSelectionElement } from "@sveltedraw/element";
 
 import {
   getElementsInGroup,
   getSelectedGroupIds,
   isSelectedViaGroup,
   selectGroupsFromGivenElements,
-} from "@excalidraw/element";
+} from "@sveltedraw/element";
 
-import { getCommonBounds, getElementAbsoluteCoords } from "@excalidraw/element";
+import { getCommonBounds, getElementAbsoluteCoords } from "@sveltedraw/element";
 import {
   getGlobalFixedPointForBindableElement,
   isFocusPointVisible,
-} from "@excalidraw/element";
+} from "@sveltedraw/element";
 
-import type { EditorInterface } from "@excalidraw/common";
+import type { EditorInterface } from "@sveltedraw/common";
 
 import type {
   TransformHandles,
   TransformHandleType,
-} from "@excalidraw/element";
+} from "@sveltedraw/element";
 
 import type {
   ElementsMap,
@@ -78,7 +78,7 @@ import type {
   GroupId,
   NonDeleted,
   NonDeletedSceneElementsMap,
-} from "@excalidraw/element/types";
+} from "@sveltedraw/element/types";
 
 import { renderSnaps } from "../renderer/renderSnaps";
 import { roundRect } from "../renderer/roundRect";

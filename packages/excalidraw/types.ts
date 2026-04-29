@@ -4,11 +4,11 @@ import type {
   throttleRAF,
   MIME_TYPES,
   EditorInterface,
-} from "@excalidraw/common";
+} from "@sveltedraw/common";
 
-import type { LinearElementEditor } from "@excalidraw/element";
+import type { LinearElementEditor } from "@sveltedraw/element";
 
-import type { MaybeTransformHandleType } from "@excalidraw/element";
+import type { MaybeTransformHandleType } from "@sveltedraw/element";
 
 import type {
   PointerType,
@@ -33,21 +33,21 @@ import type {
   ExcalidrawNonSelectionElement,
   BindMode,
   ExcalidrawTextElement,
-} from "@excalidraw/element/types";
+} from "@sveltedraw/element/types";
 
 import type {
   Merge,
   MaybePromise,
   ValueOf,
   MakeBrand,
-} from "@excalidraw/common/utility-types";
+} from "@sveltedraw/common/utility-types";
 
 import type {
   CaptureUpdateActionType,
   DurableIncrement,
   EphemeralIncrement,
-} from "@excalidraw/element";
-import type { GlobalPoint } from "@excalidraw/math";
+} from "@sveltedraw/element";
+import type { GlobalPoint } from "@sveltedraw/math";
 
 // Post-Phase-9: actions/, components/, data/library, i18n (React
 // version) were deleted. `App` is still referenced as both a type

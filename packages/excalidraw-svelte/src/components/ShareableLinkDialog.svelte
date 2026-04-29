@@ -2,7 +2,7 @@
   // Port of packages/excalidraw/components/ShareableLinkDialog.tsx
   // i18n strings as props with English fallback. The original calls
   // copyTextToSystemClipboard from the upstream excalidraw clipboard helper;
-  // we reuse it via the @excalidraw/excalidraw alias so behaviour matches
+  // we reuse it via the @sveltedraw/excalidraw alias so behaviour matches
   // (exec-command fallback, etc.).
 
   import Dialog from "./Dialog.svelte";
@@ -10,7 +10,7 @@
   import TextField from "./TextField.svelte";
   import { createCopyStatus } from "../state/useCopyStatus.svelte.js";
   // @ts-ignore upstream clipboard helper
-  import { copyTextToSystemClipboard } from "@excalidraw/excalidraw/clipboard";
+  import { copyTextToSystemClipboard } from "@sveltedraw/engine/clipboard";
 
   let {
     link,

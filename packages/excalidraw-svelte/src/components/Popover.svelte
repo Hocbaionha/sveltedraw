@@ -9,7 +9,7 @@
   import type { Snippet } from "svelte";
   import clsx from "clsx";
   // @ts-ignore upstream package
-  import { KEYS, queryFocusableElements } from "@excalidraw/common";
+  import { KEYS, queryFocusableElements } from "@sveltedraw/common";
 
   let {
     children,

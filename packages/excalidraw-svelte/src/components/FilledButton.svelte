@@ -14,7 +14,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import clsx from "clsx";
-  import { isPromiseLike } from "@excalidraw/common";
+  import { isPromiseLike } from "@sveltedraw/common";
   import Spinner from "./Spinner.svelte";
   import Icon from "../icons/Icon.svelte";
 

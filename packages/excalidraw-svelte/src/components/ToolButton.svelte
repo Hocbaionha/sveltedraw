@@ -9,8 +9,8 @@
   import type { Snippet } from "svelte";
   import { onMount, getContext } from "svelte";
   import clsx from "clsx";
-  import { isPromiseLike } from "@excalidraw/common";
-  import type { PointerType } from "@excalidraw/element/types";
+  import { isPromiseLike } from "@sveltedraw/common";
+  import type { PointerType } from "@sveltedraw/element/types";
   import Spinner from "./Spinner.svelte";
   import { EXCAL_ID_KEY } from "../state/index.js";
 

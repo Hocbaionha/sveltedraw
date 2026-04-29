@@ -35,7 +35,7 @@
  */
 
 // @ts-ignore — resolved by Vite alias; no tsconfig path to avoid upstream cascade
-import { randomId } from "@excalidraw/common";
+import { randomId } from "@sveltedraw/common";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -47,7 +47,7 @@ import { randomId } from "@excalidraw/common";
  * We inline just what we need here to avoid a cross-package type import
  * until the build pipeline is configured.
  *
- * TODO: Replace with `import type { LibraryItem, LibraryItems } from "@excalidraw/excalidraw/types"`
+ * TODO: Replace with `import type { LibraryItem, LibraryItems } from "@sveltedraw/engine/types"`
  * once the `./types` sub-path is confirmed to resolve in the build setup.
  */
 type LibraryItem = { id: string; elements: readonly unknown[] } & Record<

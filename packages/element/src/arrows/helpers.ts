@@ -1,4 +1,4 @@
-import type { App } from "@excalidraw/excalidraw/types";
+import type { App } from "@sveltedraw/engine/types";
 
 import { LinearElementEditor } from "../linearElementEditor";
 

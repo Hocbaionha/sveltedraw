@@ -25,7 +25,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   // @ts-ignore upstream
-  import { KEYS } from "@excalidraw/common";
+  import { KEYS } from "@sveltedraw/common";
   import Dialog from "../Dialog.svelte";
   import TextField from "../TextField.svelte";
   import Ellipsify from "../Ellipsify.svelte";

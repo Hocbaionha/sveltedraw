@@ -1,17 +1,17 @@
 import {
   SHIFT_LOCKING_ANGLE,
   viewportCoordsToSceneCoords,
-} from "@excalidraw/common";
+} from "@sveltedraw/common";
 import {
   normalizeRadians,
   radiansBetweenAngles,
   radiansDifference,
   type Radians,
-} from "@excalidraw/math";
+} from "@sveltedraw/math";
 
-import { pointsEqual } from "@excalidraw/math";
+import { pointsEqual } from "@sveltedraw/math";
 
-import type { AppState, Offsets, Zoom } from "@excalidraw/excalidraw/types";
+import type { AppState, Offsets, Zoom } from "@sveltedraw/engine/types";
 
 import { getCommonBounds, getElementBounds } from "./bounds";
 import {

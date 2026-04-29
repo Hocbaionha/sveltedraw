@@ -3,7 +3,7 @@
 // receives them via getters/setters/refs so reactivity stays in the host.
 
 // @ts-ignore — upstream
-import { randomId } from "@excalidraw/common";
+import { randomId } from "@sveltedraw/common";
 import { getLayerName, type LayerItem } from "./types.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

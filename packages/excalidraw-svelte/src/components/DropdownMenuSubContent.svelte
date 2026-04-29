@@ -7,7 +7,7 @@
   import { getContext } from "svelte";
   import clsx from "clsx";
   import { DropdownMenu as BitsDropdownMenu } from "bits-ui";
-  import type { EditorInterface } from "@excalidraw/common";
+  import type { EditorInterface } from "@sveltedraw/common";
   import { EDITOR_INTERFACE_KEY } from "../state/index.js";
   import Island from "./Island.svelte";
   import StackCol from "./StackCol.svelte";

@@ -17,7 +17,7 @@
 
   import { getContext } from "svelte";
   // @ts-ignore — resolved via Vite alias to packages/common/src
-  import { sceneCoordsToViewportCoords } from "@excalidraw/common";
+  import { sceneCoordsToViewportCoords } from "@sveltedraw/common";
   import {
     COLLAB_STORE_KEY,
     type CollabStore,

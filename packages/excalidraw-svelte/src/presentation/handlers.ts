@@ -3,7 +3,7 @@
 // drawing content, not just a title card.
 
 // @ts-ignore — upstream
-import { exportToSvg } from "@excalidraw/utils/export";
+import { exportToSvg } from "@sveltedraw/utils/export";
 import {
   createPresentationSlide,
   type PresentationConfig,

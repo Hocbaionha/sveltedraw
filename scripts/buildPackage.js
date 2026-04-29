@@ -72,9 +72,9 @@ const getConfig = (outdir) => ({
   assetNames: "[dir]/[name]",
   chunkNames: "[dir]/[name]-[hash]",
   alias: {
-    "@excalidraw/utils": path.resolve(__dirname, "../packages/utils/src"),
+    "@sveltedraw/utils": path.resolve(__dirname, "../packages/utils/src"),
   },
-  external: ["@excalidraw/common", "@excalidraw/element", "@excalidraw/math"],
+  external: ["@sveltedraw/common", "@sveltedraw/element", "@sveltedraw/math"],
   loader: {
     ".woff2": "file",
   },

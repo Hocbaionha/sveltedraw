@@ -3,7 +3,7 @@
   import type { Snippet } from "svelte";
   import { getContext } from "svelte";
   import clsx from "clsx";
-  import type { EditorInterface } from "@excalidraw/common";
+  import type { EditorInterface } from "@sveltedraw/common";
   import Button from "../Button.svelte";
   import Tooltip from "../Tooltip.svelte";
   import Icon from "../../icons/Icon.svelte";

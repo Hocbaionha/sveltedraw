@@ -14,20 +14,20 @@
     "verbatimModuleSyntax": true,
     "paths": {
       "@sveltedraw/excalidraw": ["../packages/excalidraw-svelte/src/index.ts"],
-      "@excalidraw/common": ["../packages/common/src/index.ts"],
-      "@excalidraw/common/*": ["../packages/common/src/*"],
-      "@excalidraw/element": ["../packages/element/src/index.ts"],
-      "@excalidraw/element/*": ["../packages/element/src/*"],
-      "@excalidraw/math": ["../packages/math/src/index.ts"],
-      "@excalidraw/math/*": ["../packages/math/src/*"],
-      "@excalidraw/utils": ["../packages/utils/src/index.ts"],
-      "@excalidraw/utils/*": ["../packages/utils/src/*"]
+      "@sveltedraw/common": ["../packages/common/src/index.ts"],
+      "@sveltedraw/common/*": ["../packages/common/src/*"],
+      "@sveltedraw/element": ["../packages/element/src/index.ts"],
+      "@sveltedraw/element/*": ["../packages/element/src/*"],
+      "@sveltedraw/math": ["../packages/math/src/index.ts"],
+      "@sveltedraw/math/*": ["../packages/math/src/*"],
+      "@sveltedraw/utils": ["../packages/utils/src/index.ts"],
+      "@sveltedraw/utils/*": ["../packages/utils/src/*"]
       // Post-Phase-9: the core TS packages (common/element/math/utils)
       // are pure TypeScript and safe to path-map. `@excalidraw/
       // excalidraw` has NO path mapping because many of its files
       // have internal type errors we haven't audited; they aren't
       // in our runtime path so svelte-check catching them would only
-      // produce noise. Runtime resolution of `@excalidraw/excalidraw/*`
+      // produce noise. Runtime resolution of `@sveltedraw/engine/*`
       // is handled by Vite aliases (vite.config.ts).
     }
   },
