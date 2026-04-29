@@ -112,7 +112,7 @@ export function createLayerHandlers(deps: LayerDeps): LayerHandlers {
               name: (el as AnyEl).customLayerName || getLayerName(el),
               visible: el.opacity !== 0,
               locked: el.locked || false,
-              opacity: (el as AnyEl).customData?._hiddenOpacity as number ?? el.opacity ?? 100,
+              opacity: ((el as AnyEl).customData?._hiddenOpacity as number) ?? el.opacity ?? 100,
               type: "element" as const,
               parentId: layer.id,
               order: newLayers.length,
