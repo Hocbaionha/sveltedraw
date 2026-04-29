@@ -248,6 +248,40 @@
   };
   const frames = $state<Map<string, Frame>>(new Map());
 
+  // Derive the frames Map from scene on demand. Historical note: `frames`
+  // was declared as a $state Map populated imperatively, but no call site
+  // ever actually populated it — `createFrameAtCenter` only mutates scene
+  // elements, not this Map. That meant `getFrames().size === 0` forever
+  // and the presentation handler (which reads this to slice the scene
+  // into per-frame slides) always fell through to its "whole scene as
+  // one slide" branch. Deriving from scene fixes that without requiring
+  // every mutation path to remember to sync.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const deriveFramesFromScene = (): Map<string, Frame> => {
+    const map = new Map<string, Frame>();
+    const sc = scene;
+    if (!sc) return map;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const els = sc.getNonDeletedElements() as any[];
+    for (const el of els) {
+      if (el.type !== "frame") continue;
+      map.set(el.id, {
+        id: el.id,
+        name: el.name ?? "Frame",
+        elementIds: new Set<string>(),
+        x: el.x, y: el.y, w: el.width, h: el.height,
+      });
+    }
+    // Second pass: attach each non-frame element to its frame (if any).
+    for (const el of els) {
+      if (el.type === "frame") continue;
+      if (!el.frameId) continue;
+      const f = map.get(el.frameId);
+      if (f) f.elementIds.add(el.id);
+    }
+    return map;
+  };
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const patchAppState = (patch: Partial<ShellAppState>) => {
     for (const [k, v] of Object.entries(patch)) {
@@ -377,11 +411,17 @@
 
   // ── Scene + Renderer + RoughCanvas ───────────────────────────────────
   // Constructed on mount (need DOM access for rough.canvas()). Kept in
-  // non-reactive locals because the renderer reads them by reference.
+  // non-reactive locals because the renderer reads them by reference and a
+  // $state proxy would (a) deep-wrap mutations the renderer makes internally
+  // and (b) trigger re-runs we don't want — `sceneReady` is the explicit
+  // reactive ticker for paint. The svelte-ignore is intentional.
+  // svelte-ignore non_reactive_update
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let scene: any = null;
+  // svelte-ignore non_reactive_update
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let renderer: any = null;
+  // svelte-ignore non_reactive_update
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let rc: any = null;
 
@@ -400,6 +440,14 @@
   // (`zoom`, `gridSize`, `gridStep` etc.) — e.g. `appState.zoom = { ...appState.zoom, value: 2 }`.
   const staticRender = () => {
     if (!renderer || !scene || !rc) return;
+    // DEV probe: count static-render invocations so tests can verify repaint.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((import.meta as any).env?.DEV) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__sveltedrawStaticTicks =
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ((window as any).__sveltedrawStaticTicks ?? 0) + 1;
+    }
 
     // `newElementId` is used by the Renderer to bust its memoized cache on
     // first render of a freshly-created element. In batch 2 we have no
@@ -769,6 +817,8 @@
         },
         getPresentationCurrentIndex: () => presentationCurrentIndex,
         createFrameAtCenter: () => createFrameAtCenter(),
+        applyStyle: (patch) => applyStyle(patch as Record<string, unknown>),
+        setActiveTool: (type) => setActiveTool(type),
         forcePresentationSlides: (n) => {
           presentationSlides = Array.from({ length: n }, (_, i) => ({
             id: `s${i}`,
@@ -1902,7 +1952,7 @@
     getScene: () => scene,
     appState,
     getBinaryFiles: () => binaryFiles,
-    getFrames: () => frames,
+    getFrames: () => deriveFramesFromScene(),
     presentationConfig,
     setSlides: (s) => { presentationSlides = s; },
     setSlideSvgs: (s) => { presentationSlideSvgs = s; },
@@ -2115,7 +2165,7 @@
     bumpSceneRepaint: () => bumpSceneRepaint(),
     imageCacheMap,
     binaryFiles,
-    getFrameCount: () => frames.size,
+    getFrameCount: () => deriveFramesFromScene().size,
     toSceneCoords: (clientX, clientY) => toSceneCoords(clientX, clientY),
     isTextEditing: () => !!textEditor,
   });
@@ -2136,6 +2186,44 @@
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const applyStyle = (patch: Record<string, any>) => {
+    // Map the raw element-style key to its `currentItem*` counterpart
+    // (upstream convention). Any key without a mapping falls through
+    // unchanged (e.g. fontSize → currentItemFontSize via pass-through below
+    // would be wrong, so missing keys are intentionally NOT written).
+    const currentItemKeyMap: Record<string, string> = {
+      strokeColor: "currentItemStrokeColor",
+      backgroundColor: "currentItemBackgroundColor",
+      strokeWidth: "currentItemStrokeWidth",
+      strokeStyle: "currentItemStrokeStyle",
+      fillStyle: "currentItemFillStyle",
+      opacity: "currentItemOpacity",
+      roughness: "currentItemRoughness",
+      roundness: "currentItemRoundness",
+      fontFamily: "currentItemFontFamily",
+      fontSize: "currentItemFontSize",
+      textAlign: "currentItemTextAlign",
+      fontWeight: "currentItemFontWeight",
+      fontStyle: "currentItemFontStyle",
+      textDecoration: "currentItemTextDecoration",
+      textColor: "currentItemTextColor",
+      startArrowhead: "currentItemStartArrowhead",
+      endArrowhead: "currentItemEndArrowhead",
+      arrowType: "currentItemArrowType",
+    };
+
+    // Always persist to currentItem* defaults so the next-drawn element
+    // inherits the style the user just picked. This matches user intent:
+    // "pick color → switch to tool → draw" should use the picked color.
+    // Previously we only wrote currentItem* when the selection was empty,
+    // so selecting something + restyling + picking a tool lost the style.
+    for (const [k, v] of Object.entries(patch)) {
+      const targetKey = currentItemKeyMap[k];
+      if (targetKey) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (appState as any)[targetKey] = v;
+      }
+    }
+
     const selected = getSelectedElements();
     if (selected.length > 0 && scene) {
       for (const el of selected) {
@@ -2154,25 +2242,6 @@
         reloadSceneFonts();
       }
     } else {
-      // No selection → update currentItem* defaults. Map the raw style
-      // key to its currentItem* counterpart per upstream convention.
-      const currentItemKeyMap: Record<string, string> = {
-        strokeColor: "currentItemStrokeColor",
-        backgroundColor: "currentItemBackgroundColor",
-        strokeWidth: "currentItemStrokeWidth",
-        fillStyle: "currentItemFillStyle",
-        opacity: "currentItemOpacity",
-        roughness: "currentItemRoughness",
-        fontWeight: "currentItemFontWeight",
-        fontStyle: "currentItemFontStyle",
-        textDecoration: "currentItemTextDecoration",
-        textColor: "currentItemTextColor",
-      };
-      for (const [k, v] of Object.entries(patch)) {
-        const targetKey = currentItemKeyMap[k] ?? k;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (appState as any)[targetKey] = v;
-      }
       scheduleSave();
     }
   };
@@ -2858,14 +2927,6 @@
         return;
       }
 
-      // B1: New frame: Ctrl+Shift+F. Creates a frame at viewport center
-      // and auto-binds every element whose bbox center falls inside.
-      if (event.shiftKey && (event.key === "f" || event.key === "F")) {
-        createFrameAtCenter();
-        event.preventDefault();
-        return;
-      }
-
       // Phase 12: Template selector: Ctrl+N (new with template)
       if (!event.shiftKey && (event.key === "n" || event.key === "N")) {
         showTemplateSelector = true;
@@ -3169,6 +3230,19 @@
       return;
     }
 
+    // Bare F (no modifiers) — insert a frame at viewport center.
+    // Matches upstream Excalidraw's single-key `F` shortcut convention;
+    // sveltedraw currently dispatches "insert at center" rather than
+    // upstream's drag-to-draw frame tool (we don't have a frame factory
+    // in the pointerdown handler yet). Follow-up: wire `f` into
+    // TOOL_HOTKEYS + add a frame branch to the tool factory so users
+    // can drag out frames at arbitrary positions/sizes.
+    if (event.key === "f" || event.key === "F") {
+      createFrameAtCenter();
+      event.preventDefault();
+      return;
+    }
+
     const nextTool = TOOL_HOTKEYS[event.key];
     if (nextTool) {
       setActiveTool(nextTool);
@@ -3180,11 +3254,14 @@
   // when no appState field changed (e.g. after scene.replaceAllElements).
   // The $effect tracks sceneReady; we reuse it as a generic "something
   // scene-level happened" ticker.
-  // Also fires imperativeAPI.notifyChange() so ALL callers — pointer handlers,
-  // text editor, drag, etc. — automatically reach onChange subscribers without
-  // any per-call wiring. imperativeAPI is declared before bumpSceneRepaint so
-  // the closure safely captures the binding.
+  //
+  // Also calls scene.triggerUpdate() to bump `sceneNonce`, the ONLY cache-bust
+  // signal for `Renderer.getRenderableElements`. Call sites that mutate with
+  // `{ informMutation: false }` skip Scene's internal triggerUpdate, so without
+  // this the canvas paints stale elements. Also fires imperativeAPI.notifyChange()
+  // so all callers reach onChange subscribers without per-call wiring.
   const bumpSceneRepaint = () => {
+    scene?.triggerUpdate();
     sceneReady++;
     imperativeAPI.notifyChange();
   };
@@ -4396,18 +4473,26 @@
         polylineActive = false;
       }
 
+      // Pull style from `currentItem*` so shapes drawn after the user picks
+      // a color / stroke in the StylePanel inherit that style. Previously
+      // this hardcoded DEFAULT_ELEMENT_PROPS.* and the user saw "pick pink
+      // fill + blue stroke → switch to rectangle → draw → comes out black"
+      // because the tool factory never read the panel-chosen defaults.
+      // `currentItem*` is kept in sync by `applyStyle` (see ~line 2150).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ap = appState as any;
       const baseOpts = {
         x,
         y,
         width: 1,
         height: 1,
-        strokeColor: DEFAULT_ELEMENT_PROPS.strokeColor,
-        backgroundColor: DEFAULT_ELEMENT_PROPS.backgroundColor,
-        fillStyle: DEFAULT_ELEMENT_PROPS.fillStyle,
-        strokeWidth: DEFAULT_ELEMENT_PROPS.strokeWidth,
-        strokeStyle: DEFAULT_ELEMENT_PROPS.strokeStyle,
-        roughness: DEFAULT_ELEMENT_PROPS.roughness,
-        opacity: DEFAULT_ELEMENT_PROPS.opacity,
+        strokeColor: ap.currentItemStrokeColor ?? DEFAULT_ELEMENT_PROPS.strokeColor,
+        backgroundColor: ap.currentItemBackgroundColor ?? DEFAULT_ELEMENT_PROPS.backgroundColor,
+        fillStyle: ap.currentItemFillStyle ?? DEFAULT_ELEMENT_PROPS.fillStyle,
+        strokeWidth: ap.currentItemStrokeWidth ?? DEFAULT_ELEMENT_PROPS.strokeWidth,
+        strokeStyle: ap.currentItemStrokeStyle ?? DEFAULT_ELEMENT_PROPS.strokeStyle,
+        roughness: ap.currentItemRoughness ?? DEFAULT_ELEMENT_PROPS.roughness,
+        opacity: ap.currentItemOpacity ?? DEFAULT_ELEMENT_PROPS.opacity,
       };
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

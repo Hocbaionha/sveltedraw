@@ -1,5 +1,3 @@
-import { diffStringsUnified } from "jest-diff";
-
 expect.extend({
   toCloselyEqualPoints(received, expected, precision) {
     if (!Array.isArray(received) || !Array.isArray(expected)) {
@@ -15,12 +13,8 @@ expect.extend({
 
     if (!pass) {
       return {
-        message: () => ` The provided array of points are not close enough.
-
-${diffStringsUnified(
-  JSON.stringify(expected, undefined, 2),
-  JSON.stringify(received, undefined, 2),
-)}`,
+        message: () =>
+          ` The provided array of points are not close enough.\nExpected: ${JSON.stringify(expected, undefined, 2)}\nReceived: ${JSON.stringify(received, undefined, 2)}`,
         pass: false,
       };
     }

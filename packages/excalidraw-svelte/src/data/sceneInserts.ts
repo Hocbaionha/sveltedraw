@@ -142,6 +142,15 @@ export function createSceneInserts(deps: SceneInsertsDeps): SceneInsertsApi {
     const frame: AnyEl = {
       id: frameId, type: "frame",
       x: frameX, y: frameY, width: W, height: H, angle: 0,
+      // NOTE: the frame static renderer (renderElement.ts:872-876) hard-codes
+      // `FRAME_STYLE.strokeColor` and ignores `element.strokeColor`, so this
+      // field is only consulted if the element is ever converted to a non-frame
+      // type. Matching the FRAME_STYLE default (#bbb) keeps data consistent
+      // with what's visually rendered and what upstream .excalidraw JSON files
+      // carry. The real fix for the "frame invisible after insert" report is
+      // auto-selecting the new frame below so the interactive canvas adds a
+      // dashed selection box around it — that's the visual signal the user
+      // was missing, not the stroke color itself.
       strokeColor: "#bbb", backgroundColor: "transparent",
       fillStyle: "solid", strokeWidth: 1, strokeStyle: "solid",
       roughness: 0, opacity: 100,
@@ -149,6 +158,12 @@ export function createSceneInserts(deps: SceneInsertsDeps): SceneInsertsApi {
       versionNonce: 1, version: 1, isDeleted: false,
       groupIds: [], frameId: null, boundElements: null,
       updated: Date.now(), link: null, locked: false, roundness: null,
+      // Fractional index — Scene assigns one via syncInvalidIndices, but only
+      // when replaceAllElements is called WITHOUT `skipValidation`. This call
+      // skips validation (for the bound-elements rewrite), so we must seed
+      // a starter value; otherwise the layers panel sorts frames into random
+      // positions and subsequent mutations can throw in validateFractionalIndices.
+      index: "a0" as AnyEl["index"],
       name: `Frame ${getFrameCount() + 1}`,
     };
     const existing = scene.getNonDeletedElements();
@@ -165,6 +180,11 @@ export function createSceneInserts(deps: SceneInsertsDeps): SceneInsertsApi {
     // Frame renders FIRST so it sits behind its children — acting as a
     // container, not an overlay. Array order == z-order.
     scene.replaceAllElements([frame, ...nextElements], { skipValidation: true });
+    // Auto-select the new frame so the user sees selection handles + dashed
+    // outline immediately (mirrors `insertCapturedSelection` at line 120).
+    // Without this, the user clicks "Insert frame" and sees no visible change
+    // — the faint grey stroke alone is not enough of a feedback signal.
+    appState.selectedElementIds = { [frameId]: true };
     pushHistory();
     bumpSceneRepaint();
     return frameId;

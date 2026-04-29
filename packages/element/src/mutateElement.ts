@@ -14,6 +14,17 @@ import { updateElbowArrowPoints } from "./elbowArrow";
 
 import { isElbowArrow } from "./typeChecks";
 
+const SHAPE_AFFECTING_KEYS = new Set([
+  "strokeColor",
+  "backgroundColor",
+  "fillStyle",
+  "strokeWidth",
+  "strokeStyle",
+  "roundness",
+  "roughness",
+  "seed",
+]);
+
 import type {
   ElementsMap,
   ExcalidrawElbowArrowElement,
@@ -127,11 +138,15 @@ export const mutateElement = <TElement extends Mutable<ExcalidrawElement>>(
     return element;
   }
 
+  const hasShapeAffectingStyleUpdate = Object.keys(updates).some((k) =>
+    SHAPE_AFFECTING_KEYS.has(k),
+  );
   if (
     typeof updates.height !== "undefined" ||
     typeof updates.width !== "undefined" ||
     typeof fileId != "undefined" ||
-    typeof points !== "undefined"
+    typeof points !== "undefined" ||
+    hasShapeAffectingStyleUpdate
   ) {
     ShapeCache.delete(element);
   }

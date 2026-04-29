@@ -140,6 +140,13 @@ export interface ExcalidrawElementWithCanvas {
   zoomValue: AppState["zoom"]["value"];
   canvasOffsetX: number;
   canvasOffsetY: number;
+  // Snapshot of element.version at the moment this bitmap was rendered.
+  // Upstream relied on `newElementWith` cloning the element (new identity =>
+  // WeakMap miss => regen). sveltedraw uses in-place `Scene.mutateElement`,
+  // so identity stays the same and we need an explicit version guard.
+  // Without this, text / freedraw style mutations (fontSize / fontFamily /
+  // strokeColor / roughness ...) keep painting the previous frame's bitmap.
+  elementVersion: number;
   boundTextElementVersion: number | null;
   imageCrop: ExcalidrawImageElement["crop"] | null;
   containingFrameOpacity: number;
@@ -328,6 +335,7 @@ const generateElementCanvas = (
     zoomValue: zoom.value,
     canvasOffsetX,
     canvasOffsetY,
+    elementVersion: element.version,
     boundTextElementVersion:
       getBoundTextElement(element, elementsMap)?.version || null,
     containingFrameOpacity:
@@ -659,6 +667,13 @@ const generateElementWithCanvas = (
     !prevElementWithCanvas ||
     shouldRegenerateBecauseZoom ||
     prevElementWithCanvas.theme !== appState.theme ||
+    // In-place Scene.mutateElement bumps element.version but keeps the same
+    // object identity, so the WeakMap hit returns a stale bitmap. Compare
+    // versions explicitly. Without this, text/freedraw style mutations
+    // (fontSize, fontFamily, strokeColor, roughness, ...) don't repaint
+    // until something else forces a regen. Companion to the ShapeCache
+    // style-key invalidation in packages/element/src/mutateElement.ts.
+    prevElementWithCanvas.elementVersion !== element.version ||
     prevElementWithCanvas.boundTextElementVersion !== boundTextElementVersion ||
     prevElementWithCanvas.imageCrop !== imageCrop ||
     prevElementWithCanvas.containingFrameOpacity !== containingFrameOpacity ||
