@@ -411,11 +411,17 @@
 
   // ── Scene + Renderer + RoughCanvas ───────────────────────────────────
   // Constructed on mount (need DOM access for rough.canvas()). Kept in
-  // non-reactive locals because the renderer reads them by reference.
+  // non-reactive locals because the renderer reads them by reference and a
+  // $state proxy would (a) deep-wrap mutations the renderer makes internally
+  // and (b) trigger re-runs we don't want — `sceneReady` is the explicit
+  // reactive ticker for paint. The svelte-ignore is intentional.
+  // svelte-ignore non_reactive_update
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let scene: any = null;
+  // svelte-ignore non_reactive_update
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let renderer: any = null;
+  // svelte-ignore non_reactive_update
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let rc: any = null;
 
