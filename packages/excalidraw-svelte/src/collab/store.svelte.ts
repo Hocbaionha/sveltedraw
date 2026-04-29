@@ -53,6 +53,7 @@ export function createCollabStore(api: SveltedrawAPI) {
     return new Promise((resolve, reject) => {
       const ydoc = new Y.Doc();
       const ymap = ydoc.getMap<unknown>("elements");
+      const zonesMap = ydoc.getMap<string>("zones");
 
       const ws = new WebsocketProvider(opts.serverUrl, opts.roomId, ydoc);
       provider = ws;
@@ -61,23 +62,37 @@ export function createCollabStore(api: SveltedrawAPI) {
         user: opts.user,
         role: opts.role,
         cursor: null,
-        zone: null,
+        zone: zonesMap.get(opts.user.id) ?? null,
         activeFrame: null,
       });
+
+      let settled = false;
+      const settle = (fn: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        fn();
+      };
+
+      const timer = setTimeout(() => {
+        settle(() => reject(new Error("Connection timed out")));
+      }, 10_000);
 
       // Resolve as soon as the websocket is open.
       ws.on("status", ({ status }: { status: string }) => {
         if (status === "connected") {
-          myRole = opts.role;
-          myUserId = opts.user.id;
-          roomId = opts.roomId;
-          connected = true;
-          resolve();
+          settle(() => {
+            myRole = opts.role;
+            myUserId = opts.user.id;
+            roomId = opts.roomId;
+            connected = true;
+            resolve();
+          });
         }
       });
 
       ws.on("connection-error", (err: Error) => {
-        reject(err);
+        settle(() => reject(err));
       });
 
       ws.awareness.on("change", () => {
@@ -100,6 +115,14 @@ export function createCollabStore(api: SveltedrawAPI) {
           }
         });
         users = states;
+      });
+
+      // Teacher writes zone assignments into zonesMap; observe it so students
+      // pick up their zone immediately without waiting for awareness gossip.
+      zonesMap.observe(() => {
+        const frame = zonesMap.get(opts.user.id) ?? null;
+        myZone = frame;
+        ws.awareness.setLocalStateField("zone", frame);
       });
 
       // Remote elements → update local scene.

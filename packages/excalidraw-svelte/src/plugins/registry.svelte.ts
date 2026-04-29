@@ -21,6 +21,11 @@ export class PluginRegistry {
 
   private cleanups = new Map<string, () => void>();
 
+  /** Whether a plugin is currently installed (O(1), no allocation). */
+  isInstalled(pluginId: string): boolean {
+    return this.cleanups.has(pluginId);
+  }
+
   /** IDs of currently installed plugins. */
   get installedIds(): ReadonlySet<string> {
     return new Set(this.cleanups.keys());

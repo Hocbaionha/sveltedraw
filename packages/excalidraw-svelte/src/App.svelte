@@ -41,7 +41,6 @@
 
 <script lang="ts">
   import { setContext, untrack, onMount } from "svelte";
-  import * as Y from "yjs";
   // @ts-ignore — upstream, resolved via Vite alias
   import { getDefaultAppState } from "@excalidraw/excalidraw/appState";
   // @ts-ignore — upstream
@@ -344,13 +343,16 @@
     const currentIds = new Set(plugins.map((p) => p.id));
 
     // Uninstall plugins that were removed from the prop array.
+    // installedIds allocates a snapshot Set — only called once per effect run.
     for (const id of pluginRegistry.installedIds) {
       if (!currentIds.has(id)) pluginRegistry.uninstall(id);
     }
 
     // Install any plugins not yet registered.
     for (const plugin of plugins) {
-      pluginRegistry.install(plugin, buildCtx(plugin.id));
+      if (!pluginRegistry.isInstalled(plugin.id)) {
+        pluginRegistry.install(plugin, buildCtx(plugin.id));
+      }
     }
   });
 
@@ -973,6 +975,7 @@
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       lastActiveTool: (appState as any).activeTool ?? null,
     };
+    imperativeAPI.notifyToolChange(type);
   };
 
   // Toggle tool lock (Q in upstream). When on, the current drawing
@@ -995,16 +998,14 @@
 
   // ── History (undo/redo) ──────────────────────────────────────────────
   // Implementation lives in ./history/store.ts. App.svelte owns the reactive
-  // panel state ($state below) and yjs collab map; the store mutates them via
-  // a setUI callback and reads ymap via a getter so collab init can come
-  // later in onMount without ordering hazards.
-  let ymap: Y.Map<any> | null = null; // Phase 10: collab map (set in onMount)
+  // panel state ($state below); collab broadcasting is handled by CollabStore
+  // (injected via the `onmount` callback), not wired here.
   const historyStore = createHistoryStore({
     getScene: () => scene,
     appState,
     scheduleSave,
     bumpSceneRepaint: () => bumpSceneRepaint(),
-    getYmap: () => ymap,
+    getYmap: () => null,
     setUI: (entries, idx) => {
       editorHistory = entries;
       historyCurrentIndex = idx;
