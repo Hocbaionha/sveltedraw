@@ -30,7 +30,7 @@ import type {
   MaybeTransformHandleType,
 } from "./transformHandles";
 import type {
-  ExcalidrawElement,
+  SveltedrawElement,
   PointerType,
   NonDeletedExcalidrawElement,
   ElementsMap,
@@ -230,7 +230,7 @@ const rotateResizeCursor = (cursor: string, angle: number) => {
  * Returns bi-directional cursor for the element being resized
  */
 export const getCursorForResizingElement = (resizingElement: {
-  element?: ExcalidrawElement;
+  element?: SveltedrawElement;
   transformHandleType: MaybeTransformHandleType;
 }): string => {
   const { element, transformHandleType } = resizingElement;

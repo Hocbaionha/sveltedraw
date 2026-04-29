@@ -42,9 +42,9 @@ import { newTextElement } from "@sveltedraw/element";
 import type { Bounds } from "@sveltedraw/common";
 
 import type {
-  ExcalidrawElement,
-  ExcalidrawFrameLikeElement,
-  ExcalidrawTextElement,
+  SveltedrawElement,
+  SveltedrawFrameLikeElement,
+  SveltedrawTextElement,
   NonDeletedExcalidrawElement,
   NonDeletedSceneElementsMap,
 } from "@sveltedraw/element/types";
@@ -62,7 +62,7 @@ import type { RenderableElementsMap } from "./types";
 
 import type { AppState, BinaryFiles } from "../types";
 
-const truncateText = (element: ExcalidrawTextElement, maxWidth: number) => {
+const truncateText = (element: SveltedrawTextElement, maxWidth: number) => {
   if (element.width <= maxWidth) {
     return element;
   }
@@ -106,13 +106,13 @@ const addFrameLabelsAsTextElements = (
   const nextElements: NonDeletedExcalidrawElement[] = [];
   for (const element of elements) {
     if (isFrameLikeElement(element)) {
-      let textElement: Mutable<ExcalidrawTextElement> = newTextElement({
+      let textElement: Mutable<SveltedrawTextElement> = newTextElement({
         x: element.x,
         y: element.y - FRAME_STYLE.nameOffsetY,
         fontFamily: FONT_FAMILY.Helvetica,
         fontSize: FRAME_STYLE.nameFontSize,
         lineHeight:
-          FRAME_STYLE.nameLineHeight as ExcalidrawTextElement["lineHeight"],
+          FRAME_STYLE.nameLineHeight as SveltedrawTextElement["lineHeight"],
         strokeColor: opts.exportWithDarkMode
           ? FRAME_STYLE.nameColorDarkTheme
           : FRAME_STYLE.nameColorLightTheme,
@@ -131,7 +131,7 @@ const addFrameLabelsAsTextElements = (
 };
 
 const getFrameRenderingConfig = (
-  exportingFrame: ExcalidrawFrameLikeElement | null,
+  exportingFrame: SveltedrawFrameLikeElement | null,
   frameRendering: AppState["frameRendering"] | null,
 ): AppState["frameRendering"] => {
   frameRendering = frameRendering || getDefaultAppState().frameRendering;
@@ -149,12 +149,12 @@ const prepareElementsForRender = ({
   frameRendering,
   exportWithDarkMode,
 }: {
-  elements: readonly ExcalidrawElement[];
-  exportingFrame: ExcalidrawFrameLikeElement | null | undefined;
+  elements: readonly SveltedrawElement[];
+  exportingFrame: SveltedrawFrameLikeElement | null | undefined;
   frameRendering: AppState["frameRendering"];
   exportWithDarkMode: AppState["exportWithDarkMode"];
 }) => {
-  let nextElements: readonly ExcalidrawElement[];
+  let nextElements: readonly SveltedrawElement[];
 
   if (exportingFrame) {
     nextElements = getElementsOverlappingFrame(
@@ -186,7 +186,7 @@ export const exportToCanvas = async (
     exportBackground: boolean;
     exportPadding?: number;
     viewBackgroundColor: string;
-    exportingFrame?: ExcalidrawFrameLikeElement | null;
+    exportingFrame?: SveltedrawFrameLikeElement | null;
   },
   createCanvas: (
     width: number,
@@ -303,7 +303,7 @@ export const exportToSvg = async (
      * if true, all embeddables passed in will be rendered when possible.
      */
     renderEmbeddables?: boolean;
-    exportingFrame?: ExcalidrawFrameLikeElement | null;
+    exportingFrame?: SveltedrawFrameLikeElement | null;
     skipInliningFonts?: true;
     reuseImages?: boolean;
   },

@@ -27,12 +27,12 @@ const SHAPE_AFFECTING_KEYS = new Set([
 
 import type {
   ElementsMap,
-  ExcalidrawElbowArrowElement,
-  ExcalidrawElement,
+  SveltedrawElbowArrowElement,
+  SveltedrawElement,
   NonDeletedSceneElementsMap,
 } from "./types";
 
-export type ElementUpdate<TElement extends ExcalidrawElement> = Omit<
+export type ElementUpdate<TElement extends SveltedrawElement> = Omit<
   Partial<TElement>,
   "id" | "updated"
 >;
@@ -43,9 +43,9 @@ export type ElementUpdate<TElement extends ExcalidrawElement> = Omit<
  * the same drawing.
  *
  * WARNING: this won't trigger the component to update, so if you need to trigger component update,
- * use `scene.mutateElement` or `ExcalidrawImperativeAPI.mutateElement` instead.
+ * use `scene.mutateElement` or `SveltedrawImperativeAPI.mutateElement` instead.
  */
-export const mutateElement = <TElement extends Mutable<ExcalidrawElement>>(
+export const mutateElement = <TElement extends Mutable<SveltedrawElement>>(
   element: TElement,
   elementsMap: ElementsMap,
   updates: ElementUpdate<TElement>,
@@ -77,7 +77,7 @@ export const mutateElement = <TElement extends Mutable<ExcalidrawElement>>(
           y: updates.y || element.y,
         },
         elementsMap as NonDeletedSceneElementsMap,
-        updates as ElementUpdate<ExcalidrawElbowArrowElement>,
+        updates as ElementUpdate<SveltedrawElbowArrowElement>,
         options,
       ),
     };
@@ -158,7 +158,7 @@ export const mutateElement = <TElement extends Mutable<ExcalidrawElement>>(
   return element;
 };
 
-export const newElementWith = <TElement extends ExcalidrawElement>(
+export const newElementWith = <TElement extends SveltedrawElement>(
   element: TElement,
   updates: ElementUpdate<TElement>,
   /** pass `true` to always regenerate */
@@ -197,9 +197,9 @@ export const newElementWith = <TElement extends ExcalidrawElement>(
  *
  * NOTE: does not trigger re-render.
  */
-export const bumpVersion = <T extends Mutable<ExcalidrawElement>>(
+export const bumpVersion = <T extends Mutable<SveltedrawElement>>(
   element: T,
-  version?: ExcalidrawElement["version"],
+  version?: SveltedrawElement["version"],
 ) => {
   element.version = (version ?? element.version) + 1;
   element.versionNonce = randomInteger();

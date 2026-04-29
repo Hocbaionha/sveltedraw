@@ -61,16 +61,16 @@ Object.defineProperty(window, "EXCALIDRAW_ASSET_PATH", {
 
 // mock the font fetch only, so that everything else, as font subsetting, can run inside of the (snapshot) tests
 vi.mock(
-  "./packages/excalidraw/fonts/ExcalidrawFontFace",
+  "./packages/excalidraw/fonts/SveltedrawFontFace",
   async (importOriginal) => {
     const mod = await importOriginal<
-      typeof import("./packages/excalidraw/fonts/ExcalidrawFontFace")
+      typeof import("./packages/excalidraw/fonts/SveltedrawFontFace")
     >();
-    const ExcalidrawFontFaceImpl = mod.ExcalidrawFontFace;
+    const SveltedrawFontFaceImpl = mod.SveltedrawFontFace;
 
     return {
       ...mod,
-      ExcalidrawFontFace: class extends ExcalidrawFontFaceImpl {
+      SveltedrawFontFace: class extends SveltedrawFontFaceImpl {
         public async fetchFont(url: URL): Promise<ArrayBuffer> {
           if (!url.toString().startsWith("file://")) {
             return super.fetchFont(url);

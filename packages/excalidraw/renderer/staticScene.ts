@@ -24,7 +24,7 @@ import { getElementAbsoluteCoords } from "@sveltedraw/element";
 
 import type {
   ElementsMap,
-  ExcalidrawFrameLikeElement,
+  SveltedrawFrameLikeElement,
   NonDeletedExcalidrawElement,
 } from "@sveltedraw/element/types";
 
@@ -130,7 +130,7 @@ const strokeGrid = (
 };
 
 export const frameClip = (
-  frame: ExcalidrawFrameLikeElement,
+  frame: SveltedrawFrameLikeElement,
   context: CanvasRenderingContext2D,
   renderConfig: StaticCanvasRenderConfig,
   appState: StaticCanvasAppState,

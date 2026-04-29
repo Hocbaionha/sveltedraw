@@ -60,12 +60,12 @@ import type {
   Arrowhead,
   ElementsMap,
   ElementsMapOrArray,
-  ExcalidrawElement,
-  ExcalidrawEllipseElement,
-  ExcalidrawFreeDrawElement,
-  ExcalidrawLinearElement,
-  ExcalidrawRectanguloidElement,
-  ExcalidrawTextElementWithContainer,
+  SveltedrawElement,
+  SveltedrawEllipseElement,
+  SveltedrawFreeDrawElement,
+  SveltedrawLinearElement,
+  SveltedrawRectanguloidElement,
+  SveltedrawTextElementWithContainer,
   NonDeleted,
 } from "./types";
 
@@ -88,22 +88,22 @@ export type SceneBounds = readonly [
 
 export class ElementBounds {
   private static boundsCache = new WeakMap<
-    ExcalidrawElement,
+    SveltedrawElement,
     {
       bounds: Bounds;
-      version: ExcalidrawElement["version"];
+      version: SveltedrawElement["version"];
     }
   >();
   private static nonRotatedBoundsCache = new WeakMap<
-    ExcalidrawElement,
+    SveltedrawElement,
     {
       bounds: Bounds;
-      version: ExcalidrawElement["version"];
+      version: SveltedrawElement["version"];
     }
   >();
 
   static getBounds(
-    element: ExcalidrawElement,
+    element: SveltedrawElement,
     elementsMap: ElementsMap,
     nonRotated: boolean = false,
   ) {
@@ -149,7 +149,7 @@ export class ElementBounds {
   }
 
   private static calculateBounds(
-    element: ExcalidrawElement,
+    element: SveltedrawElement,
     elementsMap: ElementsMap,
   ): Bounds {
     let bounds: Bounds;
@@ -248,7 +248,7 @@ export class ElementBounds {
 // If the element is created from right to left, the width is going to be negative
 // This set of functions retrieves the absolute position of the 4 points.
 export const getElementAbsoluteCoords = (
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   elementsMap: ElementsMap,
   includeBoundText: boolean = false,
 ): [number, number, number, number, number, number] => {
@@ -267,7 +267,7 @@ export const getElementAbsoluteCoords = (
     if (isArrowElement(container)) {
       const { x, y } = LinearElementEditor.getBoundTextElementPosition(
         container,
-        element as ExcalidrawTextElementWithContainer,
+        element as SveltedrawTextElementWithContainer,
         elementsMap,
       );
       return [
@@ -301,7 +301,7 @@ export const getElementAbsoluteCoords = (
  * Uses helpers from /math
  */
 export const getElementLineSegments = (
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   elementsMap: ElementsMap,
 ): LineSegment<GlobalPoint>[] => {
   const shape = getElementShape(element, elementsMap);
@@ -390,7 +390,7 @@ export const getElementLineSegments = (
     }
     return segments;
   } else if (shape.type === "ellipse") {
-    return getSegmentsOnEllipse(element as ExcalidrawEllipseElement);
+    return getSegmentsOnEllipse(element as SveltedrawEllipseElement);
   }
 
   const [nw, ne, sw, se, , , w, e] = (
@@ -419,8 +419,8 @@ export const getElementLineSegments = (
 };
 
 const _isRectanguloidElement = (
-  element: ExcalidrawElement,
-): element is ExcalidrawRectanguloidElement => {
+  element: SveltedrawElement,
+): element is SveltedrawRectanguloidElement => {
   return (
     element != null &&
     (element.type === "rectangle" ||
@@ -476,7 +476,7 @@ const getSegmentsOnCurve = (
 };
 
 const getSegmentsOnEllipse = (
-  ellipse: ExcalidrawEllipseElement,
+  ellipse: SveltedrawEllipseElement,
 ): LineSegment<GlobalPoint>[] => {
   const center = pointFrom<GlobalPoint>(
     ellipse.x + ellipse.width / 2,
@@ -522,7 +522,7 @@ export const getRectangleBoxAbsoluteCoords = (boxSceneCoords: RectangleBox) => {
   ];
 };
 
-export const getDiamondPoints = (element: ExcalidrawElement) => {
+export const getDiamondPoints = (element: SveltedrawElement) => {
   // Here we add +1 to avoid these numbers to be 0
   // otherwise rough.js will throw an error complaining about it
   const topX = Math.floor(element.width / 2) + 1;
@@ -700,7 +700,7 @@ export const getBoundsFromPoints = <P extends GlobalPoint | LocalPoint>(
 };
 
 const getFreeDrawElementAbsoluteCoords = (
-  element: ExcalidrawFreeDrawElement,
+  element: SveltedrawFreeDrawElement,
 ): [number, number, number, number, number, number] => {
   const [minX, minY, maxX, maxY] = getBoundsFromPoints(element.points);
   const x1 = minX + element.x;
@@ -747,7 +747,7 @@ export const getArrowheadAngle = (arrowhead: Arrowhead): Degrees => {
 };
 
 export const getArrowheadPoints = (
-  element: ExcalidrawLinearElement,
+  element: SveltedrawLinearElement,
   shape: Drawable[],
   position: "start" | "end",
   arrowhead: Arrowhead,
@@ -913,7 +913,7 @@ export const getArrowheadPoints = (
 
 // TODO reuse shape.ts
 const generateLinearElementShape = (
-  element: ExcalidrawLinearElement,
+  element: SveltedrawLinearElement,
 ): Drawable => {
   const generator = rough.generator();
   const options = generateRoughOptions(element);
@@ -935,7 +935,7 @@ const generateLinearElementShape = (
 };
 
 const getLinearElementRotatedBounds = (
-  element: ExcalidrawLinearElement,
+  element: SveltedrawLinearElement,
   cx: number,
   cy: number,
   elementsMap: ElementsMap,
@@ -998,7 +998,7 @@ const getLinearElementRotatedBounds = (
 };
 
 export const getElementBounds = (
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   elementsMap: ElementsMap,
   nonRotated: boolean = false,
 ): Bounds => {
@@ -1032,7 +1032,7 @@ export const getCommonBounds = (
 };
 
 export const getDraggedElementsBounds = (
-  elements: ExcalidrawElement[],
+  elements: SveltedrawElement[],
   dragOffset: { x: number; y: number },
 ) => {
   const [minX, minY, maxX, maxY] = getCommonBounds(elements);
@@ -1045,7 +1045,7 @@ export const getDraggedElementsBounds = (
 };
 
 export const getResizedElementAbsoluteCoords = (
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   nextWidth: number,
   nextHeight: number,
   normalizePoints: boolean,
@@ -1095,7 +1095,7 @@ export const getResizedElementAbsoluteCoords = (
 };
 
 export const getElementPointsCoords = (
-  element: ExcalidrawLinearElement,
+  element: SveltedrawLinearElement,
   points: readonly (readonly [number, number])[],
 ): Bounds => {
   // This might be computationally heavey
@@ -1118,7 +1118,7 @@ export const getElementPointsCoords = (
 };
 
 export const getClosestElementBounds = (
-  elements: readonly ExcalidrawElement[],
+  elements: readonly SveltedrawElement[],
   from: { x: number; y: number },
 ): Bounds => {
   if (!elements.length) {
@@ -1157,8 +1157,8 @@ export interface BoundingBox {
 
 export const getCommonBoundingBox = (
   elements:
-    | readonly ExcalidrawElement[]
-    | readonly NonDeleted<ExcalidrawElement>[],
+    | readonly SveltedrawElement[]
+    | readonly NonDeleted<SveltedrawElement>[],
 ): BoundingBox => {
   const [minX, minY, maxX, maxY] = getCommonBounds(elements);
   return {
@@ -1201,7 +1201,7 @@ export const getCenterForBounds = (bounds: Bounds): GlobalPoint =>
  * Get the axis-aligned bounding box for a given element
  */
 export const aabbForElement = (
-  element: Readonly<ExcalidrawElement>,
+  element: Readonly<SveltedrawElement>,
   elementsMap: ElementsMap,
   offset?: [number, number, number, number],
 ) => {
@@ -1296,7 +1296,7 @@ export const boundsContainBounds = (outerBounds: Bounds, innerBounds: Bounds) =>
   ].every((point) => pointInsideBoundsInclusive(point, outerBounds));
 
 export const elementCenterPoint = (
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   elementsMap: ElementsMap,
   xOffset: number = 0,
   yOffset: number = 0,

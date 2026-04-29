@@ -33,7 +33,7 @@ export type VerticalAlign = typeof VERTICAL_ALIGN[VerticalAlignKeys];
 export type FractionalIndex = string & { _brand: "franctionalIndex" };
 
 export type BoundElement = Readonly<{
-  id: ExcalidrawLinearElement["id"];
+  id: SveltedrawLinearElement["id"];
   type: "arrow" | "text";
 }>;
 
@@ -90,23 +90,23 @@ type _ExcalidrawElementBase = Readonly<{
   } | null;
 }>;
 
-export type ExcalidrawSelectionElement = _ExcalidrawElementBase & {
+export type SveltedrawSelectionElement = _ExcalidrawElementBase & {
   type: "selection";
 };
 
-export type ExcalidrawRectangleElement = _ExcalidrawElementBase & {
+export type SveltedrawRectangleElement = _ExcalidrawElementBase & {
   type: "rectangle";
 };
 
-export type ExcalidrawDiamondElement = _ExcalidrawElementBase & {
+export type SveltedrawDiamondElement = _ExcalidrawElementBase & {
   type: "diamond";
 };
 
-export type ExcalidrawEllipseElement = _ExcalidrawElementBase & {
+export type SveltedrawEllipseElement = _ExcalidrawElementBase & {
   type: "ellipse";
 };
 
-export type ExcalidrawEmbeddableElement = _ExcalidrawElementBase &
+export type SveltedrawEmbeddableElement = _ExcalidrawElementBase &
   Readonly<{
     type: "embeddable";
   }>;
@@ -122,16 +122,16 @@ export type MagicGenerationData =
       code: "ERR_GENERATION_INTERRUPTED" | string;
     };
 
-export type ExcalidrawIframeElement = _ExcalidrawElementBase &
+export type SveltedrawIframeElement = _ExcalidrawElementBase &
   Readonly<{
     type: "iframe";
     // TODO move later to AI-specific frame
     customData?: { generationData?: MagicGenerationData };
   }>;
 
-export type ExcalidrawIframeLikeElement =
-  | ExcalidrawIframeElement
-  | ExcalidrawEmbeddableElement;
+export type SveltedrawIframeLikeElement =
+  | SveltedrawIframeElement
+  | SveltedrawEmbeddableElement;
 
 export type IframeData =
   | {
@@ -152,7 +152,7 @@ export type ImageCrop = {
   naturalHeight: number;
 };
 
-export type ExcalidrawImageElement = _ExcalidrawElementBase &
+export type SveltedrawImageElement = _ExcalidrawElementBase &
   Readonly<{
     type: "image";
     fileId: FileId | null;
@@ -165,83 +165,83 @@ export type ExcalidrawImageElement = _ExcalidrawElementBase &
   }>;
 
 export type InitializedExcalidrawImageElement = MarkNonNullable<
-  ExcalidrawImageElement,
+  SveltedrawImageElement,
   "fileId"
 >;
 
-export type ExcalidrawFrameElement = _ExcalidrawElementBase & {
+export type SveltedrawFrameElement = _ExcalidrawElementBase & {
   type: "frame";
   name: string | null;
 };
 
-export type ExcalidrawMagicFrameElement = _ExcalidrawElementBase & {
+export type SveltedrawMagicFrameElement = _ExcalidrawElementBase & {
   type: "magicframe";
   name: string | null;
 };
 
-export type ExcalidrawFrameLikeElement =
-  | ExcalidrawFrameElement
-  | ExcalidrawMagicFrameElement;
+export type SveltedrawFrameLikeElement =
+  | SveltedrawFrameElement
+  | SveltedrawMagicFrameElement;
 
 /**
  * These are elements that don't have any additional properties.
  */
-export type ExcalidrawGenericElement =
-  | ExcalidrawSelectionElement
-  | ExcalidrawRectangleElement
-  | ExcalidrawDiamondElement
-  | ExcalidrawEllipseElement;
+export type SveltedrawGenericElement =
+  | SveltedrawSelectionElement
+  | SveltedrawRectangleElement
+  | SveltedrawDiamondElement
+  | SveltedrawEllipseElement;
 
-export type ExcalidrawFlowchartNodeElement =
-  | ExcalidrawRectangleElement
-  | ExcalidrawDiamondElement
-  | ExcalidrawEllipseElement;
+export type SveltedrawFlowchartNodeElement =
+  | SveltedrawRectangleElement
+  | SveltedrawDiamondElement
+  | SveltedrawEllipseElement;
 
-export type ExcalidrawRectanguloidElement =
-  | ExcalidrawRectangleElement
-  | ExcalidrawImageElement
-  | ExcalidrawTextElement
-  | ExcalidrawFreeDrawElement
-  | ExcalidrawIframeLikeElement
-  | ExcalidrawFrameLikeElement
-  | ExcalidrawEmbeddableElement
-  | ExcalidrawSelectionElement;
+export type SveltedrawRectanguloidElement =
+  | SveltedrawRectangleElement
+  | SveltedrawImageElement
+  | SveltedrawTextElement
+  | SveltedrawFreeDrawElement
+  | SveltedrawIframeLikeElement
+  | SveltedrawFrameLikeElement
+  | SveltedrawEmbeddableElement
+  | SveltedrawSelectionElement;
 
 /**
- * ExcalidrawElement should be JSON serializable and (eventually) contain
- * no computed data. The list of all ExcalidrawElements should be shareable
+ * SveltedrawElement should be JSON serializable and (eventually) contain
+ * no computed data. The list of all SveltedrawElements should be shareable
  * between peers and contain no state local to the peer.
  */
-export type ExcalidrawElement =
-  | ExcalidrawGenericElement
-  | ExcalidrawTextElement
-  | ExcalidrawLinearElement
-  | ExcalidrawArrowElement
-  | ExcalidrawFreeDrawElement
-  | ExcalidrawImageElement
-  | ExcalidrawFrameElement
-  | ExcalidrawMagicFrameElement
-  | ExcalidrawIframeElement
-  | ExcalidrawEmbeddableElement;
+export type SveltedrawElement =
+  | SveltedrawGenericElement
+  | SveltedrawTextElement
+  | SveltedrawLinearElement
+  | SveltedrawArrowElement
+  | SveltedrawFreeDrawElement
+  | SveltedrawImageElement
+  | SveltedrawFrameElement
+  | SveltedrawMagicFrameElement
+  | SveltedrawIframeElement
+  | SveltedrawEmbeddableElement;
 
-export type ExcalidrawNonSelectionElement = Exclude<
-  ExcalidrawElement,
-  ExcalidrawSelectionElement
+export type SveltedrawNonSelectionElement = Exclude<
+  SveltedrawElement,
+  SveltedrawSelectionElement
 >;
 
-export type Ordered<TElement extends ExcalidrawElement> = TElement & {
+export type Ordered<TElement extends SveltedrawElement> = TElement & {
   index: FractionalIndex;
 };
 
-export type OrderedExcalidrawElement = Ordered<ExcalidrawElement>;
+export type OrderedExcalidrawElement = Ordered<SveltedrawElement>;
 
-export type NonDeleted<TElement extends ExcalidrawElement> = TElement & {
+export type NonDeleted<TElement extends SveltedrawElement> = TElement & {
   isDeleted: boolean;
 };
 
-export type NonDeletedExcalidrawElement = NonDeleted<ExcalidrawElement>;
+export type NonDeletedExcalidrawElement = NonDeleted<SveltedrawElement>;
 
-export type ExcalidrawTextElement = _ExcalidrawElementBase &
+export type SveltedrawTextElement = _ExcalidrawElementBase &
   Readonly<{
     type: "text";
     fontSize: number;
@@ -249,7 +249,7 @@ export type ExcalidrawTextElement = _ExcalidrawElementBase &
     text: string;
     textAlign: TextAlign;
     verticalAlign: VerticalAlign;
-    containerId: ExcalidrawGenericElement["id"] | null;
+    containerId: SveltedrawGenericElement["id"] | null;
     originalText: string;
     /**
      * If `true` the width will fit the text. If `false`, the text will
@@ -273,33 +273,33 @@ export type ExcalidrawTextElement = _ExcalidrawElementBase &
     textColor?: string;
   }>;
 
-export type ExcalidrawBindableElement =
-  | ExcalidrawRectangleElement
-  | ExcalidrawDiamondElement
-  | ExcalidrawEllipseElement
-  | ExcalidrawTextElement
-  | ExcalidrawImageElement
-  | ExcalidrawIframeElement
-  | ExcalidrawEmbeddableElement
-  | ExcalidrawFrameElement
-  | ExcalidrawMagicFrameElement;
+export type SveltedrawBindableElement =
+  | SveltedrawRectangleElement
+  | SveltedrawDiamondElement
+  | SveltedrawEllipseElement
+  | SveltedrawTextElement
+  | SveltedrawImageElement
+  | SveltedrawIframeElement
+  | SveltedrawEmbeddableElement
+  | SveltedrawFrameElement
+  | SveltedrawMagicFrameElement;
 
-export type ExcalidrawTextContainer =
-  | ExcalidrawRectangleElement
-  | ExcalidrawDiamondElement
-  | ExcalidrawEllipseElement
-  | ExcalidrawArrowElement;
+export type SveltedrawTextContainer =
+  | SveltedrawRectangleElement
+  | SveltedrawDiamondElement
+  | SveltedrawEllipseElement
+  | SveltedrawArrowElement;
 
-export type ExcalidrawTextElementWithContainer = {
-  containerId: ExcalidrawTextContainer["id"];
-} & ExcalidrawTextElement;
+export type SveltedrawTextElementWithContainer = {
+  containerId: SveltedrawTextContainer["id"];
+} & SveltedrawTextElement;
 
 export type FixedPoint = [number, number];
 
 export type BindMode = "inside" | "orbit" | "skip";
 
 export type FixedPointBinding = {
-  elementId: ExcalidrawBindableElement["id"];
+  elementId: SveltedrawBindableElement["id"];
 
   // Represents the fixed point binding information in form of a vertical and
   // horizontal ratio (i.e. a percentage value in the 0.0-1.0 range). This ratio
@@ -347,7 +347,7 @@ export type Arrowhead =
 
 export type AnyArrowhead = Arrowhead | ArrowheadLegacy;
 
-export type ExcalidrawLinearElement = _ExcalidrawElementBase &
+export type SveltedrawLinearElement = _ExcalidrawElementBase &
   Readonly<{
     type: "line" | "arrow";
     points: readonly LocalPoint[];
@@ -357,7 +357,7 @@ export type ExcalidrawLinearElement = _ExcalidrawElementBase &
     endArrowhead: Arrowhead | null;
   }>;
 
-export type ExcalidrawLineElement = ExcalidrawLinearElement &
+export type SveltedrawLineElement = SveltedrawLinearElement &
   Readonly<{
     type: "line";
     polygon: boolean;
@@ -369,14 +369,14 @@ export type FixedSegment = {
   index: Index;
 };
 
-export type ExcalidrawArrowElement = ExcalidrawLinearElement &
+export type SveltedrawArrowElement = SveltedrawLinearElement &
   Readonly<{
     type: "arrow";
     elbowed: boolean;
   }>;
 
-export type ExcalidrawElbowArrowElement = Merge<
-  ExcalidrawArrowElement,
+export type SveltedrawElbowArrowElement = Merge<
+  SveltedrawArrowElement,
   {
     elbowed: true;
     fixedSegments: readonly FixedSegment[] | null;
@@ -401,7 +401,7 @@ export type ExcalidrawElbowArrowElement = Merge<
   }
 >;
 
-export type ExcalidrawFreeDrawElement = _ExcalidrawElementBase &
+export type SveltedrawFreeDrawElement = _ExcalidrawElementBase &
   Readonly<{
     type: "freedraw";
     points: readonly LocalPoint[];
@@ -411,21 +411,21 @@ export type ExcalidrawFreeDrawElement = _ExcalidrawElementBase &
 
 export type FileId = string & { _brand: "FileId" };
 
-export type ExcalidrawElementType = ExcalidrawElement["type"];
+export type SveltedrawElementType = SveltedrawElement["type"];
 
 /**
  * Map of excalidraw elements.
  * Unspecified whether deleted or non-deleted.
  * Can be a subset of Scene elements.
  */
-export type ElementsMap = Map<ExcalidrawElement["id"], ExcalidrawElement>;
+export type ElementsMap = Map<SveltedrawElement["id"], SveltedrawElement>;
 
 /**
  * Map of non-deleted elements.
  * Can be a subset of Scene elements.
  */
 export type NonDeletedElementsMap = Map<
-  ExcalidrawElement["id"],
+  SveltedrawElement["id"],
   NonDeletedExcalidrawElement
 > &
   MakeBrand<"NonDeletedElementsMap">;
@@ -435,8 +435,8 @@ export type NonDeletedElementsMap = Map<
  * Not a subset. Use this type when you need access to current Scene elements.
  */
 export type SceneElementsMap = Map<
-  ExcalidrawElement["id"],
-  Ordered<ExcalidrawElement>
+  SveltedrawElement["id"],
+  Ordered<SveltedrawElement>
 > &
   MakeBrand<"SceneElementsMap">;
 
@@ -445,21 +445,21 @@ export type SceneElementsMap = Map<
  * Not a subset. Use this type when you need access to current Scene elements.
  */
 export type NonDeletedSceneElementsMap = Map<
-  ExcalidrawElement["id"],
+  SveltedrawElement["id"],
   Ordered<NonDeletedExcalidrawElement>
 > &
   MakeBrand<"NonDeletedSceneElementsMap">;
 
 export type ElementsMapOrArray =
-  | readonly ExcalidrawElement[]
+  | readonly SveltedrawElement[]
   | Readonly<ElementsMap>;
 
-export type ExcalidrawLinearElementSubType =
+export type SveltedrawLinearElementSubType =
   | "line"
   | "sharpArrow"
   | "curvedArrow"
   | "elbowArrow";
 
 export type ConvertibleGenericTypes = "rectangle" | "diamond" | "ellipse";
-export type ConvertibleLinearTypes = ExcalidrawLinearElementSubType;
+export type ConvertibleLinearTypes = SveltedrawLinearElementSubType;
 export type ConvertibleTypes = ConvertibleGenericTypes | ConvertibleLinearTypes;

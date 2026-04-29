@@ -5,7 +5,7 @@ import {
   getFontString,
 } from "@sveltedraw/common";
 
-import type { ExcalidrawProps } from "@sveltedraw/engine/types";
+import type { SveltedrawProps } from "@sveltedraw/engine/types";
 import type { MarkRequired } from "@sveltedraw/common/utility-types";
 
 import { newTextElement } from "./newElement";
@@ -13,8 +13,8 @@ import { wrapText } from "./textWrapping";
 import { isIframeElement } from "./typeChecks";
 
 import type {
-  ExcalidrawElement,
-  ExcalidrawIframeLikeElement,
+  SveltedrawElement,
+  SveltedrawIframeLikeElement,
   IframeData,
 } from "./types";
 
@@ -400,8 +400,8 @@ export const getEmbedLink = (
 };
 
 export const createPlaceholderEmbeddableLabel = (
-  element: ExcalidrawIframeLikeElement,
-): ExcalidrawElement => {
+  element: SveltedrawIframeLikeElement,
+): SveltedrawElement => {
   let text: string;
   if (isIframeElement(element)) {
     text = "IFrame element";
@@ -502,7 +502,7 @@ export const maybeParseEmbedSrc = (str: string): string => {
 
 export const embeddableURLValidator = (
   url: string | null | undefined,
-  validateEmbeddable: ExcalidrawProps["validateEmbeddable"],
+  validateEmbeddable: SveltedrawProps["validateEmbeddable"],
 ): boolean => {
   if (!url) {
     return false;

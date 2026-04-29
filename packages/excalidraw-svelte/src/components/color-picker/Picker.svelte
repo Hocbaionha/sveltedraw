@@ -17,7 +17,7 @@
     KEYS,
   } from "@sveltedraw/common";
   import type { ColorPaletteCustom } from "@sveltedraw/common";
-  import type { ExcalidrawElement } from "@sveltedraw/element/types";
+  import type { SveltedrawElement } from "@sveltedraw/element/types";
   import {
     colorPickerSectionStore,
     type ActiveColorPickerSection,
@@ -57,7 +57,7 @@
     color: string | null;
     onChange: (color: string) => void;
     type: ColorPickerType;
-    elements: readonly ExcalidrawElement[];
+    elements: readonly SveltedrawElement[];
     palette: ColorPaletteCustom;
     children?: Snippet;
     showTitle?: boolean;

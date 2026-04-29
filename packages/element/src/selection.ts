@@ -44,8 +44,8 @@ import { getBoundTextElement } from "./textElement";
 import type {
   ElementsMap,
   ElementsMapOrArray,
-  ExcalidrawElement,
-  ExcalidrawFrameLikeElement,
+  SveltedrawElement,
+  SveltedrawFrameLikeElement,
   NonDeleted,
   NonDeletedExcalidrawElement,
 } from "./types";
@@ -54,9 +54,9 @@ const shouldIgnoreElementFromSelection = (
   element: NonDeletedExcalidrawElement,
 ) => element.locked || isBoundToContainer(element);
 
-const excludeElementsFromFrames = <T extends ExcalidrawElement>(
+const excludeElementsFromFrames = <T extends SveltedrawElement>(
   selectedElements: readonly T[],
-  framesInSelection: Set<ExcalidrawFrameLikeElement["id"]>,
+  framesInSelection: Set<SveltedrawFrameLikeElement["id"]>,
 ) => {
   return selectedElements.filter((element) => {
     if (element.frameId && framesInSelection.has(element.frameId)) {
@@ -73,7 +73,7 @@ const excludeElementsFromFrames = <T extends ExcalidrawElement>(
  * @param selectedElements
  */
 export const excludeElementsInFramesFromSelection = <
-  T extends ExcalidrawElement,
+  T extends SveltedrawElement,
 >(
   selectedElements: readonly T[],
 ) => {
@@ -403,8 +403,8 @@ export const getSelectedElements = (
     includeElementsInFrames?: boolean;
   },
 ) => {
-  const addedElements = new Set<ExcalidrawElement["id"]>();
-  const selectedElements: ExcalidrawElement[] = [];
+  const addedElements = new Set<SveltedrawElement["id"]>();
+  const selectedElements: SveltedrawElement[] = [];
   for (const element of elements.values()) {
     if (appState.selectedElementIds[element.id]) {
       selectedElements.push(element);
@@ -423,7 +423,7 @@ export const getSelectedElements = (
   }
 
   if (opts?.includeElementsInFrames) {
-    const elementsToInclude: ExcalidrawElement[] = [];
+    const elementsToInclude: SveltedrawElement[] = [];
     selectedElements.forEach((element) => {
       if (isFrameLikeElement(element)) {
         getFrameChildren(elements, element.id).forEach(
@@ -470,7 +470,7 @@ export const makeNextSelectedElementIds = (
 };
 
 const _getLinearElementEditor = (
-  targetElements: readonly ExcalidrawElement[],
+  targetElements: readonly SveltedrawElement[],
   allElements: readonly NonDeletedExcalidrawElement[],
 ) => {
   const linears = targetElements.filter(isLinearElement);
@@ -490,7 +490,7 @@ const _getLinearElementEditor = (
 };
 
 export const getSelectionStateForElements = (
-  targetElements: readonly ExcalidrawElement[],
+  targetElements: readonly SveltedrawElement[],
   allElements: readonly NonDeletedExcalidrawElement[],
   appState: AppState,
 ) => {
@@ -501,7 +501,7 @@ export const getSelectionStateForElements = (
         editingGroupId: appState.editingGroupId,
         selectedElementIds: excludeElementsInFramesFromSelection(
           targetElements,
-        ).reduce((acc: Record<ExcalidrawElement["id"], true>, element) => {
+        ).reduce((acc: Record<SveltedrawElement["id"], true>, element) => {
           if (!isBoundToContainer(element)) {
             acc[element.id] = true;
           }
@@ -519,7 +519,7 @@ export const getSelectionStateForElements = (
  * Returns editing or single-selected text element, if any.
  */
 export const getActiveTextElement = (
-  selectedElements: readonly NonDeleted<ExcalidrawElement>[],
+  selectedElements: readonly NonDeleted<SveltedrawElement>[],
   appState: Pick<AppState, "editingTextElement">,
 ) => {
   const activeTextElement =

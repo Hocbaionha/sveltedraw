@@ -3,10 +3,10 @@ import { vi } from "vitest";
 
 import {
   convertToExcalidrawElements,
-  type ExcalidrawElementSkeleton,
+  type SveltedrawElementSkeleton,
 } from "../transform";
 
-import type { ExcalidrawArrowElement } from "../types";
+import type { SveltedrawArrowElement } from "../types";
 
 const opts = { regenerateIds: false };
 
@@ -21,13 +21,13 @@ describe("Test Transform", () => {
       },
     ];
     let data = convertToExcalidrawElements(
-      elements as ExcalidrawElementSkeleton[],
+      elements as SveltedrawElementSkeleton[],
     );
     expect(data.length).toBe(1);
     expect(data[0].id).toBe("id0");
 
     data = convertToExcalidrawElements(
-      elements as ExcalidrawElementSkeleton[],
+      elements as SveltedrawElementSkeleton[],
       opts,
     );
     expect(data[0].id).toBe("rect-1");
@@ -85,7 +85,7 @@ describe("Test Transform", () => {
     ];
 
     convertToExcalidrawElements(
-      elements as ExcalidrawElementSkeleton[],
+      elements as SveltedrawElementSkeleton[],
       opts,
     ).forEach((ele) => {
       expect(ele).toMatchSnapshot({
@@ -114,7 +114,7 @@ describe("Test Transform", () => {
       },
     ];
     convertToExcalidrawElements(
-      elements as ExcalidrawElementSkeleton[],
+      elements as SveltedrawElementSkeleton[],
       opts,
     ).forEach((ele) => {
       expect(ele).toMatchSnapshot({
@@ -156,7 +156,7 @@ describe("Test Transform", () => {
       },
     ];
     const excalidrawElements = convertToExcalidrawElements(
-      elements as ExcalidrawElementSkeleton[],
+      elements as SveltedrawElementSkeleton[],
       opts,
     );
 
@@ -239,7 +239,7 @@ describe("Test Transform", () => {
       },
     ];
     const excalidrawElements = convertToExcalidrawElements(
-      elements as ExcalidrawElementSkeleton[],
+      elements as SveltedrawElementSkeleton[],
       opts,
     );
 
@@ -297,7 +297,7 @@ describe("Test Transform", () => {
       },
     ];
     const excalidrawElements = convertToExcalidrawElements(
-      elements as ExcalidrawElementSkeleton[],
+      elements as SveltedrawElementSkeleton[],
       opts,
     );
 
@@ -313,7 +313,7 @@ describe("Test Transform", () => {
   });
 
   describe("Test Frames", () => {
-    const elements: ExcalidrawElementSkeleton[] = [
+    const elements: SveltedrawElementSkeleton[] = [
       {
         type: "rectangle",
         x: 10,
@@ -337,7 +337,7 @@ describe("Test Transform", () => {
     ];
 
     it("should transform frames and update frame ids when regenerated", () => {
-      const elementsSkeleton: ExcalidrawElementSkeleton[] = [
+      const elementsSkeleton: SveltedrawElementSkeleton[] = [
         ...elements,
         {
           type: "frame",
@@ -361,7 +361,7 @@ describe("Test Transform", () => {
     });
 
     it("should consider user defined frame dimensions over calculated when provided", () => {
-      const elementsSkeleton: ExcalidrawElementSkeleton[] = [
+      const elementsSkeleton: SveltedrawElementSkeleton[] = [
         ...elements,
         {
           type: "frame",
@@ -381,7 +381,7 @@ describe("Test Transform", () => {
     });
 
     it("should consider user defined frame coordinates calculated when provided", () => {
-      const elementsSkeleton: ExcalidrawElementSkeleton[] = [
+      const elementsSkeleton: SveltedrawElementSkeleton[] = [
         ...elements,
         {
           type: "frame",
@@ -420,7 +420,7 @@ describe("Test Transform", () => {
         },
       ];
       const excalidrawElements = convertToExcalidrawElements(
-        elements as ExcalidrawElementSkeleton[],
+        elements as SveltedrawElementSkeleton[],
         opts,
       );
 
@@ -501,7 +501,7 @@ describe("Test Transform", () => {
       ];
 
       const excalidrawElements = convertToExcalidrawElements(
-        elements as ExcalidrawElementSkeleton[],
+        elements as SveltedrawElementSkeleton[],
         opts,
       );
 
@@ -614,7 +614,7 @@ describe("Test Transform", () => {
       ];
 
       const excalidrawElements = convertToExcalidrawElements(
-        elements as ExcalidrawElementSkeleton[],
+        elements as SveltedrawElementSkeleton[],
         opts,
       );
 
@@ -663,7 +663,7 @@ describe("Test Transform", () => {
       ];
 
       const excalidrawElements = convertToExcalidrawElements(
-        elements as ExcalidrawElementSkeleton[],
+        elements as SveltedrawElementSkeleton[],
         opts,
       );
 
@@ -717,7 +717,7 @@ describe("Test Transform", () => {
       ];
 
       const excalidrawElements = convertToExcalidrawElements(
-        elements as ExcalidrawElementSkeleton[],
+        elements as SveltedrawElementSkeleton[],
         opts,
       );
 
@@ -768,12 +768,12 @@ describe("Test Transform", () => {
         },
       ];
       const excalidrawElements = convertToExcalidrawElements(
-        elements as ExcalidrawElementSkeleton[],
+        elements as SveltedrawElementSkeleton[],
         opts,
       );
       expect(excalidrawElements.length).toBe(2);
       const [arrow, rect] = excalidrawElements;
-      expect((arrow as ExcalidrawArrowElement).endBinding).toStrictEqual({
+      expect((arrow as SveltedrawArrowElement).endBinding).toStrictEqual({
         elementId: "rect-1",
         fixedPoint: [-2.05, 0.5001],
         mode: "orbit",
@@ -811,7 +811,7 @@ describe("Test Transform", () => {
       },
     ];
     const excalidrawElements = convertToExcalidrawElements(
-      elements as ExcalidrawElementSkeleton[],
+      elements as SveltedrawElementSkeleton[],
       opts,
     );
 
@@ -835,7 +835,7 @@ describe("Test Transform", () => {
       },
     ];
     const convertedElements = convertToExcalidrawElements(
-      rawData as ExcalidrawElementSkeleton[],
+      rawData as SveltedrawElementSkeleton[],
       opts,
     );
     expect(convertedElements[0].customData).toStrictEqual({
@@ -844,7 +844,7 @@ describe("Test Transform", () => {
   });
 
   it("should transform the elements correctly when linear elements have single point", () => {
-    const elements: ExcalidrawElementSkeleton[] = [
+    const elements: SveltedrawElementSkeleton[] = [
       {
         id: "B",
         type: "rectangle",

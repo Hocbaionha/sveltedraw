@@ -82,8 +82,8 @@ export { default as LockButton } from './LockButton.svelte';
 export { default as HandButton } from './HandButton.svelte';
 export { default as LaserPointerButton } from './LaserPointerButton.svelte';
 export { default as ElementCanvasButton } from './ElementCanvasButton.svelte';
-export { default as ExcalidrawLogo } from './ExcalidrawLogo.svelte';
-export type { LogoSize } from './ExcalidrawLogo.svelte';
+export { default as SveltedrawLogo } from './SveltedrawLogo.svelte';
+export type { LogoSize } from './SveltedrawLogo.svelte';
 export { default as ActiveConfirmDialog } from './ActiveConfirmDialog.svelte';
 export { default as ShareableLinkDialog } from './ShareableLinkDialog.svelte';
 
@@ -136,7 +136,7 @@ export { default as RadioSelection } from './RadioSelection.svelte';
 
 // Phase 4 batch 3 — FooterCenter + WelcomeScreen leaves
 // WelcomeScreen.Center default content (Logo/MenuItemHelp/MenuItemLoadScene)
-// deferred — needs ExcalidrawLogo + ActionManager.
+// deferred — needs SveltedrawLogo + ActionManager.
 export { default as FooterCenter } from './FooterCenter.svelte';
 export * from './welcome-screen/index.js';
 

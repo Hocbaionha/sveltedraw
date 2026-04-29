@@ -15,9 +15,9 @@ import {
 } from "@sveltedraw/math";
 
 import type {
-  ExcalidrawElement,
-  ExcalidrawFreeDrawElement,
-  ExcalidrawLinearElement,
+  SveltedrawElement,
+  SveltedrawFreeDrawElement,
+  SveltedrawLinearElement,
   NonDeletedExcalidrawElement,
 } from "@sveltedraw/element/types";
 import type { LocalPoint } from "@sveltedraw/math";
@@ -31,7 +31,7 @@ type Points = readonly LocalPoint[];
 const getNonLinearElementRelativePoints = (
   element: Exclude<
     Element,
-    ExcalidrawLinearElement | ExcalidrawFreeDrawElement
+    SveltedrawLinearElement | SveltedrawFreeDrawElement
   >,
 ): [
   TopLeft: LocalPoint,
@@ -56,7 +56,7 @@ const getNonLinearElementRelativePoints = (
 };
 
 /** @returns vertices relative to element's top-left [0,0] position  */
-const getElementRelativePoints = (element: ExcalidrawElement): Points => {
+const getElementRelativePoints = (element: SveltedrawElement): Points => {
   if (isLinearElement(element) || isFreeDrawElement(element)) {
     return element.points;
   }
@@ -165,7 +165,7 @@ export const elementsOverlappingBBox = ({
   errorMargin = 0,
 }: {
   elements: Elements;
-  bounds: Bounds | ExcalidrawElement;
+  bounds: Bounds | SveltedrawElement;
   /** safety offset. Defaults to 0. */
   errorMargin?: number;
   /**

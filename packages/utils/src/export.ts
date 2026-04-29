@@ -17,8 +17,8 @@ import {
 } from "@sveltedraw/engine/scene/export";
 
 import type {
-  ExcalidrawElement,
-  ExcalidrawFrameLikeElement,
+  SveltedrawElement,
+  SveltedrawFrameLikeElement,
   NonDeleted,
 } from "@sveltedraw/element/types";
 import type { AppState, BinaryFiles } from "@sveltedraw/engine/types";
@@ -26,11 +26,11 @@ import type { AppState, BinaryFiles } from "@sveltedraw/engine/types";
 export { MIME_TYPES };
 
 type ExportOpts = {
-  elements: readonly NonDeleted<ExcalidrawElement>[];
+  elements: readonly NonDeleted<SveltedrawElement>[];
   appState?: Partial<Omit<AppState, "offsetTop" | "offsetLeft">>;
   files: BinaryFiles | null;
   maxWidthOrHeight?: number;
-  exportingFrame?: ExcalidrawFrameLikeElement | null;
+  exportingFrame?: SveltedrawFrameLikeElement | null;
   getDimensions?: (
     width: number,
     height: number,

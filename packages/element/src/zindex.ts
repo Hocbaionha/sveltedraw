@@ -12,16 +12,16 @@ import { getHoveredElementForBinding } from "./collision";
 
 import type { Scene } from "./Scene";
 import type {
-  ExcalidrawArrowElement,
-  ExcalidrawElement,
-  ExcalidrawFrameLikeElement,
+  SveltedrawArrowElement,
+  SveltedrawElement,
+  SveltedrawFrameLikeElement,
   NonDeletedExcalidrawElement,
   NonDeletedSceneElementsMap,
   Ordered,
   OrderedExcalidrawElement,
 } from "./types";
 
-const isOfTargetFrame = (element: ExcalidrawElement, frameId: string) => {
+const isOfTargetFrame = (element: SveltedrawElement, frameId: string) => {
   return element.frameId === frameId || element.id === frameId;
 };
 
@@ -34,9 +34,9 @@ const isOfTargetFrame = (element: ExcalidrawElement, frameId: string) => {
  * appState.selectedElementsIds
  */
 const getIndicesToMove = (
-  elements: readonly ExcalidrawElement[],
+  elements: readonly SveltedrawElement[],
   appState: AppState,
-  elementsToBeMoved?: readonly ExcalidrawElement[],
+  elementsToBeMoved?: readonly SveltedrawElement[],
 ) => {
   let selectedIndices: number[] = [];
   let deletedIndices: number[] = [];
@@ -86,8 +86,8 @@ const toContiguousGroups = (array: number[]) => {
  * If no binding present, returns `undefined`.
  */
 const getTargetIndexAccountingForBinding = (
-  nextElement: ExcalidrawElement,
-  elements: readonly ExcalidrawElement[],
+  nextElement: SveltedrawElement,
+  elements: readonly SveltedrawElement[],
   direction: "left" | "right",
   scene: Scene,
 ) => {
@@ -127,8 +127,8 @@ const getTargetIndexAccountingForBinding = (
 };
 
 const getContiguousFrameRangeElements = (
-  allElements: readonly ExcalidrawElement[],
-  frameId: ExcalidrawFrameLikeElement["id"],
+  allElements: readonly SveltedrawElement[],
+  frameId: SveltedrawFrameLikeElement["id"],
 ) => {
   let rangeStart = -1;
   let rangeEnd = -1;
@@ -152,7 +152,7 @@ const getContiguousFrameRangeElements = (
  */
 export const moveArrowAboveBindable = (
   point: GlobalPoint,
-  arrow: ExcalidrawArrowElement,
+  arrow: SveltedrawArrowElement,
   elements: readonly Ordered<NonDeletedExcalidrawElement>[],
   elementsMap: NonDeletedSceneElementsMap,
   scene: Scene,
@@ -196,19 +196,19 @@ export const moveArrowAboveBindable = (
  */
 const getTargetIndex = (
   appState: AppState,
-  elements: readonly ExcalidrawElement[],
+  elements: readonly SveltedrawElement[],
   boundaryIndex: number,
   direction: "left" | "right",
   /**
    * Frame id if moving frame children.
    * If whole frame (including all children) is being moved, supply `null`.
    */
-  containingFrame: ExcalidrawFrameLikeElement["id"] | null,
+  containingFrame: SveltedrawFrameLikeElement["id"] | null,
   scene: Scene,
 ) => {
   const sourceElement = elements[boundaryIndex];
 
-  const indexFilter = (element: ExcalidrawElement) => {
+  const indexFilter = (element: SveltedrawElement) => {
     if (element.isDeleted) {
       return false;
     }
@@ -302,7 +302,7 @@ const getTargetIndex = (
   return candidateIndex;
 };
 
-const getTargetElementsMap = <T extends ExcalidrawElement>(
+const getTargetElementsMap = <T extends SveltedrawElement>(
   elements: readonly T[],
   indices: number[],
 ) => {
@@ -310,11 +310,11 @@ const getTargetElementsMap = <T extends ExcalidrawElement>(
     const element = elements[index];
     acc.set(element.id, element);
     return acc;
-  }, new Map<string, ExcalidrawElement>());
+  }, new Map<string, SveltedrawElement>());
 };
 
 const shiftElementsByOne = (
-  elements: readonly ExcalidrawElement[],
+  elements: readonly SveltedrawElement[],
   appState: AppState,
   direction: "left" | "right",
   scene: Scene,
@@ -328,7 +328,7 @@ const shiftElementsByOne = (
     groupedIndices = groupedIndices.reverse();
   }
 
-  const selectedFrames = new Set<ExcalidrawFrameLikeElement["id"]>(
+  const selectedFrames = new Set<SveltedrawFrameLikeElement["id"]>(
     indicesToMove
       .filter((idx) => isFrameLikeElement(elements[idx]))
       .map((idx) => elements[idx].id),
@@ -395,15 +395,15 @@ const shiftElementsByOne = (
 };
 
 const shiftElementsToEnd = (
-  elements: readonly ExcalidrawElement[],
+  elements: readonly SveltedrawElement[],
   appState: AppState,
   direction: "left" | "right",
-  containingFrame: ExcalidrawFrameLikeElement["id"] | null,
-  elementsToBeMoved?: readonly ExcalidrawElement[],
+  containingFrame: SveltedrawFrameLikeElement["id"] | null,
+  elementsToBeMoved?: readonly SveltedrawElement[],
 ) => {
   const indicesToMove = getIndicesToMove(elements, appState, elementsToBeMoved);
   const targetElementsMap = getTargetElementsMap(elements, indicesToMove);
-  const displacedElements: ExcalidrawElement[] = [];
+  const displacedElements: SveltedrawElement[] = [];
 
   let leadingIndex: number;
   let trailingIndex: number;
@@ -481,16 +481,16 @@ const shiftElementsToEnd = (
 };
 
 function shiftElementsAccountingForFrames(
-  allElements: readonly ExcalidrawElement[],
+  allElements: readonly SveltedrawElement[],
   appState: AppState,
   direction: "left" | "right",
   shiftFunction: (
-    elements: readonly ExcalidrawElement[],
+    elements: readonly SveltedrawElement[],
     appState: AppState,
     direction: "left" | "right",
-    containingFrame: ExcalidrawFrameLikeElement["id"] | null,
-    elementsToBeMoved?: readonly ExcalidrawElement[],
-  ) => ExcalidrawElement[] | readonly ExcalidrawElement[],
+    containingFrame: SveltedrawFrameLikeElement["id"] | null,
+    elementsToBeMoved?: readonly SveltedrawElement[],
+  ) => SveltedrawElement[] | readonly SveltedrawElement[],
 ) {
   const elementsToMove = arrayToMap(
     getSelectedElements(allElements, appState, {
@@ -500,11 +500,11 @@ function shiftElementsAccountingForFrames(
   );
 
   const frameAwareContiguousElementsToMove: {
-    regularElements: ExcalidrawElement[];
-    frameChildren: Map<ExcalidrawFrameLikeElement["id"], ExcalidrawElement[]>;
+    regularElements: SveltedrawElement[];
+    frameChildren: Map<SveltedrawFrameLikeElement["id"], SveltedrawElement[]>;
   } = { regularElements: [], frameChildren: new Map() };
 
-  const fullySelectedFrames = new Set<ExcalidrawFrameLikeElement["id"]>();
+  const fullySelectedFrames = new Set<SveltedrawFrameLikeElement["id"]>();
 
   for (const element of allElements) {
     if (elementsToMove.has(element.id) && isFrameLikeElement(element)) {
@@ -564,7 +564,7 @@ function shiftElementsAccountingForFrames(
 // -----------------------------------------------------------------------------
 
 export const moveOneLeft = (
-  allElements: readonly ExcalidrawElement[],
+  allElements: readonly SveltedrawElement[],
   appState: AppState,
   scene: Scene,
 ) => {
@@ -572,7 +572,7 @@ export const moveOneLeft = (
 };
 
 export const moveOneRight = (
-  allElements: readonly ExcalidrawElement[],
+  allElements: readonly SveltedrawElement[],
   appState: AppState,
   scene: Scene,
 ) => {
@@ -580,7 +580,7 @@ export const moveOneRight = (
 };
 
 export const moveAllLeft = (
-  allElements: readonly ExcalidrawElement[],
+  allElements: readonly SveltedrawElement[],
   appState: AppState,
 ) => {
   return shiftElementsAccountingForFrames(
@@ -592,7 +592,7 @@ export const moveAllLeft = (
 };
 
 export const moveAllRight = (
-  allElements: readonly ExcalidrawElement[],
+  allElements: readonly SveltedrawElement[],
   appState: AppState,
 ) => {
   return shiftElementsAccountingForFrames(

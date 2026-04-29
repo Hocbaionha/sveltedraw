@@ -5,7 +5,7 @@
   // Generic over the element type `E` and the property tag `T`, with runtime
   // collaborators accepted as opaque structural props (`scene`, `app`,
   // `appState`, `setAppState`). The caller supplies concrete types from
-  // upstream (ExcalidrawElement / Scene / AppState / AppClassProperties).
+  // upstream (SveltedrawElement / Scene / AppState / AppClassProperties).
 
   export type DragInputCallbackArgs<T, E, App, AppState, Scene> = {
     accumulatedChange: number;
@@ -219,7 +219,7 @@
     let originalElementsMap: Map<string, E> | null = app.scene
       .getNonDeletedElements()
       .reduce((acc: Map<string, E>, element) => {
-        // deepCopyElement is typed for the upstream ExcalidrawElement; we
+        // deepCopyElement is typed for the upstream SveltedrawElement; we
         // cast through unknown because we're generic over a structural E.
         acc.set(
           element.id,

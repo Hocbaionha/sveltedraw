@@ -38,19 +38,19 @@ import { getElementAbsoluteCoords } from "@sveltedraw/element";
 
 import type {
   ElementsMap,
-  ExcalidrawBindableElement,
-  ExcalidrawDiamondElement,
-  ExcalidrawElement,
-  ExcalidrawEllipseElement,
-  ExcalidrawEmbeddableElement,
-  ExcalidrawFrameLikeElement,
-  ExcalidrawFreeDrawElement,
-  ExcalidrawIframeElement,
-  ExcalidrawImageElement,
-  ExcalidrawLinearElement,
-  ExcalidrawRectangleElement,
-  ExcalidrawSelectionElement,
-  ExcalidrawTextElement,
+  SveltedrawBindableElement,
+  SveltedrawDiamondElement,
+  SveltedrawElement,
+  SveltedrawEllipseElement,
+  SveltedrawEmbeddableElement,
+  SveltedrawFrameLikeElement,
+  SveltedrawFreeDrawElement,
+  SveltedrawIframeElement,
+  SveltedrawImageElement,
+  SveltedrawLinearElement,
+  SveltedrawRectangleElement,
+  SveltedrawSelectionElement,
+  SveltedrawTextElement,
 } from "@sveltedraw/element/types";
 import type { Curve, LineSegment, Polygon, Radians } from "@sveltedraw/math";
 
@@ -103,14 +103,14 @@ export type GeometricShape<Point extends GlobalPoint | LocalPoint> =
     };
 
 type RectangularElement =
-  | ExcalidrawRectangleElement
-  | ExcalidrawDiamondElement
-  | ExcalidrawFrameLikeElement
-  | ExcalidrawEmbeddableElement
-  | ExcalidrawImageElement
-  | ExcalidrawIframeElement
-  | ExcalidrawTextElement
-  | ExcalidrawSelectionElement;
+  | SveltedrawRectangleElement
+  | SveltedrawDiamondElement
+  | SveltedrawFrameLikeElement
+  | SveltedrawEmbeddableElement
+  | SveltedrawImageElement
+  | SveltedrawIframeElement
+  | SveltedrawTextElement
+  | SveltedrawSelectionElement;
 
 // polygon
 export const getPolygonShape = <Point extends GlobalPoint | LocalPoint>(
@@ -149,7 +149,7 @@ export const getPolygonShape = <Point extends GlobalPoint | LocalPoint>(
 
 // return the selection box for an element, possibly rotated as well
 export const getSelectionBoxShape = <Point extends GlobalPoint | LocalPoint>(
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   elementsMap: ElementsMap,
   padding = 10,
 ) => {
@@ -179,7 +179,7 @@ export const getSelectionBoxShape = <Point extends GlobalPoint | LocalPoint>(
 
 // ellipse
 export const getEllipseShape = <Point extends GlobalPoint | LocalPoint>(
-  element: ExcalidrawEllipseElement,
+  element: SveltedrawEllipseElement,
 ): GeometricShape<Point> => {
   const { width, height, angle, x, y } = element;
 
@@ -263,7 +263,7 @@ const polylineFromPoints = <Point extends GlobalPoint | LocalPoint>(
 };
 
 export const getFreedrawShape = <Point extends GlobalPoint | LocalPoint>(
-  element: ExcalidrawFreeDrawElement,
+  element: SveltedrawFreeDrawElement,
   center: Point,
   isClosed: boolean = false,
 ): GeometricShape<Point> => {
@@ -294,7 +294,7 @@ export const getFreedrawShape = <Point extends GlobalPoint | LocalPoint>(
 };
 
 export const getClosedCurveShape = <Point extends GlobalPoint | LocalPoint>(
-  element: ExcalidrawLinearElement,
+  element: SveltedrawLinearElement,
   roughShape: Drawable,
   startingPoint: Point = pointFrom<Point>(0, 0),
   angleInRadian: Radians,
@@ -362,7 +362,7 @@ export const getClosedCurveShape = <Point extends GlobalPoint | LocalPoint>(
 export const segmentIntersectRectangleElement = <
   Point extends LocalPoint | GlobalPoint,
 >(
-  element: ExcalidrawBindableElement,
+  element: SveltedrawBindableElement,
   segment: LineSegment<Point>,
   gap: number = 0,
 ): Point[] => {

@@ -9,10 +9,10 @@ import {
 } from "@sveltedraw/common";
 
 import type {
-  ExcalidrawElement,
-  ExcalidrawFreeDrawElement,
-  ExcalidrawLinearElement,
-  ExcalidrawTextElement,
+  SveltedrawElement,
+  SveltedrawFreeDrawElement,
+  SveltedrawLinearElement,
+  SveltedrawTextElement,
   NonDeleted,
   Ordered,
   OrderedExcalidrawElement,
@@ -672,7 +672,7 @@ export class AppStateDelta implements DeltaContainer<AppState> {
           ? new LinearElementEditor(
               nextElements.get(
                 insertedSelectedLinearElement.elementId,
-              ) as NonDeleted<ExcalidrawLinearElement>,
+              ) as NonDeleted<SveltedrawLinearElement>,
               nextElements,
               insertedSelectedLinearElement.isEditing,
             )
@@ -1012,7 +1012,7 @@ export class AppStateDelta implements DeltaContainer<AppState> {
   }
 }
 
-type ElementPartial<TElement extends ExcalidrawElement = ExcalidrawElement> =
+type ElementPartial<TElement extends SveltedrawElement = SveltedrawElement> =
   Omit<Partial<Ordered<TElement>>, "id" | "updated" | "seed">;
 
 export type ApplyToOptions = {
@@ -1746,8 +1746,8 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
   ) {
     const nextAffectedElements = new Map<string, OrderedExcalidrawElement>();
     const updater = (
-      element: ExcalidrawElement,
-      updates: ElementUpdate<ExcalidrawElement>,
+      element: SveltedrawElement,
+      updates: ElementUpdate<SveltedrawElement>,
     ) => {
       const nextElement = nextElements.get(element.id); // only ever modify next element!
       if (!nextElement) {
@@ -1839,8 +1839,8 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
     nextElements: SceneElementsMap,
     id: string,
     updater: (
-      element: ExcalidrawElement,
-      updates: ElementUpdate<ExcalidrawElement>,
+      element: SveltedrawElement,
+      updates: ElementUpdate<SveltedrawElement>,
     ) => void,
   ) {
     // the instance could have been updated, so make sure we are passing the latest element to each function below
@@ -1863,8 +1863,8 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
     nextElements: SceneElementsMap,
     id: string,
     updater: (
-      element: ExcalidrawElement,
-      updates: ElementUpdate<ExcalidrawElement>,
+      element: SveltedrawElement,
+      updates: ElementUpdate<SveltedrawElement>,
     ) => void,
   ) {
     // the instance could have been updated, so make sure we are passing the latest element to each function below
@@ -1920,18 +1920,18 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
     const elements = scene.getNonDeletedElementsMap();
     const boxesToRedraw = new Map<
       string,
-      { container: OrderedExcalidrawElement; boundText: ExcalidrawTextElement }
+      { container: OrderedExcalidrawElement; boundText: SveltedrawTextElement }
     >();
 
     for (const element of changed.values()) {
       if (isBoundToContainer(element)) {
-        const { containerId } = element as ExcalidrawTextElement;
+        const { containerId } = element as SveltedrawTextElement;
         const container = containerId ? elements.get(containerId) : undefined;
 
         if (container) {
           boxesToRedraw.set(container.id, {
             container,
-            boundText: element as ExcalidrawTextElement,
+            boundText: element as SveltedrawTextElement,
           });
         }
       }
@@ -1945,7 +1945,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
         if (boundText) {
           boxesToRedraw.set(element.id, {
             container: element,
-            boundText: boundText as ExcalidrawTextElement,
+            boundText: boundText as SveltedrawTextElement,
           });
         }
       }
@@ -2028,14 +2028,14 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
       const deletedPoints =
         (
           deleted as ElementPartial<
-            ExcalidrawFreeDrawElement | ExcalidrawLinearElement
+            SveltedrawFreeDrawElement | SveltedrawLinearElement
           >
         ).points ?? [];
 
       const insertedPoints =
         (
           inserted as ElementPartial<
-            ExcalidrawFreeDrawElement | ExcalidrawLinearElement
+            SveltedrawFreeDrawElement | SveltedrawLinearElement
           >
         ).points ?? [];
 

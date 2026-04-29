@@ -1,5 +1,5 @@
 // -----------------------------------------------------------------------------
-// ExcalidrawImageElement & related helpers
+// SveltedrawImageElement & related helpers
 // -----------------------------------------------------------------------------
 
 import { MIME_TYPES, SVG_NS } from "@sveltedraw/common";
@@ -13,7 +13,7 @@ import type {
 import { isInitializedImageElement } from "./typeChecks";
 
 import type {
-  ExcalidrawElement,
+  SveltedrawElement,
   FileId,
   InitializedExcalidrawImageElement,
 } from "./types";
@@ -89,7 +89,7 @@ export const updateImageCache = async ({
 };
 
 export const getInitializedImageElements = (
-  elements: readonly ExcalidrawElement[],
+  elements: readonly SveltedrawElement[],
 ) =>
   elements.filter((element) =>
     isInitializedImageElement(element),

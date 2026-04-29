@@ -8,7 +8,7 @@ import { getClosestElementBounds } from "@sveltedraw/element";
 
 import { getCommonBounds } from "@sveltedraw/element";
 
-import type { ExcalidrawElement } from "@sveltedraw/element/types";
+import type { SveltedrawElement } from "@sveltedraw/element/types";
 
 import type { AppState, Offsets, PointerCoords, Zoom } from "../types";
 
@@ -58,7 +58,7 @@ export const centerScrollOn = ({
 };
 
 export const calculateScrollCenter = (
-  elements: readonly ExcalidrawElement[],
+  elements: readonly SveltedrawElement[],
   appState: AppState,
 ): { scrollX: number; scrollY: number } => {
   elements = getVisibleElements(elements);

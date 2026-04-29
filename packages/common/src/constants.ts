@@ -1,5 +1,5 @@
 import type {
-  ExcalidrawElement,
+  SveltedrawElement,
   FontFamilyValues,
 } from "@sveltedraw/element/types";
 import type { AppProps, AppState } from "@sveltedraw/engine/types";
@@ -194,13 +194,13 @@ export const THEME = {
 export const DARK_THEME_FILTER = "invert(93%) hue-rotate(180deg)";
 
 export const FRAME_STYLE = {
-  strokeColor: "#bbb" as ExcalidrawElement["strokeColor"],
-  strokeWidth: 2 as ExcalidrawElement["strokeWidth"],
-  strokeStyle: "solid" as ExcalidrawElement["strokeStyle"],
-  fillStyle: "solid" as ExcalidrawElement["fillStyle"],
-  roughness: 0 as ExcalidrawElement["roughness"],
-  roundness: null as ExcalidrawElement["roundness"],
-  backgroundColor: "transparent" as ExcalidrawElement["backgroundColor"],
+  strokeColor: "#bbb" as SveltedrawElement["strokeColor"],
+  strokeWidth: 2 as SveltedrawElement["strokeWidth"],
+  strokeStyle: "solid" as SveltedrawElement["strokeStyle"],
+  fillStyle: "solid" as SveltedrawElement["fillStyle"],
+  roughness: 0 as SveltedrawElement["roughness"],
+  roundness: null as SveltedrawElement["roundness"],
+  backgroundColor: "transparent" as SveltedrawElement["backgroundColor"],
   radius: 8,
   nameOffsetY: 3,
   nameColorLightTheme: "#999999",
@@ -410,14 +410,14 @@ export const STROKE_WIDTH = {
 } as const;
 
 export const DEFAULT_ELEMENT_PROPS: {
-  strokeColor: ExcalidrawElement["strokeColor"];
-  backgroundColor: ExcalidrawElement["backgroundColor"];
-  fillStyle: ExcalidrawElement["fillStyle"];
-  strokeWidth: ExcalidrawElement["strokeWidth"];
-  strokeStyle: ExcalidrawElement["strokeStyle"];
-  roughness: ExcalidrawElement["roughness"];
-  opacity: ExcalidrawElement["opacity"];
-  locked: ExcalidrawElement["locked"];
+  strokeColor: SveltedrawElement["strokeColor"];
+  backgroundColor: SveltedrawElement["backgroundColor"];
+  fillStyle: SveltedrawElement["fillStyle"];
+  strokeWidth: SveltedrawElement["strokeWidth"];
+  strokeStyle: SveltedrawElement["strokeStyle"];
+  roughness: SveltedrawElement["roughness"];
+  opacity: SveltedrawElement["opacity"];
+  locked: SveltedrawElement["locked"];
 } = {
   strokeColor: COLOR_PALETTE.black,
   backgroundColor: COLOR_PALETTE.transparent,

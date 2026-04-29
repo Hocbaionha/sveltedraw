@@ -3,7 +3,7 @@ import { isElementInViewport } from "@sveltedraw/element";
 import { memoize, toBrandedType } from "@sveltedraw/common";
 
 import type {
-  ExcalidrawElement,
+  SveltedrawElement,
   NonDeletedElementsMap,
   NonDeletedExcalidrawElement,
 } from "@sveltedraw/element/types";
@@ -73,7 +73,7 @@ export class Renderer {
     }: {
       elements: readonly NonDeletedExcalidrawElement[];
       editingTextElement: AppState["editingTextElement"];
-      newElementId: ExcalidrawElement["id"] | undefined;
+      newElementId: SveltedrawElement["id"] | undefined;
     }) => {
       const elementsMap = toBrandedType<RenderableElementsMap>(new Map());
 
@@ -119,7 +119,7 @@ export class Renderer {
         editingTextElement: AppState["editingTextElement"];
         /** note: first render of newElement will always bust the cache
          * (we'd have to prefilter elements outside of this function) */
-        newElementId: ExcalidrawElement["id"] | undefined;
+        newElementId: SveltedrawElement["id"] | undefined;
         sceneNonce: ReturnType<InstanceType<typeof Scene>["getSceneNonce"]>;
       }) => {
         const elements = this.scene.getNonDeletedElements();

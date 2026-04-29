@@ -7,83 +7,83 @@ import type { ElementOrToolType } from "@sveltedraw/engine/types";
 import type { MarkNonNullable } from "@sveltedraw/common/utility-types";
 
 import type {
-  ExcalidrawElement,
-  ExcalidrawTextElement,
-  ExcalidrawEmbeddableElement,
-  ExcalidrawLinearElement,
-  ExcalidrawBindableElement,
-  ExcalidrawFreeDrawElement,
+  SveltedrawElement,
+  SveltedrawTextElement,
+  SveltedrawEmbeddableElement,
+  SveltedrawLinearElement,
+  SveltedrawBindableElement,
+  SveltedrawFreeDrawElement,
   InitializedExcalidrawImageElement,
-  ExcalidrawImageElement,
-  ExcalidrawTextElementWithContainer,
-  ExcalidrawTextContainer,
-  ExcalidrawFrameElement,
+  SveltedrawImageElement,
+  SveltedrawTextElementWithContainer,
+  SveltedrawTextContainer,
+  SveltedrawFrameElement,
   RoundnessType,
-  ExcalidrawFrameLikeElement,
-  ExcalidrawElementType,
-  ExcalidrawIframeElement,
-  ExcalidrawIframeLikeElement,
-  ExcalidrawMagicFrameElement,
-  ExcalidrawArrowElement,
-  ExcalidrawElbowArrowElement,
-  ExcalidrawLineElement,
-  ExcalidrawFlowchartNodeElement,
-  ExcalidrawLinearElementSubType,
+  SveltedrawFrameLikeElement,
+  SveltedrawElementType,
+  SveltedrawIframeElement,
+  SveltedrawIframeLikeElement,
+  SveltedrawMagicFrameElement,
+  SveltedrawArrowElement,
+  SveltedrawElbowArrowElement,
+  SveltedrawLineElement,
+  SveltedrawFlowchartNodeElement,
+  SveltedrawLinearElementSubType,
 } from "./types";
 
 export const isInitializedImageElement = (
-  element: ExcalidrawElement | null,
+  element: SveltedrawElement | null,
 ): element is InitializedExcalidrawImageElement => {
   return !!element && element.type === "image" && !!element.fileId;
 };
 
 export const isImageElement = (
-  element: ExcalidrawElement | null,
-): element is ExcalidrawImageElement => {
+  element: SveltedrawElement | null,
+): element is SveltedrawImageElement => {
   return !!element && element.type === "image";
 };
 
 export const isEmbeddableElement = (
-  element: ExcalidrawElement | null | undefined,
-): element is ExcalidrawEmbeddableElement => {
+  element: SveltedrawElement | null | undefined,
+): element is SveltedrawEmbeddableElement => {
   return !!element && element.type === "embeddable";
 };
 
 export const isIframeElement = (
-  element: ExcalidrawElement | null,
-): element is ExcalidrawIframeElement => {
+  element: SveltedrawElement | null,
+): element is SveltedrawIframeElement => {
   return !!element && element.type === "iframe";
 };
 
 export const isIframeLikeElement = (
-  element: ExcalidrawElement | null,
-): element is ExcalidrawIframeLikeElement => {
+  element: SveltedrawElement | null,
+): element is SveltedrawIframeLikeElement => {
   return (
     !!element && (element.type === "iframe" || element.type === "embeddable")
   );
 };
 
 export const isTextElement = (
-  element: ExcalidrawElement | null,
-): element is ExcalidrawTextElement => {
+  element: SveltedrawElement | null,
+): element is SveltedrawTextElement => {
   return element != null && element.type === "text";
 };
 
 export const isFrameElement = (
-  element: ExcalidrawElement | null,
-): element is ExcalidrawFrameElement => {
+  element: SveltedrawElement | null,
+): element is SveltedrawFrameElement => {
   return element != null && element.type === "frame";
 };
 
 export const isMagicFrameElement = (
-  element: ExcalidrawElement | null,
-): element is ExcalidrawMagicFrameElement => {
+  element: SveltedrawElement | null,
+): element is SveltedrawMagicFrameElement => {
   return element != null && element.type === "magicframe";
 };
 
 export const isFrameLikeElement = (
-  element: ExcalidrawElement | null,
-): element is ExcalidrawFrameLikeElement => {
+  element: SveltedrawElement | null,
+): element is SveltedrawFrameLikeElement => {
   return (
     element != null &&
     (element.type === "frame" || element.type === "magicframe")
@@ -91,38 +91,38 @@ export const isFrameLikeElement = (
 };
 
 export const isFreeDrawElement = (
-  element?: ExcalidrawElement | null,
-): element is ExcalidrawFreeDrawElement => {
+  element?: SveltedrawElement | null,
+): element is SveltedrawFreeDrawElement => {
   return element != null && isFreeDrawElementType(element.type);
 };
 
 export const isFreeDrawElementType = (
-  elementType: ExcalidrawElementType,
+  elementType: SveltedrawElementType,
 ): boolean => {
   return elementType === "freedraw";
 };
 
 export const isLinearElement = (
-  element?: ExcalidrawElement | null,
-): element is ExcalidrawLinearElement => {
+  element?: SveltedrawElement | null,
+): element is SveltedrawLinearElement => {
   return element != null && isLinearElementType(element.type);
 };
 
 export const isLineElement = (
-  element?: ExcalidrawElement | null,
-): element is ExcalidrawLineElement => {
+  element?: SveltedrawElement | null,
+): element is SveltedrawLineElement => {
   return element != null && element.type === "line";
 };
 
 export const isArrowElement = (
-  element?: ExcalidrawElement | null,
-): element is ExcalidrawArrowElement => {
+  element?: SveltedrawElement | null,
+): element is SveltedrawArrowElement => {
   return element != null && element.type === "arrow";
 };
 
 export const isElbowArrow = (
-  element?: ExcalidrawElement,
-): element is ExcalidrawElbowArrowElement => {
+  element?: SveltedrawElement,
+): element is SveltedrawElbowArrowElement => {
   return isArrowElement(element) && element.elbowed;
 };
 
@@ -130,20 +130,20 @@ export const isElbowArrow = (
  * sharp or curved arrow, but not elbow
  */
 export const isSimpleArrow = (
-  element?: ExcalidrawElement,
-): element is ExcalidrawArrowElement => {
+  element?: SveltedrawElement,
+): element is SveltedrawArrowElement => {
   return isArrowElement(element) && !element.elbowed;
 };
 
 export const isSharpArrow = (
-  element?: ExcalidrawElement,
-): element is ExcalidrawArrowElement => {
+  element?: SveltedrawElement,
+): element is SveltedrawArrowElement => {
   return isArrowElement(element) && !element.elbowed && !element.roundness;
 };
 
 export const isCurvedArrow = (
-  element?: ExcalidrawElement,
-): element is ExcalidrawArrowElement => {
+  element?: SveltedrawElement,
+): element is SveltedrawArrowElement => {
   return (
     isArrowElement(element) && !element.elbowed && element.roundness !== null
   );
@@ -158,9 +158,9 @@ export const isLinearElementType = (
 };
 
 export const isBindingElement = (
-  element?: ExcalidrawElement | null,
+  element?: SveltedrawElement | null,
   includeLocked = true,
-): element is ExcalidrawArrowElement => {
+): element is SveltedrawArrowElement => {
   return (
     element != null &&
     (!element.locked || includeLocked === true) &&
@@ -175,9 +175,9 @@ export const isBindingElementType = (
 };
 
 export const isBindableElement = (
-  element: ExcalidrawElement | null | undefined,
+  element: SveltedrawElement | null | undefined,
   includeLocked = true,
-): element is ExcalidrawBindableElement => {
+): element is SveltedrawBindableElement => {
   return (
     element != null &&
     (!element.locked || includeLocked === true) &&
@@ -194,8 +194,8 @@ export const isBindableElement = (
 };
 
 export const isRectanguloidElement = (
-  element?: ExcalidrawElement | null,
-): element is ExcalidrawBindableElement => {
+  element?: SveltedrawElement | null,
+): element is SveltedrawBindableElement => {
   return (
     element != null &&
     (element.type === "rectangle" ||
@@ -212,8 +212,8 @@ export const isRectanguloidElement = (
 // TODO: Remove this when proper distance calculation is introduced
 // @see binding.ts:distanceToBindableElement()
 export const isRectangularElement = (
-  element?: ExcalidrawElement | null,
-): element is ExcalidrawBindableElement => {
+  element?: SveltedrawElement | null,
+): element is SveltedrawBindableElement => {
   return (
     element != null &&
     (element.type === "rectangle" ||
@@ -228,9 +228,9 @@ export const isRectangularElement = (
 };
 
 export const isTextBindableContainer = (
-  element: ExcalidrawElement | null,
+  element: SveltedrawElement | null,
   includeLocked = true,
-): element is ExcalidrawTextContainer => {
+): element is SveltedrawTextContainer => {
   return (
     element != null &&
     (!element.locked || includeLocked === true) &&
@@ -243,8 +243,8 @@ export const isTextBindableContainer = (
 
 export const isExcalidrawElement = (
   element: any,
-): element is ExcalidrawElement => {
-  const type: ExcalidrawElementType | undefined = element?.type;
+): element is SveltedrawElement => {
+  const type: SveltedrawElementType | undefined = element?.type;
   if (!type) {
     return false;
   }
@@ -272,8 +272,8 @@ export const isExcalidrawElement = (
 };
 
 export const isFlowchartNodeElement = (
-  element: ExcalidrawElement,
-): element is ExcalidrawFlowchartNodeElement => {
+  element: SveltedrawElement,
+): element is SveltedrawFlowchartNodeElement => {
   return (
     element.type === "rectangle" ||
     element.type === "ellipse" ||
@@ -282,8 +282,8 @@ export const isFlowchartNodeElement = (
 };
 
 export const hasBoundTextElement = (
-  element: ExcalidrawElement | null,
-): element is MarkNonNullable<ExcalidrawBindableElement, "boundElements"> => {
+  element: SveltedrawElement | null,
+): element is MarkNonNullable<SveltedrawBindableElement, "boundElements"> => {
   return (
     isTextBindableContainer(element) &&
     !!element.boundElements?.some(({ type }) => type === "text")
@@ -291,8 +291,8 @@ export const hasBoundTextElement = (
 };
 
 export const isBoundToContainer = (
-  element: ExcalidrawElement | null,
-): element is ExcalidrawTextElementWithContainer => {
+  element: SveltedrawElement | null,
+): element is SveltedrawTextElementWithContainer => {
   return (
     element !== null &&
     "containerId" in element &&
@@ -301,7 +301,7 @@ export const isBoundToContainer = (
   );
 };
 
-export const isArrowBoundToElement = (element: ExcalidrawArrowElement) => {
+export const isArrowBoundToElement = (element: SveltedrawArrowElement) => {
   return !!element.startBinding || !!element.endBinding;
 };
 
@@ -316,7 +316,7 @@ export const isUsingProportionalRadius = (type: string) =>
 
 export const canApplyRoundnessTypeToElement = (
   roundnessType: RoundnessType,
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
 ) => {
   if (
     (roundnessType === ROUNDNESS.ADAPTIVE_RADIUS ||
@@ -338,7 +338,7 @@ export const canApplyRoundnessTypeToElement = (
 };
 
 export const getDefaultRoundnessTypeForElement = (
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
 ) => {
   if (isUsingProportionalRadius(element.type)) {
     return {
@@ -356,8 +356,8 @@ export const getDefaultRoundnessTypeForElement = (
 };
 
 export const getLinearElementSubType = (
-  element: ExcalidrawLinearElement,
-): ExcalidrawLinearElementSubType => {
+  element: SveltedrawLinearElement,
+): SveltedrawLinearElementSubType => {
   if (isSharpArrow(element)) {
     return "sharpArrow";
   }
@@ -378,13 +378,13 @@ export const getLinearElementSubType = (
  *  canBecomePolygon(points).
  */
 export const isValidPolygon = (
-  points: ExcalidrawLineElement["points"],
+  points: SveltedrawLineElement["points"],
 ): boolean => {
   return points.length > 3 && pointsEqual(points[0], points[points.length - 1]);
 };
 
 export const canBecomePolygon = (
-  points: ExcalidrawLineElement["points"],
+  points: SveltedrawLineElement["points"],
 ): boolean => {
   return (
     points.length > 3 ||

@@ -21,11 +21,11 @@ import type { ValueOf } from "@sveltedraw/common/utility-types";
 
 import type { IMAGE_MIME_TYPES, STRING_MIME_TYPES } from "@sveltedraw/common";
 import type {
-  ExcalidrawElement,
+  SveltedrawElement,
   NonDeletedExcalidrawElement,
 } from "@sveltedraw/element/types";
 
-import { ExcalidrawError } from "./errors";
+import { SveltedrawError } from "./errors";
 import {
   createFile,
   getFileHandle,
@@ -44,7 +44,7 @@ type ElementsClipboard = {
 export type PastedMixedContent = { type: "text" | "imageUrl"; value: string }[];
 
 export interface ClipboardData {
-  elements?: readonly ExcalidrawElement[];
+  elements?: readonly SveltedrawElement[];
   files?: BinaryFiles;
   text?: string;
   mixedContent?: PastedMixedContent;
@@ -72,7 +72,7 @@ export const probablySupportsClipboardBlob =
 
 const clipboardContainsElements = (
   contents: any,
-): contents is { elements: ExcalidrawElement[]; files?: BinaryFiles } => {
+): contents is { elements: SveltedrawElement[]; files?: BinaryFiles } => {
   if (
     [
       EXPORT_DATA_TYPES.excalidraw,
@@ -304,11 +304,11 @@ export const readSystemClipboard = async () => {
           const file = createFile(imageBlob, type, undefined);
           types[type] = file;
         } else {
-          throw new ExcalidrawError(`Unsupported clipboard type: ${type}`);
+          throw new SveltedrawError(`Unsupported clipboard type: ${type}`);
         }
       } catch (error: any) {
         console.warn(
-          error instanceof ExcalidrawError
+          error instanceof SveltedrawError
             ? error.message
             : `Cannot retrieve ${type} from clipboardItem: ${error.message}`,
         );

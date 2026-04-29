@@ -1,6 +1,6 @@
 import type { UserIdleState, EditorInterface } from "@sveltedraw/common";
 import type {
-  ExcalidrawElement,
+  SveltedrawElement,
   NonDeletedElementsMap,
   NonDeletedExcalidrawElement,
   NonDeletedSceneElementsMap,
@@ -61,7 +61,7 @@ export type SVGRenderConfig = {
 export type InteractiveCanvasRenderConfig = {
   // collab-related state
   // ---------------------------------------------------------------------------
-  remoteSelectedElementIds: Map<ExcalidrawElement["id"], SocketId[]>;
+  remoteSelectedElementIds: Map<SveltedrawElement["id"], SocketId[]>;
   remotePointerViewportCoords: Map<SocketId, { x: number; y: number }>;
   remotePointerUserStates: Map<SocketId, UserIdleState>;
   remotePointerUsernames: Map<SocketId, string>;
@@ -113,7 +113,7 @@ export type InteractiveSceneRenderConfig = {
 export type NewElementSceneRenderConfig = {
   canvas: HTMLCanvasElement | null;
   rc: RoughCanvas;
-  newElement: ExcalidrawElement | null;
+  newElement: SveltedrawElement | null;
   elementsMap: RenderableElementsMap;
   allElementsMap: NonDeletedSceneElementsMap;
   scale: number;

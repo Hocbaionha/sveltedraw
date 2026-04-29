@@ -59,13 +59,13 @@ import type { LocalPoint, Radians } from "@sveltedraw/math";
 import type {
   ElementsMap,
   ElementsMapOrArray,
-  ExcalidrawArrowElement,
-  ExcalidrawBindableElement,
-  ExcalidrawElbowArrowElement,
-  ExcalidrawElement,
-  ExcalidrawLinearElement,
-  ExcalidrawSelectionElement,
-  ExcalidrawTextElement,
+  SveltedrawArrowElement,
+  SveltedrawBindableElement,
+  SveltedrawElbowArrowElement,
+  SveltedrawElement,
+  SveltedrawLinearElement,
+  SveltedrawSelectionElement,
+  SveltedrawTextElement,
   FixedPointBinding,
   FontFamilyValues,
   NonDeletedSceneElementsMap,
@@ -134,7 +134,7 @@ const getFontFamilyByName = (fontFamilyName: string): FontFamilyValues => {
   return DEFAULT_FONT_FAMILY;
 };
 
-const repairBinding = <T extends ExcalidrawArrowElement>(
+const repairBinding = <T extends SveltedrawArrowElement>(
   element: T,
   binding: FixedPointBinding | null,
   targetElementsMap: Readonly<ElementsMap>,
@@ -153,8 +153,8 @@ const repairBinding = <T extends ExcalidrawArrowElement>(
 
     if (isElbowArrow(element)) {
       const fixedPointBinding:
-        | ExcalidrawElbowArrowElement["startBinding"]
-        | ExcalidrawElbowArrowElement["endBinding"] = {
+        | SveltedrawElbowArrowElement["startBinding"]
+        | SveltedrawElbowArrowElement["endBinding"] = {
         ...binding,
         fixedPoint: normalizeFixedPoint(binding.fixedPoint),
         mode: binding.mode || "orbit",
@@ -187,12 +187,12 @@ const repairBinding = <T extends ExcalidrawArrowElement>(
     // ---------------------------------------------------------------------------
 
     const targetBoundElement = targetElementsMap.get(binding.elementId) as
-      | ExcalidrawBindableElement
+      | SveltedrawBindableElement
       | undefined;
     const boundElement =
       targetBoundElement ||
       (existingElementsMap?.get(binding.elementId) as
-        | ExcalidrawBindableElement
+        | SveltedrawBindableElement
         | undefined);
     const elementsMap = targetBoundElement
       ? targetElementsMap
@@ -262,14 +262,14 @@ const repairBinding = <T extends ExcalidrawArrowElement>(
 };
 
 const restoreElementWithProperties = <
-  T extends Required<Omit<ExcalidrawElement, "customData">> & {
-    customData?: ExcalidrawElement["customData"];
+  T extends Required<Omit<SveltedrawElement, "customData">> & {
+    customData?: SveltedrawElement["customData"];
     /** @deprecated */
-    boundElementIds?: readonly ExcalidrawElement["id"][];
+    boundElementIds?: readonly SveltedrawElement["id"][];
     /** @deprecated */
     strokeSharpness?: StrokeRoundness;
   },
-  K extends Pick<T, keyof Omit<Required<T>, keyof ExcalidrawElement>>,
+  K extends Pick<T, keyof Omit<Required<T>, keyof SveltedrawElement>>,
 >(
   element: T,
   extra: Pick<
@@ -278,9 +278,9 @@ const restoreElementWithProperties = <
     // @ts-ignore TS complains here but type checks the call sites fine.
     keyof K
   > &
-    Partial<Pick<ExcalidrawElement, "type" | "x" | "y" | "customData">>,
+    Partial<Pick<SveltedrawElement, "type" | "x" | "y" | "customData">>,
 ): T => {
-  const base: Pick<T, keyof ExcalidrawElement> = {
+  const base: Pick<T, keyof SveltedrawElement> = {
     type: extra.type || element.type,
     // all elements must have version > 0 so getSceneVersion() will pick up
     // newly added elements
@@ -349,7 +349,7 @@ const restoreElementWithProperties = <
 
 export const restoreElement = (
   /** element to be restored */
-  element: Exclude<ExcalidrawElement, ExcalidrawSelectionElement>,
+  element: Exclude<SveltedrawElement, SveltedrawSelectionElement>,
   /** all elements to be restored */
   targetElementsMap: Readonly<ElementsMap>,
   /** used for additional context */
@@ -477,14 +477,14 @@ export const restoreElement = (
       const base = {
         type: element.type,
         startBinding: repairBinding(
-          element as ExcalidrawArrowElement,
+          element as SveltedrawArrowElement,
           element.startBinding,
           targetElementsMap,
           existingElementsMap,
           "start",
         ),
         endBinding: repairBinding(
-          element as ExcalidrawArrowElement,
+          element as SveltedrawArrowElement,
           element.endBinding,
           targetElementsMap,
           existingElementsMap,
@@ -495,13 +495,13 @@ export const restoreElement = (
         points,
         x,
         y,
-        elbowed: (element as ExcalidrawArrowElement).elbowed,
+        elbowed: (element as SveltedrawArrowElement).elbowed,
         ...getSizeFromPoints(points),
       };
 
       // TODO: Separate arrow from linear element
       const restoredElement = isElbowArrow(element)
-        ? restoreElementWithProperties(element as ExcalidrawElbowArrowElement, {
+        ? restoreElementWithProperties(element as SveltedrawElbowArrowElement, {
             ...base,
             elbowed: true,
             fixedSegments:
@@ -511,7 +511,7 @@ export const restoreElement = (
             startIsSpecial: element.startIsSpecial,
             endIsSpecial: element.endIsSpecial,
           })
-        : restoreElementWithProperties(element as ExcalidrawArrowElement, base);
+        : restoreElementWithProperties(element as SveltedrawArrowElement, base);
 
       return {
         ...restoredElement,
@@ -549,18 +549,18 @@ export const restoreElement = (
  * NOTE mutates elements.
  */
 const repairContainerElement = (
-  container: Mutable<ExcalidrawElement>,
-  elementsMap: Map<string, Mutable<ExcalidrawElement>>,
+  container: Mutable<SveltedrawElement>,
+  elementsMap: Map<string, Mutable<SveltedrawElement>>,
 ) => {
   if (container.boundElements) {
     // copy because we're not cloning on restore, and we don't want to mutate upstream
     const boundElements = container.boundElements.slice();
 
     // dedupe bindings & fix boundElement.containerId if not set already
-    const boundIds = new Set<ExcalidrawElement["id"]>();
+    const boundIds = new Set<SveltedrawElement["id"]>();
     container.boundElements = boundElements.reduce(
       (
-        acc: Mutable<NonNullable<ExcalidrawElement["boundElements"]>>,
+        acc: Mutable<NonNullable<SveltedrawElement["boundElements"]>>,
         binding,
       ) => {
         const boundElement = elementsMap.get(binding.id);
@@ -597,8 +597,8 @@ const repairContainerElement = (
  * NOTE mutates elements.
  */
 const repairBoundElement = (
-  boundElement: Mutable<ExcalidrawTextElement>,
-  elementsMap: Map<string, Mutable<ExcalidrawElement>>,
+  boundElement: Mutable<SveltedrawTextElement>,
+  elementsMap: Map<string, Mutable<SveltedrawElement>>,
 ) => {
   const container = boundElement.containerId
     ? elementsMap.get(boundElement.containerId)
@@ -636,8 +636,8 @@ const repairBoundElement = (
  * NOTE mutates elements.
  */
 const repairFrameMembership = (
-  element: Mutable<ExcalidrawElement>,
-  elementsMap: Map<string, Mutable<ExcalidrawElement>>,
+  element: Mutable<SveltedrawElement>,
+  elementsMap: Map<string, Mutable<SveltedrawElement>>,
 ) => {
   if (element.frameId) {
     const containingFrame = elementsMap.get(element.frameId);
@@ -648,7 +648,7 @@ const repairFrameMembership = (
   }
 };
 
-export const restoreElements = <T extends ExcalidrawElement>(
+export const restoreElements = <T extends SveltedrawElement>(
   targetElements: readonly T[] | undefined | null,
   /** used for additional context (e.g. repairing arrow bindings) */
   existingElements: Readonly<ElementsMapOrArray> | null | undefined,
@@ -673,7 +673,7 @@ export const restoreElements = <T extends ExcalidrawElement>(
       if (element.type === "selection") {
         return elements;
       }
-      let migratedElement: ExcalidrawElement | null;
+      let migratedElement: SveltedrawElement | null;
       try {
         migratedElement = restoreElement(
           element,
@@ -710,7 +710,7 @@ export const restoreElements = <T extends ExcalidrawElement>(
       }
 
       return elements;
-    }, [] as ExcalidrawElement[]),
+    }, [] as SveltedrawElement[]),
   );
 
   if (!opts?.repairBindings) {
@@ -750,14 +750,14 @@ export const restoreElements = <T extends ExcalidrawElement>(
         (!restoredElementsMap.has(element.startBinding.elementId) ||
           !isArrowElement(element))
       ) {
-        (element as Mutable<ExcalidrawLinearElement>).startBinding = null;
+        (element as Mutable<SveltedrawLinearElement>).startBinding = null;
       }
       if (
         element.endBinding &&
         (!restoredElementsMap.has(element.endBinding.elementId) ||
           !isArrowElement(element))
       ) {
-        (element as Mutable<ExcalidrawLinearElement>).endBinding = null;
+        (element as Mutable<SveltedrawLinearElement>).endBinding = null;
       }
     }
   }
@@ -840,7 +840,7 @@ export const restoreElements = <T extends ExcalidrawElement>(
  * it does not apply universally (e.g. we don't want to do this for collab
  * updates).
  */
-export const bumpElementVersions = <T extends ExcalidrawElement>(
+export const bumpElementVersions = <T extends SveltedrawElement>(
   targetElements: readonly T[],
   localElements: Readonly<ElementsMapOrArray> | null | undefined,
 ) => {

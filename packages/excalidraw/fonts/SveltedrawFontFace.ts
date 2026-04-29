@@ -4,7 +4,7 @@ import { subsetWoff2GlyphsByCodepoints } from "../subset/subset-main";
 
 type DataURL = string;
 
-export class ExcalidrawFontFace {
+export class SveltedrawFontFace {
   public readonly urls: URL[] | DataURL[];
   public readonly fontFace: FontFace;
 
@@ -15,10 +15,10 @@ export class ExcalidrawFontFace {
   }/dist/prod/`;
 
   constructor(family: string, uri: string, descriptors?: FontFaceDescriptors) {
-    this.urls = ExcalidrawFontFace.createUrls(uri);
+    this.urls = SveltedrawFontFace.createUrls(uri);
 
     const sources = this.urls
-      .map((url) => `url(${url}) ${ExcalidrawFontFace.getFormat(url)}`)
+      .map((url) => `url(${url}) ${SveltedrawFontFace.getFormat(url)}`)
       .join(", ");
 
     this.fontFace = new FontFace(family, sources, {
@@ -164,7 +164,7 @@ export class ExcalidrawFontFace {
     }
 
     // fallback url for bundled fonts
-    urls.push(new URL(assetUrl, ExcalidrawFontFace.ASSETS_FALLBACK_URL));
+    urls.push(new URL(assetUrl, SveltedrawFontFace.ASSETS_FALLBACK_URL));
 
     return urls;
   }

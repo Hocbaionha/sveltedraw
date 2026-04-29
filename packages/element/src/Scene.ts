@@ -23,10 +23,10 @@ import { getSelectedElements } from "@sveltedraw/element";
 import { mutateElement, type ElementUpdate } from "@sveltedraw/element";
 
 import type {
-  ExcalidrawElement,
+  SveltedrawElement,
   NonDeletedExcalidrawElement,
   NonDeleted,
-  ExcalidrawFrameLikeElement,
+  SveltedrawFrameLikeElement,
   ElementsMapOrArray,
   SceneElementsMap,
   NonDeletedSceneElementsMap,
@@ -47,7 +47,7 @@ type SceneStateCallbackRemover = () => void;
 
 type SelectionHash = string & { __brand: "selectionHash" };
 
-const getNonDeletedElements = <T extends ExcalidrawElement>(
+const getNonDeletedElements = <T extends SveltedrawElement>(
   allElements: readonly T[],
 ) => {
   const elementsMap = new Map() as NonDeletedSceneElementsMap;
@@ -65,7 +65,7 @@ const getNonDeletedElements = <T extends ExcalidrawElement>(
 };
 
 const validateIndicesThrottled = throttle(
-  (elements: readonly ExcalidrawElement[]) => {
+  (elements: readonly SveltedrawElement[]) => {
     if (isDevEnv() || isTestEnv() || window?.DEBUG_FRACTIONAL_INDICES) {
       validateFractionalIndices(elements, {
         // throw only in dev & test, to remain functional on `DEBUG_FRACTIONAL_INDICES`
@@ -103,7 +103,7 @@ const hashSelectionOpts = (
 
 // ideally this would be a branded type but it'd be insanely hard to work with
 // in our codebase
-export type ExcalidrawElementsIncludingDeleted = readonly ExcalidrawElement[];
+export type SveltedrawElementsIncludingDeleted = readonly SveltedrawElement[];
 
 export class Scene {
   // ---------------------------------------------------------------------------
@@ -119,9 +119,9 @@ export class Scene {
   );
   // ideally all elements within the scene should be wrapped around with `Ordered` type, but right now there is no real benefit doing so
   private elements: readonly OrderedExcalidrawElement[] = [];
-  private nonDeletedFramesLikes: readonly NonDeleted<ExcalidrawFrameLikeElement>[] =
+  private nonDeletedFramesLikes: readonly NonDeleted<SveltedrawFrameLikeElement>[] =
     [];
-  private frames: readonly ExcalidrawFrameLikeElement[] = [];
+  private frames: readonly SveltedrawFrameLikeElement[] = [];
   private elementsMap = toBrandedType<SceneElementsMap>(new Map());
   private selectedElementsCache: {
     selectedElementIds: AppState["selectedElementIds"] | null;
@@ -187,7 +187,7 @@ export class Scene {
     // selection-related options
     includeBoundTextElement?: boolean;
     includeElementsInFrames?: boolean;
-  }): NonDeleted<ExcalidrawElement>[] {
+  }): NonDeleted<SveltedrawElement>[] {
     const hash = hashSelectionOpts(opts);
 
     const elements = opts?.elements || this.nonDeletedElements;
@@ -221,17 +221,17 @@ export class Scene {
     return selectedElements;
   }
 
-  getNonDeletedFramesLikes(): readonly NonDeleted<ExcalidrawFrameLikeElement>[] {
+  getNonDeletedFramesLikes(): readonly NonDeleted<SveltedrawFrameLikeElement>[] {
     return this.nonDeletedFramesLikes;
   }
 
-  getElement<T extends ExcalidrawElement>(id: T["id"]): T | null {
+  getElement<T extends SveltedrawElement>(id: T["id"]): T | null {
     return (this.elementsMap.get(id) as T | undefined) || null;
   }
 
   getNonDeletedElement(
-    id: ExcalidrawElement["id"],
-  ): NonDeleted<ExcalidrawElement> | null {
+    id: SveltedrawElement["id"],
+  ): NonDeleted<SveltedrawElement> | null {
     const element = this.getElement(id);
     if (element && isNonDeletedElement(element)) {
       return element;
@@ -252,7 +252,7 @@ export class Scene {
    * @returns whether a change was made
    */
   mapElements(
-    iteratee: (element: ExcalidrawElement) => ExcalidrawElement,
+    iteratee: (element: SveltedrawElement) => SveltedrawElement,
   ): boolean {
     let didChange = false;
     const newElements = this.elements.map((element) => {
@@ -276,7 +276,7 @@ export class Scene {
   ) {
     // we do trust the insertion order on the map, though maybe we shouldn't and should prefer order defined by fractional indices
     const _nextElements = toArray(nextElements);
-    const nextFrameLikes: ExcalidrawFrameLikeElement[] = [];
+    const nextFrameLikes: SveltedrawFrameLikeElement[] = [];
 
     if (!options?.skipValidation) {
       validateIndicesThrottled(_nextElements);
@@ -338,7 +338,7 @@ export class Scene {
     this.callbacks.clear();
   }
 
-  insertElementAtIndex(element: ExcalidrawElement, index: number) {
+  insertElementAtIndex(element: SveltedrawElement, index: number) {
     if (!Number.isFinite(index) || index < 0) {
       throw new Error(
         "insertElementAtIndex can only be called with index >= 0",
@@ -356,7 +356,7 @@ export class Scene {
     this.replaceAllElements(nextElements);
   }
 
-  insertElementsAtIndex(elements: ExcalidrawElement[], index: number) {
+  insertElementsAtIndex(elements: SveltedrawElement[], index: number) {
     if (!elements.length) {
       return;
     }
@@ -378,7 +378,7 @@ export class Scene {
     this.replaceAllElements(nextElements);
   }
 
-  insertElement = (element: ExcalidrawElement) => {
+  insertElement = (element: SveltedrawElement) => {
     const index = element.frameId
       ? this.getElementIndex(element.frameId)
       : this.elements.length;
@@ -386,7 +386,7 @@ export class Scene {
     this.insertElementAtIndex(element, index);
   };
 
-  insertElements = (elements: ExcalidrawElement[]) => {
+  insertElements = (elements: SveltedrawElement[]) => {
     if (!elements.length) {
       return;
     }
@@ -404,8 +404,8 @@ export class Scene {
 
   getContainerElement = (
     element:
-      | (ExcalidrawElement & {
-          containerId: ExcalidrawElement["id"] | null;
+      | (SveltedrawElement & {
+          containerId: SveltedrawElement["id"] | null;
         })
       | null,
   ) => {
@@ -418,7 +418,7 @@ export class Scene {
     return null;
   };
 
-  getElementsFromId = (id: string): ExcalidrawElement[] => {
+  getElementsFromId = (id: string): SveltedrawElement[] => {
     const elementsMap = this.getNonDeletedElementsMap();
     // first check if the id is an element
     const el = elementsMap.get(id);
@@ -432,7 +432,7 @@ export class Scene {
 
   // Mutate an element with passed updates and trigger the component to update. Make sure you
   // are calling it either from a React event handler or within unstable_batchedUpdates().
-  mutateElement<TElement extends Mutable<ExcalidrawElement>>(
+  mutateElement<TElement extends Mutable<SveltedrawElement>>(
     element: TElement,
     updates: ElementUpdate<TElement>,
     options: {

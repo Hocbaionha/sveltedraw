@@ -8,7 +8,7 @@ import {
 } from "@sveltedraw/common";
 
 import type { ValueOf } from "@sveltedraw/common/utility-types";
-import type { ExcalidrawElement, FileId } from "@sveltedraw/element/types";
+import type { SveltedrawElement, FileId } from "@sveltedraw/element/types";
 
 import { cleanAppStateForExport } from "../appState";
 
@@ -139,7 +139,7 @@ export const loadSceneOrLibraryFromBlob = async (
   blob: Blob | File,
   /** @see restore.localAppState */
   localAppState: AppState | null,
-  localElements: readonly ExcalidrawElement[] | null,
+  localElements: readonly SveltedrawElement[] | null,
   /** FileSystemFileHandle. Defaults to `blob.handle` if defined, otherwise null. */
   fileHandle?: FileSystemFileHandle | null,
 ) => {
@@ -198,7 +198,7 @@ export const loadFromBlob = async (
   blob: Blob,
   /** @see restore.localAppState */
   localAppState: AppState | null,
-  localElements: readonly ExcalidrawElement[] | null,
+  localElements: readonly SveltedrawElement[] | null,
   /** FileSystemFileHandle. Defaults to `blob.handle` if defined, otherwise null. */
   fileHandle?: FileSystemFileHandle | null,
 ) => {

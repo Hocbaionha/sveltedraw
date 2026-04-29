@@ -35,17 +35,17 @@ import type { Scene } from "./Scene";
 import type { MaybeTransformHandleType } from "./transformHandles";
 import type {
   ElementsMap,
-  ExcalidrawElement,
-  ExcalidrawElementType,
-  ExcalidrawTextContainer,
-  ExcalidrawTextElement,
-  ExcalidrawTextElementWithContainer,
+  SveltedrawElement,
+  SveltedrawElementType,
+  SveltedrawTextContainer,
+  SveltedrawTextElement,
+  SveltedrawTextElementWithContainer,
   NonDeletedExcalidrawElement,
 } from "./types";
 
 export const redrawTextBoundingBox = (
-  textElement: ExcalidrawTextElement,
-  container: ExcalidrawElement | null,
+  textElement: SveltedrawTextElement,
+  container: SveltedrawElement | null,
   scene: Scene,
 ) => {
   const elementsMap = scene.getNonDeletedElementsMap();
@@ -100,7 +100,7 @@ export const redrawTextBoundingBox = (
   if (container) {
     const maxContainerHeight = getBoundTextMaxHeight(
       container,
-      textElement as ExcalidrawTextElementWithContainer,
+      textElement as SveltedrawTextElementWithContainer,
     );
     const maxContainerWidth = getBoundTextMaxWidth(container, textElement);
 
@@ -124,7 +124,7 @@ export const redrawTextBoundingBox = (
     const updatedTextElement = {
       ...textElement,
       ...boundTextUpdates,
-    } as ExcalidrawTextElementWithContainer;
+    } as SveltedrawTextElementWithContainer;
 
     const { x, y } = computeBoundTextPosition(
       container,
@@ -220,8 +220,8 @@ export const handleBindTextResize = (
 };
 
 export const computeBoundTextPosition = (
-  container: ExcalidrawElement,
-  boundTextElement: ExcalidrawTextElementWithContainer,
+  container: SveltedrawElement,
+  boundTextElement: SveltedrawTextElementWithContainer,
   elementsMap: ElementsMap,
 ) => {
   if (isArrowElement(container)) {
@@ -277,14 +277,14 @@ export const computeBoundTextPosition = (
   return { x, y };
 };
 
-export const getBoundTextElementId = (container: ExcalidrawElement | null) => {
+export const getBoundTextElementId = (container: SveltedrawElement | null) => {
   return container?.boundElements?.length
     ? container?.boundElements?.find((ele) => ele.type === "text")?.id || null
     : null;
 };
 
 export const getBoundTextElement = (
-  element: ExcalidrawElement | null,
+  element: SveltedrawElement | null,
   elementsMap: ElementsMap,
 ) => {
   if (!element) {
@@ -294,27 +294,27 @@ export const getBoundTextElement = (
 
   if (boundTextElementId) {
     return (elementsMap.get(boundTextElementId) ||
-      null) as ExcalidrawTextElementWithContainer | null;
+      null) as SveltedrawTextElementWithContainer | null;
   }
   return null;
 };
 
 export const getContainerElement = (
-  element: ExcalidrawTextElement | null,
+  element: SveltedrawTextElement | null,
   elementsMap: ElementsMap,
-): ExcalidrawTextContainer | null => {
+): SveltedrawTextContainer | null => {
   if (!element) {
     return null;
   }
   if (element.containerId) {
     return (elementsMap.get(element.containerId) ||
-      null) as ExcalidrawTextContainer | null;
+      null) as SveltedrawTextContainer | null;
   }
   return null;
 };
 
 export const getContainerCenter = (
-  container: ExcalidrawElement,
+  container: SveltedrawElement,
   appState: AppState,
   elementsMap: ElementsMap,
 ) => {
@@ -374,8 +374,8 @@ export const getContainerCoords = (container: NonDeletedExcalidrawElement) => {
 };
 
 export const getTextElementAngle = (
-  textElement: ExcalidrawTextElement,
-  container: ExcalidrawTextContainer | null,
+  textElement: SveltedrawTextElement,
+  container: SveltedrawTextContainer | null,
 ) => {
   if (isArrowElement(container)) {
     return 0;
@@ -387,8 +387,8 @@ export const getTextElementAngle = (
 };
 
 export const getBoundTextElementPosition = (
-  container: ExcalidrawElement,
-  boundTextElement: ExcalidrawTextElementWithContainer,
+  container: SveltedrawElement,
+  boundTextElement: SveltedrawTextElementWithContainer,
   elementsMap: ElementsMap,
 ) => {
   if (isArrowElement(container)) {
@@ -441,8 +441,8 @@ const VALID_CONTAINER_TYPES = new Set([
 ]);
 
 export const isValidTextContainer = (element: {
-  type: ExcalidrawElementType;
-}): element is ExcalidrawTextContainer =>
+  type: SveltedrawElementType;
+}): element is SveltedrawTextContainer =>
   VALID_CONTAINER_TYPES.has(element.type);
 
 export const computeContainerDimensionForBoundText = (
@@ -465,8 +465,8 @@ export const computeContainerDimensionForBoundText = (
 };
 
 export const getBoundTextMaxWidth = (
-  container: ExcalidrawElement,
-  boundTextElement: ExcalidrawTextElement | null,
+  container: SveltedrawElement,
+  boundTextElement: SveltedrawTextElement | null,
 ) => {
   const { width } = container;
   if (isArrowElement(container)) {
@@ -490,8 +490,8 @@ export const getBoundTextMaxWidth = (
 };
 
 export const getBoundTextMaxHeight = (
-  container: ExcalidrawElement,
-  boundTextElement: ExcalidrawTextElementWithContainer,
+  container: SveltedrawElement,
+  boundTextElement: SveltedrawTextElementWithContainer,
 ) => {
   const { height } = container;
   if (isArrowElement(container)) {
@@ -517,7 +517,7 @@ export const getBoundTextMaxHeight = (
 
 /** retrieves text from text elements and concatenates to a single string */
 export const getTextFromElements = (
-  elements: readonly ExcalidrawElement[],
+  elements: readonly SveltedrawElement[],
   separator = "\n\n",
 ) => {
   const text = elements

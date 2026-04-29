@@ -1,8 +1,8 @@
 import { LOCAL_FONT_PROTOCOL } from "@sveltedraw/common";
 
-import { type ExcalidrawFontFaceDescriptor } from "../Fonts";
+import { type SveltedrawFontFaceDescriptor } from "../Fonts";
 
-export const HelveticaFontFaces: ExcalidrawFontFaceDescriptor[] = [
+export const HelveticaFontFaces: SveltedrawFontFaceDescriptor[] = [
   {
     uri: LOCAL_FONT_PROTOCOL,
   },

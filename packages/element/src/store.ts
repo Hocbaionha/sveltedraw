@@ -32,7 +32,7 @@ import {
 import type { ApplyToOptions } from "./delta";
 
 import type {
-  ExcalidrawElement,
+  SveltedrawElement,
   OrderedExcalidrawElement,
   SceneElementsMap,
 } from "./types";
@@ -120,7 +120,7 @@ export class Store {
     params:
       | {
           action: CaptureUpdateActionType;
-          elements: readonly ExcalidrawElement[] | undefined;
+          elements: readonly SveltedrawElement[] | undefined;
           appState: AppState | ObservedAppState | undefined;
         }
       | {

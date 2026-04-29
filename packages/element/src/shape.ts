@@ -65,13 +65,13 @@ import {
 import { shouldTestInside } from "./collision";
 
 import type {
-  ExcalidrawElement,
+  SveltedrawElement,
   NonDeletedExcalidrawElement,
-  ExcalidrawSelectionElement,
-  ExcalidrawLinearElement,
-  ExcalidrawFreeDrawElement,
+  SveltedrawSelectionElement,
+  SveltedrawLinearElement,
+  SveltedrawFreeDrawElement,
   ElementsMap,
-  ExcalidrawLineElement,
+  SveltedrawLineElement,
   Arrowhead,
 } from "./types";
 
@@ -81,7 +81,7 @@ import type { Point as RoughPoint } from "roughjs/bin/geometry";
 export class ShapeCache {
   private static rg = new RoughGenerator();
   private static cache = new WeakMap<
-    ExcalidrawElement,
+    SveltedrawElement,
     { shape: ElementShape; theme: AppState["theme"] }
   >();
 
@@ -89,7 +89,7 @@ export class ShapeCache {
    * Retrieves shape from cache if available. Use this only if shape
    * is optional and you have a fallback in case it's not cached.
    */
-  public static get = <T extends ExcalidrawElement>(
+  public static get = <T extends SveltedrawElement>(
     element: T,
     theme: AppState["theme"] | null,
   ) => {
@@ -102,7 +102,7 @@ export class ShapeCache {
     return undefined;
   };
 
-  public static delete = (element: ExcalidrawElement) => {
+  public static delete = (element: SveltedrawElement) => {
     ShapeCache.cache.delete(element);
     elementWithCanvasCache.delete(element);
   };
@@ -116,7 +116,7 @@ export class ShapeCache {
    * returns cached shape.
    */
   public static generateElementShape = <
-    T extends Exclude<ExcalidrawElement, ExcalidrawSelectionElement>,
+    T extends Exclude<SveltedrawElement, SveltedrawSelectionElement>,
   >(
     element: T,
     renderConfig: {
@@ -167,7 +167,7 @@ const getDashArrayDashed = (strokeWidth: number) => [8, 8 + strokeWidth];
 
 const getDashArrayDotted = (strokeWidth: number) => [1.5, 6 + strokeWidth];
 
-function adjustRoughness(element: ExcalidrawElement): number {
+function adjustRoughness(element: SveltedrawElement): number {
   const roughness = element.roughness;
 
   const maxSize = Math.max(element.width, element.height);
@@ -191,7 +191,7 @@ function adjustRoughness(element: ExcalidrawElement): number {
 }
 
 export const generateRoughOptions = (
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   continuousPath = false,
   isDarkMode: boolean = false,
 ): Options => {
@@ -328,7 +328,7 @@ const generateArrowheadLinesToTip = (
 };
 
 const getArrowheadLineOptions = (
-  element: ExcalidrawLinearElement,
+  element: SveltedrawLinearElement,
   options: Options,
 ) => {
   const lineOptions = { ...options };
@@ -373,7 +373,7 @@ const generateArrowheadOutlineCircle = (
 };
 
 const getArrowheadShapes = (
-  element: ExcalidrawLinearElement,
+  element: SveltedrawLinearElement,
   shape: Drawable[],
   position: "start" | "end",
   arrowhead: Arrowhead,
@@ -582,7 +582,7 @@ const getArrowheadShapes = (
 };
 
 export const generateLinearCollisionShape = (
-  element: ExcalidrawLinearElement | ExcalidrawFreeDrawElement,
+  element: SveltedrawLinearElement | SveltedrawFreeDrawElement,
   elementsMap: ElementsMap,
 ): {
   op: string;
@@ -756,7 +756,7 @@ export const generateLinearCollisionShape = (
  * @private
  */
 const _generateElementShape = (
-  element: Exclude<NonDeletedExcalidrawElement, ExcalidrawSelectionElement>,
+  element: Exclude<NonDeletedExcalidrawElement, SveltedrawSelectionElement>,
   generator: RoughGenerator,
   {
     isExporting,
@@ -1074,7 +1074,7 @@ const generateElbowArrowShape = (
  * which is then used for hit detection
  */
 export const getElementShape = <Point extends GlobalPoint | LocalPoint>(
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   elementsMap: ElementsMap,
 ): GeometricShape<Point> => {
   switch (element.type) {
@@ -1124,11 +1124,11 @@ export const getElementShape = <Point extends GlobalPoint | LocalPoint>(
 };
 
 export const toggleLinePolygonState = (
-  element: ExcalidrawLineElement,
+  element: SveltedrawLineElement,
   nextPolygonState: boolean,
 ): {
-  polygon: ExcalidrawLineElement["polygon"];
-  points: ExcalidrawLineElement["points"];
+  polygon: SveltedrawLineElement["polygon"];
+  points: SveltedrawLineElement["points"];
 } | null => {
   const updatedPoints = [...element.points];
 
@@ -1158,7 +1158,7 @@ export const toggleLinePolygonState = (
     }
   }
 
-  // TODO: satisfies ElementUpdate<ExcalidrawLineElement>
+  // TODO: satisfies ElementUpdate<SveltedrawLineElement>
   const ret = {
     polygon: nextPolygonState,
     points: updatedPoints,
@@ -1172,14 +1172,14 @@ export const toggleLinePolygonState = (
 // -----------------------------------------------------------------------------
 
 // NOTE not cached (-> for SVG export)
-const getFreeDrawSvgPath = (element: ExcalidrawFreeDrawElement) => {
+const getFreeDrawSvgPath = (element: SveltedrawFreeDrawElement) => {
   return getSvgPathFromStroke(
     getFreedrawOutlinePoints(element),
   ) as SVGPathString;
 };
 
 export const getFreedrawOutlinePoints = (
-  element: ExcalidrawFreeDrawElement,
+  element: SveltedrawFreeDrawElement,
 ) => {
   // If input points are empty (should they ever be?) return a dot
   const inputPoints = element.simulatePressure

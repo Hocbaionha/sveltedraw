@@ -19,7 +19,7 @@
   // @ts-ignore upstream
   import { COLOR_PALETTE } from "@sveltedraw/common";
   import type { ColorTuple, ColorPaletteCustom } from "@sveltedraw/common";
-  import type { ExcalidrawElement } from "@sveltedraw/element/types";
+  import type { SveltedrawElement } from "@sveltedraw/element/types";
   import { Popover as BitsPopover } from "bits-ui";
   import ButtonSeparator from "../ButtonSeparator.svelte";
   import PropertiesPopover from "../PropertiesPopover.svelte";
@@ -56,7 +56,7 @@
     color: string | null;
     onChange: (color: string) => void;
     label: string;
-    elements: readonly ExcalidrawElement[];
+    elements: readonly SveltedrawElement[];
     palette?: ColorPaletteCustom | null;
     topPicks?: ColorTuple;
     updateData: (formData?: unknown) => void;

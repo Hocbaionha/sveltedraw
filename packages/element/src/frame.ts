@@ -28,26 +28,26 @@ import {
   isTextElement,
 } from "./typeChecks";
 
-import type { ExcalidrawElementsIncludingDeleted } from "./Scene";
+import type { SveltedrawElementsIncludingDeleted } from "./Scene";
 
 import type {
   ElementsMap,
   ElementsMapOrArray,
-  ExcalidrawElement,
-  ExcalidrawFrameLikeElement,
+  SveltedrawElement,
+  SveltedrawFrameLikeElement,
   NonDeleted,
   NonDeletedExcalidrawElement,
 } from "./types";
 
 // --------------------------- Frame State ------------------------------------
 export const bindElementsToFramesAfterDuplication = (
-  nextElements: readonly ExcalidrawElement[],
-  origElements: readonly ExcalidrawElement[],
-  origIdToDuplicateId: Map<ExcalidrawElement["id"], ExcalidrawElement["id"]>,
+  nextElements: readonly SveltedrawElement[],
+  origElements: readonly SveltedrawElement[],
+  origIdToDuplicateId: Map<SveltedrawElement["id"], SveltedrawElement["id"]>,
 ) => {
   const nextElementMap = arrayToMap(nextElements) as Map<
-    ExcalidrawElement["id"],
-    ExcalidrawElement
+    SveltedrawElement["id"],
+    SveltedrawElement
   >;
 
   for (const element of origElements) {
@@ -66,8 +66,8 @@ export const bindElementsToFramesAfterDuplication = (
 };
 
 export function isElementIntersectingFrame(
-  element: ExcalidrawElement,
-  frame: ExcalidrawFrameLikeElement,
+  element: SveltedrawElement,
+  frame: SveltedrawFrameLikeElement,
   elementsMap: ElementsMap,
 ) {
   const frameLineSegments = getElementLineSegments(frame, elementsMap);
@@ -84,8 +84,8 @@ export function isElementIntersectingFrame(
 }
 
 export const getElementsCompletelyInFrame = (
-  elements: readonly ExcalidrawElement[],
-  frame: ExcalidrawFrameLikeElement,
+  elements: readonly SveltedrawElement[],
+  frame: SveltedrawFrameLikeElement,
   elementsMap: ElementsMap,
 ) =>
   omitGroupsContainingFrameLikes(
@@ -97,8 +97,8 @@ export const getElementsCompletelyInFrame = (
   );
 
 export const isElementContainingFrame = (
-  element: ExcalidrawElement,
-  frame: ExcalidrawFrameLikeElement,
+  element: SveltedrawElement,
+  frame: SveltedrawFrameLikeElement,
   elementsMap: ElementsMap,
 ) => {
   return getElementsWithinSelection([frame], element, elementsMap).some(
@@ -107,8 +107,8 @@ export const isElementContainingFrame = (
 };
 
 export const getElementsIntersectingFrame = (
-  elements: readonly ExcalidrawElement[],
-  frame: ExcalidrawFrameLikeElement,
+  elements: readonly SveltedrawElement[],
+  frame: SveltedrawFrameLikeElement,
 ) => {
   const elementsMap = arrayToMap(elements);
   return elements.filter((element) =>
@@ -117,8 +117,8 @@ export const getElementsIntersectingFrame = (
 };
 
 export const elementsAreInFrameBounds = (
-  elements: readonly ExcalidrawElement[],
-  frame: ExcalidrawFrameLikeElement,
+  elements: readonly SveltedrawElement[],
+  frame: SveltedrawFrameLikeElement,
   elementsMap: ElementsMap,
 ) => {
   const [frameX1, frameY1, frameX2, frameY2] = getElementAbsoluteCoords(
@@ -138,8 +138,8 @@ export const elementsAreInFrameBounds = (
 };
 
 export const elementOverlapsWithFrame = (
-  element: ExcalidrawElement,
-  frame: ExcalidrawFrameLikeElement,
+  element: SveltedrawElement,
+  frame: SveltedrawFrameLikeElement,
   elementsMap: ElementsMap,
 ) => {
   return (
@@ -154,7 +154,7 @@ export const isCursorInFrame = (
     x: number;
     y: number;
   },
-  frame: NonDeleted<ExcalidrawFrameLikeElement>,
+  frame: NonDeleted<SveltedrawFrameLikeElement>,
   elementsMap: ElementsMap,
 ) => {
   const [fx1, fy1, fx2, fy2] = getElementAbsoluteCoords(frame, elementsMap);
@@ -169,7 +169,7 @@ export const isCursorInFrame = (
 export const groupsAreAtLeastIntersectingTheFrame = (
   elements: readonly NonDeletedExcalidrawElement[],
   groupIds: readonly string[],
-  frame: ExcalidrawFrameLikeElement,
+  frame: SveltedrawFrameLikeElement,
 ) => {
   const elementsMap = arrayToMap(elements);
   const elementsInGroup = groupIds.flatMap((groupId) =>
@@ -190,7 +190,7 @@ export const groupsAreAtLeastIntersectingTheFrame = (
 export const groupsAreCompletelyOutOfFrame = (
   elements: readonly NonDeletedExcalidrawElement[],
   groupIds: readonly string[],
-  frame: ExcalidrawFrameLikeElement,
+  frame: SveltedrawFrameLikeElement,
 ) => {
   const elementsMap = arrayToMap(elements);
   const elementsInGroup = groupIds.flatMap((groupId) =>
@@ -215,10 +215,10 @@ export const groupsAreCompletelyOutOfFrame = (
 /**
  * Returns a map of frameId to frame elements. Includes empty frames.
  */
-export const groupByFrameLikes = (elements: readonly ExcalidrawElement[]) => {
+export const groupByFrameLikes = (elements: readonly SveltedrawElement[]) => {
   const frameElementsMap = new Map<
-    ExcalidrawElement["id"],
-    ExcalidrawElement[]
+    SveltedrawElement["id"],
+    SveltedrawElement[]
   >();
 
   for (const element of elements) {
@@ -235,7 +235,7 @@ export const getFrameChildren = (
   allElements: ElementsMapOrArray,
   frameId: string,
 ) => {
-  const frameChildren: ExcalidrawElement[] = [];
+  const frameChildren: SveltedrawElement[] = [];
   for (const element of allElements.values()) {
     if (element.frameId === frameId) {
       frameChildren.push(element);
@@ -245,15 +245,15 @@ export const getFrameChildren = (
 };
 
 export const getFrameLikeElements = (
-  allElements: ExcalidrawElementsIncludingDeleted,
-): ExcalidrawFrameLikeElement[] => {
-  return allElements.filter((element): element is ExcalidrawFrameLikeElement =>
+  allElements: SveltedrawElementsIncludingDeleted,
+): SveltedrawFrameLikeElement[] => {
+  return allElements.filter((element): element is SveltedrawFrameLikeElement =>
     isFrameLikeElement(element),
   );
 };
 
 /**
- * Returns ExcalidrawFrameElements and non-frame-children elements.
+ * Returns SveltedrawFrameElements and non-frame-children elements.
  *
  * Considers children as root elements if they point to a frame parent
  * non-existing in the elements set.
@@ -261,7 +261,7 @@ export const getFrameLikeElements = (
  * Considers non-frame bound elements (container or arrow labels) as root.
  */
 export const getRootElements = (
-  allElements: ExcalidrawElementsIncludingDeleted,
+  allElements: SveltedrawElementsIncludingDeleted,
 ) => {
   const frameElements = arrayToMap(getFrameLikeElements(allElements));
   return allElements.filter(
@@ -273,13 +273,13 @@ export const getRootElements = (
 };
 
 export const getElementsInResizingFrame = (
-  allElements: ExcalidrawElementsIncludingDeleted,
-  frame: ExcalidrawFrameLikeElement,
+  allElements: SveltedrawElementsIncludingDeleted,
+  frame: SveltedrawFrameLikeElement,
   appState: AppState,
   elementsMap: ElementsMap,
-): ExcalidrawElement[] => {
+): SveltedrawElement[] => {
   const prevElementsInFrame = getFrameChildren(allElements, frame.id);
-  const nextElementsInFrame = new Set<ExcalidrawElement>(prevElementsInFrame);
+  const nextElementsInFrame = new Set<SveltedrawElement>(prevElementsInFrame);
 
   const elementsCompletelyInFrame = new Set([
     ...getElementsCompletelyInFrame(allElements, frame, elementsMap),
@@ -367,8 +367,8 @@ export const getElementsInResizingFrame = (
 };
 
 export const getElementsInNewFrame = (
-  elements: ExcalidrawElementsIncludingDeleted,
-  frame: ExcalidrawFrameLikeElement,
+  elements: SveltedrawElementsIncludingDeleted,
+  frame: SveltedrawFrameLikeElement,
   elementsMap: ElementsMap,
 ) => {
   return omitPartialGroups(
@@ -382,8 +382,8 @@ export const getElementsInNewFrame = (
 };
 
 export const omitPartialGroups = (
-  elements: ExcalidrawElement[],
-  frame: ExcalidrawFrameLikeElement,
+  elements: SveltedrawElement[],
+  frame: SveltedrawFrameLikeElement,
   allElementsMap: ElementsMap,
 ) => {
   const elementsToReturn = [];
@@ -423,24 +423,24 @@ export const omitPartialGroups = (
 };
 
 export const getContainingFrame = (
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   elementsMap: ElementsMap,
 ) => {
   if (!element.frameId) {
     return null;
   }
   return (elementsMap.get(element.frameId) ||
-    null) as null | ExcalidrawFrameLikeElement;
+    null) as null | SveltedrawFrameLikeElement;
 };
 
 // --------------------------- Frame Operations -------------------------------
 
 /** */
 export const filterElementsEligibleAsFrameChildren = (
-  elements: readonly ExcalidrawElement[],
-  frame: ExcalidrawFrameLikeElement,
+  elements: readonly SveltedrawElement[],
+  frame: SveltedrawFrameLikeElement,
 ) => {
-  const otherFrames = new Set<ExcalidrawFrameLikeElement["id"]>();
+  const otherFrames = new Set<SveltedrawFrameLikeElement["id"]>();
   const elementsMap = arrayToMap(elements);
   elements = omitGroupsContainingFrameLikes(elements);
 
@@ -450,9 +450,9 @@ export const filterElementsEligibleAsFrameChildren = (
     }
   }
 
-  const processedGroups = new Set<ExcalidrawElement["id"]>();
+  const processedGroups = new Set<SveltedrawElement["id"]>();
 
-  const eligibleElements: ExcalidrawElement[] = [];
+  const eligibleElements: SveltedrawElement[] = [];
 
   for (const element of elements) {
     // don't add frames or their children
@@ -499,11 +499,11 @@ export const filterElementsEligibleAsFrameChildren = (
 export const addElementsToFrame = <T extends ElementsMapOrArray>(
   allElements: T,
   elementsToAdd: NonDeletedExcalidrawElement[],
-  frame: ExcalidrawFrameLikeElement,
+  frame: SveltedrawFrameLikeElement,
   appState: AppState,
 ): T => {
   const elementsMap = arrayToMap(allElements);
-  const currTargetFrameChildrenMap = new Map<ExcalidrawElement["id"], true>();
+  const currTargetFrameChildrenMap = new Map<SveltedrawElement["id"], true>();
   for (const element of allElements.values()) {
     if (element.frameId === frame.id) {
       currTargetFrameChildrenMap.set(element.id, true);
@@ -512,9 +512,9 @@ export const addElementsToFrame = <T extends ElementsMapOrArray>(
 
   const suppliedElementsToAddSet = new Set(elementsToAdd.map((el) => el.id));
 
-  const finalElementsToAdd: ExcalidrawElement[] = [];
+  const finalElementsToAdd: SveltedrawElement[] = [];
 
-  const otherFrames = new Set<ExcalidrawFrameLikeElement["id"]>();
+  const otherFrames = new Set<SveltedrawFrameLikeElement["id"]>();
 
   for (const element of elementsToAdd) {
     if (isFrameLikeElement(element) && element.id !== frame.id) {
@@ -575,13 +575,13 @@ export const removeElementsFromFrame = (
   elementsMap: ElementsMap,
 ) => {
   const _elementsToRemove = new Map<
-    ExcalidrawElement["id"],
-    ExcalidrawElement
+    SveltedrawElement["id"],
+    SveltedrawElement
   >();
 
   const toRemoveElementsByFrame = new Map<
-    ExcalidrawFrameLikeElement["id"],
-    ExcalidrawElement[]
+    SveltedrawFrameLikeElement["id"],
+    SveltedrawElement[]
   >();
 
   for (const element of elementsToRemove) {
@@ -608,19 +608,19 @@ export const removeElementsFromFrame = (
   }
 };
 
-export const removeAllElementsFromFrame = <T extends ExcalidrawElement>(
+export const removeAllElementsFromFrame = <T extends SveltedrawElement>(
   allElements: readonly T[],
-  frame: ExcalidrawFrameLikeElement,
+  frame: SveltedrawFrameLikeElement,
 ) => {
   const elementsInFrame = getFrameChildren(allElements, frame.id);
   removeElementsFromFrame(elementsInFrame, arrayToMap(allElements));
   return allElements;
 };
 
-export const replaceAllElementsInFrame = <T extends ExcalidrawElement>(
+export const replaceAllElementsInFrame = <T extends SveltedrawElement>(
   allElements: readonly T[],
-  nextElementsInFrame: ExcalidrawElement[],
-  frame: ExcalidrawFrameLikeElement,
+  nextElementsInFrame: SveltedrawElement[],
+  frame: SveltedrawFrameLikeElement,
   app: AppClassProperties,
 ): T[] => {
   return addElementsToFrame(
@@ -644,7 +644,7 @@ export const updateFrameMembershipOfSelectedElements = <
     // supplying elements explicitly in case we're passed non-state elements
     elements: allElements,
   });
-  const elementsToFilter = new Set<ExcalidrawElement>(selectedElements);
+  const elementsToFilter = new Set<SveltedrawElement>(selectedElements);
 
   if (appState.editingGroupId) {
     for (const element of selectedElements) {
@@ -653,14 +653,14 @@ export const updateFrameMembershipOfSelectedElements = <
       } else {
         element.groupIds
           .flatMap((gid: string) => getElementsInGroup(allElements, gid))
-          .forEach((element: ExcalidrawElement) =>
+          .forEach((element: SveltedrawElement) =>
             elementsToFilter.add(element),
           );
       }
     }
   }
 
-  const elementsToRemove = new Set<ExcalidrawElement>();
+  const elementsToRemove = new Set<SveltedrawElement>();
 
   const elementsMap = arrayToMap(allElements);
 
@@ -689,7 +689,7 @@ export const omitGroupsContainingFrameLikes = (
   /** subset of elements you want to filter. Optional perf optimization so we
    * don't have to filter all elements unnecessarily
    */
-  selectedElements?: readonly ExcalidrawElement[],
+  selectedElements?: readonly SveltedrawElement[],
 ) => {
   const uniqueGroupIds = new Set<string>();
   const elements = selectedElements || allElements;
@@ -712,7 +712,7 @@ export const omitGroupsContainingFrameLikes = (
     }
   }
 
-  const ret: ExcalidrawElement[] = [];
+  const ret: SveltedrawElement[] = [];
 
   for (const element of elements.values()) {
     if (!rejectedGroupIds.has(element.groupIds[element.groupIds.length - 1])) {
@@ -728,7 +728,7 @@ export const omitGroupsContainingFrameLikes = (
  * is going to be added to or remove from
  */
 export const getTargetFrame = (
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   elementsMap: ElementsMap,
   appState: StaticCanvasAppState,
 ) => {
@@ -755,11 +755,11 @@ export const getTargetFrame = (
 // TODO: this a huge bottleneck for large scenes, optimise
 // given an element, return if the element is in some frame
 export const isElementInFrame = (
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   allElementsMap: ElementsMap,
   appState: StaticCanvasAppState,
   opts?: {
-    targetFrame?: ExcalidrawFrameLikeElement;
+    targetFrame?: SveltedrawFrameLikeElement;
     checkedGroups?: Map<string, boolean>;
   },
 ) => {
@@ -849,8 +849,8 @@ export const isElementInFrame = (
 };
 
 export const shouldApplyFrameClip = (
-  element: ExcalidrawElement,
-  frame: ExcalidrawFrameLikeElement,
+  element: SveltedrawElement,
+  frame: SveltedrawFrameLikeElement,
   appState: StaticCanvasAppState,
   elementsMap: ElementsMap,
   checkedGroups?: Map<string, boolean>,
@@ -911,18 +911,18 @@ export const shouldApplyFrameClip = (
 const DEFAULT_FRAME_NAME = "Frame";
 const DEFAULT_AI_FRAME_NAME = "AI Frame";
 
-export const getDefaultFrameName = (element: ExcalidrawFrameLikeElement) => {
+export const getDefaultFrameName = (element: SveltedrawFrameLikeElement) => {
   // TODO name frames "AI" only if specific to AI frames
   return isFrameElement(element) ? DEFAULT_FRAME_NAME : DEFAULT_AI_FRAME_NAME;
 };
 
-export const getFrameLikeTitle = (element: ExcalidrawFrameLikeElement) => {
+export const getFrameLikeTitle = (element: SveltedrawFrameLikeElement) => {
   return element.name === null ? getDefaultFrameName(element) : element.name;
 };
 
 export const getElementsOverlappingFrame = (
-  elements: readonly ExcalidrawElement[],
-  frame: ExcalidrawFrameLikeElement,
+  elements: readonly SveltedrawElement[],
+  frame: SveltedrawFrameLikeElement,
   elementsMap: ElementsMap,
 ) => {
   return elements.filter(
@@ -938,7 +938,7 @@ export const getElementsOverlappingFrame = (
 };
 
 export const frameAndChildrenSelectedTogether = (
-  selectedElements: readonly ExcalidrawElement[],
+  selectedElements: readonly SveltedrawElement[],
 ) => {
   const selectedElementsMap = arrayToMap(selectedElements);
 

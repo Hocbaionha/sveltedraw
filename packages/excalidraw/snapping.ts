@@ -28,7 +28,7 @@ import type { Bounds } from "@sveltedraw/common";
 import type { MaybeTransformHandleType } from "@sveltedraw/element";
 import type {
   ElementsMap,
-  ExcalidrawElement,
+  SveltedrawElement,
   NonDeletedExcalidrawElement,
 } from "@sveltedraw/element/types";
 
@@ -196,7 +196,7 @@ export const areRoughlyEqual = (a: number, b: number, precision = 0.01) => {
 };
 
 export const getElementsCorners = (
-  elements: ExcalidrawElement[],
+  elements: SveltedrawElement[],
   elementsMap: ElementsMap,
   {
     omitCenter,
@@ -327,11 +327,11 @@ const getReferenceElements = (
 
 export const getVisibleGaps = (
   elements: readonly NonDeletedExcalidrawElement[],
-  selectedElements: ExcalidrawElement[],
+  selectedElements: SveltedrawElement[],
   appState: AppState,
   elementsMap: ElementsMap,
 ) => {
-  const referenceElements: ExcalidrawElement[] = getReferenceElements(
+  const referenceElements: SveltedrawElement[] = getReferenceElements(
     elements,
     selectedElements,
     appState,
@@ -444,7 +444,7 @@ export const getVisibleGaps = (
 };
 
 const getGapSnaps = (
-  selectedElements: ExcalidrawElement[],
+  selectedElements: SveltedrawElement[],
   dragOffset: Vector2D,
   app: AppClassProperties,
   event: KeyboardModifiersObject,
@@ -615,7 +615,7 @@ const getGapSnaps = (
 
 export const getReferenceSnapPoints = (
   elements: readonly NonDeletedExcalidrawElement[],
-  selectedElements: ExcalidrawElement[],
+  selectedElements: SveltedrawElement[],
   appState: AppState,
   elementsMap: ElementsMap,
 ) => {
@@ -634,7 +634,7 @@ export const getReferenceSnapPoints = (
 };
 
 const getPointSnaps = (
-  selectedElements: ExcalidrawElement[],
+  selectedElements: SveltedrawElement[],
   selectionSnapPoints: GlobalPoint[],
   app: AppClassProperties,
   event: KeyboardModifiersObject,
@@ -690,7 +690,7 @@ const getPointSnaps = (
 };
 
 export const snapDraggedElements = (
-  elements: ExcalidrawElement[],
+  elements: SveltedrawElement[],
   dragOffset: Vector2D,
   app: AppClassProperties,
   event: KeyboardModifiersObject,
@@ -913,7 +913,7 @@ const dedupeGapSnapLines = (gapSnapLines: GapSnapLine[]) => {
 };
 
 const createGapSnapLines = (
-  selectedElements: ExcalidrawElement[],
+  selectedElements: SveltedrawElement[],
   dragOffset: Vector2D,
   gapSnaps: GapSnap[],
 ): GapSnapLine[] => {
@@ -1107,9 +1107,9 @@ const createGapSnapLines = (
 
 export const snapResizingElements = (
   // use the latest elements to create snap lines
-  selectedElements: ExcalidrawElement[],
+  selectedElements: SveltedrawElement[],
   // while using the original elements to appy dragOffset to calculate snaps
-  selectedOriginalElements: ExcalidrawElement[],
+  selectedOriginalElements: SveltedrawElement[],
   app: AppClassProperties,
   event: KeyboardModifiersObject,
   dragOffset: Vector2D,
@@ -1244,7 +1244,7 @@ export const snapResizingElements = (
 };
 
 export const snapNewElement = (
-  newElement: ExcalidrawElement,
+  newElement: SveltedrawElement,
   app: AppClassProperties,
   event: KeyboardModifiersObject,
   origin: Vector2D,
@@ -1316,7 +1316,7 @@ export const snapNewElement = (
 };
 
 export const getSnapLinesAtPointer = (
-  elements: readonly ExcalidrawElement[],
+  elements: readonly SveltedrawElement[],
   app: AppClassProperties,
   pointer: Vector2D,
   event: KeyboardModifiersObject,

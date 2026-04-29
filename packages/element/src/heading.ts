@@ -26,7 +26,7 @@ import type {
 
 import { getCenterForBounds } from "./bounds";
 
-import type { ExcalidrawBindableElement } from "./types";
+import type { SveltedrawBindableElement } from "./types";
 
 export const HEADING_RIGHT = [1, 0] as Heading;
 export const HEADING_DOWN = [0, 1] as Heading;
@@ -67,7 +67,7 @@ export const headingIsHorizontal = (a: Heading) =>
 export const headingIsVertical = (a: Heading) => !headingIsHorizontal(a);
 
 const headingForPointFromDiamondElement = (
-  element: Readonly<ExcalidrawBindableElement>,
+  element: Readonly<SveltedrawBindableElement>,
   aabb: Readonly<Bounds>,
   point: Readonly<GlobalPoint>,
 ): Heading => {
@@ -229,7 +229,7 @@ const headingForPointFromDiamondElement = (
 // close fitting bounding box, then creating 4 search cones around the center of
 // the external bbox.
 export const headingForPointFromElement = <Point extends GlobalPoint>(
-  element: Readonly<ExcalidrawBindableElement>,
+  element: Readonly<SveltedrawBindableElement>,
   aabb: Readonly<Bounds>,
   p: Readonly<Point>,
 ): Heading => {

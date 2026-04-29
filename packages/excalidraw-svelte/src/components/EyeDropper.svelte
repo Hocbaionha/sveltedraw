@@ -9,12 +9,12 @@
 
   // @ts-ignore upstream
   import type { ColorPickerType } from "@sveltedraw/common";
-  import type { ExcalidrawElement } from "@sveltedraw/element/types";
+  import type { SveltedrawElement } from "@sveltedraw/element/types";
 
   export type EyeDropperChangeArgs = {
     type: ColorPickerType;
     color: string;
-    selectedElements: ExcalidrawElement[];
+    selectedElements: SveltedrawElement[];
     event: { altKey: boolean };
   };
 </script>
@@ -43,7 +43,7 @@
     /** Last known pointer position — used to initialise the color preview
      * at the cursor before the first pointermove. */
     lastViewportPosition: { x: number; y: number };
-    selectedElements: ExcalidrawElement[];
+    selectedElements: SveltedrawElement[];
     colorPickerType: ColorPickerType;
     onCancel: () => void;
     /** Fired on pointerup with the committed color. */

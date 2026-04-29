@@ -72,18 +72,18 @@ import type { Scene } from "./Scene";
 
 import type {
   NonDeleted,
-  ExcalidrawLinearElement,
-  ExcalidrawElement,
-  ExcalidrawTextElementWithContainer,
+  SveltedrawLinearElement,
+  SveltedrawElement,
+  SveltedrawTextElementWithContainer,
   ElementsMap,
   NonDeletedSceneElementsMap,
   FixedPointBinding,
   FixedSegment,
-  ExcalidrawElbowArrowElement,
+  SveltedrawElbowArrowElement,
   PointsPositionUpdates,
   NonDeletedExcalidrawElement,
   Ordered,
-  ExcalidrawBindableElement,
+  SveltedrawBindableElement,
 } from "./types";
 
 /**
@@ -97,7 +97,7 @@ import type {
 const getNormalizedPoints = ({
   points,
 }: {
-  points: ExcalidrawLinearElement["points"];
+  points: SveltedrawLinearElement["points"];
 }): {
   points: LocalPoint[];
   offsetX: number;
@@ -123,7 +123,7 @@ type PointMoveOtherUpdates = {
 };
 
 export class LinearElementEditor {
-  public readonly elementId: ExcalidrawElement["id"] & {
+  public readonly elementId: SveltedrawElement["id"] & {
     _brand: "excalidrawLinearElementId";
   };
   /** indices */
@@ -162,7 +162,7 @@ export class LinearElementEditor {
   public readonly pointerDownState: never;
 
   constructor(
-    element: NonDeleted<ExcalidrawLinearElement>,
+    element: NonDeleted<SveltedrawLinearElement>,
     elementsMap: ElementsMap,
     isEditing: boolean = false,
   ) {
@@ -212,9 +212,9 @@ export class LinearElementEditor {
 
   /**
    * @param id the `elementId` from the instance of this class (so that we can
-   *  statically guarantee this method returns an ExcalidrawLinearElement)
+   *  statically guarantee this method returns an SveltedrawLinearElement)
    */
-  static getElement<T extends ExcalidrawLinearElement>(
+  static getElement<T extends SveltedrawLinearElement>(
     id: InstanceType<typeof LinearElementEditor>["elementId"],
     elementsMap: ElementsMap,
   ): T | null {
@@ -410,7 +410,7 @@ export class LinearElementEditor {
       element.startBinding &&
       (elementsMap.get(
         element.startBinding.elementId,
-      ) as ExcalidrawBindableElement | null);
+      ) as SveltedrawBindableElement | null);
     const newLinearElementEditor = {
       ...linearElementEditor,
       customLineAngle,
@@ -626,13 +626,13 @@ export class LinearElementEditor {
       element.startBinding &&
       (elementsMap.get(
         element.startBinding.elementId,
-      ) as ExcalidrawBindableElement | null);
+      ) as SveltedrawBindableElement | null);
     const endBindingElement =
       isBindingElement(element) &&
       element.endBinding &&
       (elementsMap.get(
         element.endBinding.elementId,
-      ) as ExcalidrawBindableElement | null);
+      ) as SveltedrawBindableElement | null);
     const altFocusPointBindableElement =
       endIsSelected && // The "other" end (i.e. "end") is dragged
       startBindingElement &&
@@ -769,7 +769,7 @@ export class LinearElementEditor {
   }
 
   static getEditorMidPoints = (
-    element: NonDeleted<ExcalidrawLinearElement>,
+    element: NonDeleted<SveltedrawLinearElement>,
     elementsMap: ElementsMap,
     appState: InteractiveCanvasAppState,
   ): (GlobalPoint | null)[] => {
@@ -893,7 +893,7 @@ export class LinearElementEditor {
   };
 
   static isSegmentTooShort<P extends GlobalPoint | LocalPoint>(
-    element: NonDeleted<ExcalidrawLinearElement>,
+    element: NonDeleted<SveltedrawLinearElement>,
     startPoint: P,
     endPoint: P,
     index: number,
@@ -934,7 +934,7 @@ export class LinearElementEditor {
   }
 
   static getSegmentMidPoint(
-    element: NonDeleted<ExcalidrawLinearElement>,
+    element: NonDeleted<SveltedrawLinearElement>,
     index: number,
     elementsMap: ElementsMap,
   ): GlobalPoint {
@@ -1014,7 +1014,7 @@ export class LinearElementEditor {
     scene: Scene,
   ): {
     didAddPoint: boolean;
-    hitElement: NonDeleted<ExcalidrawElement> | null;
+    hitElement: NonDeleted<SveltedrawElement> | null;
     linearElementEditor: LinearElementEditor | null;
   } {
     const appState = app.state;
@@ -1254,7 +1254,7 @@ export class LinearElementEditor {
 
   /** scene coords */
   static getPointGlobalCoordinates(
-    element: NonDeleted<ExcalidrawLinearElement>,
+    element: NonDeleted<SveltedrawLinearElement>,
     p: LocalPoint,
     elementsMap: ElementsMap,
   ): GlobalPoint {
@@ -1272,7 +1272,7 @@ export class LinearElementEditor {
 
   /** scene coords */
   static getPointsGlobalCoordinates(
-    element: NonDeleted<ExcalidrawLinearElement>,
+    element: NonDeleted<SveltedrawLinearElement>,
     elementsMap: ElementsMap,
   ): GlobalPoint[] {
     const [x1, y1, x2, y2] = getElementAbsoluteCoords(element, elementsMap);
@@ -1289,7 +1289,7 @@ export class LinearElementEditor {
   }
 
   static getPointAtIndexGlobalCoordinates(
-    element: NonDeleted<ExcalidrawLinearElement>,
+    element: NonDeleted<SveltedrawLinearElement>,
     indexMaybeFromEnd: number, // -1 for last element
     elementsMap: ElementsMap,
   ): GlobalPoint {
@@ -1312,7 +1312,7 @@ export class LinearElementEditor {
   }
 
   static pointFromAbsoluteCoords(
-    element: NonDeleted<ExcalidrawLinearElement>,
+    element: NonDeleted<SveltedrawLinearElement>,
     absoluteCoords: GlobalPoint,
     elementsMap: ElementsMap,
   ): LocalPoint {
@@ -1336,7 +1336,7 @@ export class LinearElementEditor {
   }
 
   static getPointIndexUnderCursor(
-    element: NonDeleted<ExcalidrawLinearElement>,
+    element: NonDeleted<SveltedrawLinearElement>,
     elementsMap: ElementsMap,
     zoom: AppState["zoom"],
     x: number,
@@ -1364,7 +1364,7 @@ export class LinearElementEditor {
   }
 
   static createPointAt(
-    element: NonDeleted<ExcalidrawLinearElement>,
+    element: NonDeleted<SveltedrawLinearElement>,
     elementsMap: ElementsMap,
     scenePointerX: number,
     scenePointerY: number,
@@ -1390,7 +1390,7 @@ export class LinearElementEditor {
    * Also returns normalized x and y coords to account for the normalization
    * of the points.
    */
-  static getNormalizeElementPointsAndCoords(element: ExcalidrawLinearElement) {
+  static getNormalizeElementPointsAndCoords(element: SveltedrawLinearElement) {
     const { points, offsetX, offsetY } = getNormalizedPoints(element);
 
     return {
@@ -1479,7 +1479,7 @@ export class LinearElementEditor {
   }
 
   static deletePoints(
-    element: NonDeleted<ExcalidrawLinearElement>,
+    element: NonDeleted<SveltedrawLinearElement>,
     app: AppClassProperties,
     pointIndices: readonly number[],
   ) {
@@ -1523,7 +1523,7 @@ export class LinearElementEditor {
   }
 
   static addPoints(
-    element: NonDeleted<ExcalidrawLinearElement>,
+    element: NonDeleted<SveltedrawLinearElement>,
     scene: Scene,
     addedPoints: LocalPoint[],
   ) {
@@ -1552,7 +1552,7 @@ export class LinearElementEditor {
   }
 
   static movePoints(
-    element: NonDeleted<ExcalidrawLinearElement>,
+    element: NonDeleted<SveltedrawLinearElement>,
     scene: Scene,
     pointUpdates: PointsPositionUpdates,
     otherUpdates?: {
@@ -1735,7 +1735,7 @@ export class LinearElementEditor {
   }
 
   private static _updatePoints(
-    element: NonDeleted<ExcalidrawLinearElement>,
+    element: NonDeleted<SveltedrawLinearElement>,
     scene: Scene,
     nextPoints: readonly LocalPoint[],
     offsetX: number,
@@ -1798,7 +1798,7 @@ export class LinearElementEditor {
   }
 
   private static _getShiftLockedDelta(
-    element: NonDeleted<ExcalidrawLinearElement>,
+    element: NonDeleted<SveltedrawLinearElement>,
     elementsMap: ElementsMap,
     referencePoint: LocalPoint,
     scenePointer: GlobalPoint,
@@ -1840,8 +1840,8 @@ export class LinearElementEditor {
   }
 
   static getBoundTextElementPosition = (
-    element: ExcalidrawLinearElement,
-    boundTextElement: ExcalidrawTextElementWithContainer,
+    element: SveltedrawLinearElement,
+    boundTextElement: SveltedrawTextElementWithContainer,
     elementsMap: ElementsMap,
   ): { x: number; y: number } => {
     const points = LinearElementEditor.getPointsGlobalCoordinates(
@@ -1877,10 +1877,10 @@ export class LinearElementEditor {
   };
 
   static getMinMaxXYWithBoundText = (
-    element: ExcalidrawLinearElement,
+    element: SveltedrawLinearElement,
     elementsMap: ElementsMap,
     elementBounds: Bounds,
-    boundTextElement: ExcalidrawTextElementWithContainer,
+    boundTextElement: SveltedrawTextElementWithContainer,
   ): [number, number, number, number, number, number] => {
     let [x1, y1, x2, y2] = elementBounds;
     const cx = (x1 + x2) / 2;
@@ -1981,7 +1981,7 @@ export class LinearElementEditor {
   };
 
   static getElementAbsoluteCoords = (
-    element: ExcalidrawLinearElement,
+    element: SveltedrawLinearElement,
     elementsMap: ElementsMap,
     includeBoundText: boolean = false,
   ): [number, number, number, number, number, number] => {
@@ -2098,7 +2098,7 @@ export class LinearElementEditor {
   }
 
   static deleteFixedSegment(
-    element: ExcalidrawElbowArrowElement,
+    element: SveltedrawElbowArrowElement,
     scene: Scene,
     index: number,
   ): void {
@@ -2127,7 +2127,7 @@ const pointDraggingUpdates = (
   scenePointerX: number,
   scenePointerY: number,
   elementsMap: NonDeletedSceneElementsMap,
-  element: NonDeleted<ExcalidrawLinearElement>,
+  element: NonDeleted<SveltedrawLinearElement>,
   elements: readonly Ordered<NonDeletedExcalidrawElement>[],
   app: AppClassProperties,
   angleLocked: boolean,
@@ -2221,7 +2221,7 @@ const pointDraggingUpdates = (
 
     if (element.startBinding) {
       const startBindable = elementsMap.get(element.startBinding.elementId) as
-        | ExcalidrawBindableElement
+        | SveltedrawBindableElement
         | undefined;
       if (startBindable) {
         const startPoint =
@@ -2240,7 +2240,7 @@ const pointDraggingUpdates = (
 
     if (element.endBinding) {
       const endBindable = elementsMap.get(element.endBinding.elementId) as
-        | ExcalidrawBindableElement
+        | SveltedrawBindableElement
         | undefined;
       if (endBindable) {
         const endPoint =
@@ -2406,7 +2406,7 @@ const pointDraggingUpdates = (
     ? end.element ??
       (elementsMap.get(
         nextArrow.endBinding.elementId,
-      )! as ExcalidrawBindableElement)
+      )! as SveltedrawBindableElement)
     : null;
 
   const endLocalPoint = startIsDraggingOverEndElement
@@ -2436,7 +2436,7 @@ const pointDraggingUpdates = (
     ? start.element ??
       (elementsMap.get(
         nextArrow.startBinding.elementId,
-      )! as ExcalidrawBindableElement)
+      )! as SveltedrawBindableElement)
     : null;
 
   const startLocalPoint =

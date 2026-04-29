@@ -31,9 +31,9 @@ import {
 } from "./typeChecks";
 import {
   type ElementsMap,
-  type ExcalidrawBindableElement,
-  type ExcalidrawElement,
-  type ExcalidrawFlowchartNodeElement,
+  type SveltedrawBindableElement,
+  type SveltedrawElement,
+  type SveltedrawFlowchartNodeElement,
   type NonDeletedSceneElementsMap,
   type Ordered,
   type OrderedExcalidrawElement,
@@ -63,12 +63,12 @@ export const getLinkDirectionFromKey = (key: string): LinkDirection => {
 
 const getNodeRelatives = (
   type: "predecessors" | "successors",
-  node: ExcalidrawBindableElement,
+  node: SveltedrawBindableElement,
   elementsMap: ElementsMap,
   direction: LinkDirection,
 ) => {
   const items = [...elementsMap.values()].reduce(
-    (acc: { relative: ExcalidrawBindableElement; heading: Heading }[], el) => {
+    (acc: { relative: SveltedrawBindableElement; heading: Heading }[], el) => {
       let oppositeBinding;
       if (
         isElbowArrow(el) &&
@@ -88,7 +88,7 @@ const getNodeRelatives = (
 
         invariant(
           isBindableElement(relative),
-          "not an ExcalidrawBindableElement",
+          "not an SveltedrawBindableElement",
         );
 
         const edgePoint = (
@@ -132,7 +132,7 @@ const getNodeRelatives = (
 };
 
 const getSuccessors = (
-  node: ExcalidrawBindableElement,
+  node: SveltedrawBindableElement,
   elementsMap: ElementsMap,
   direction: LinkDirection,
 ) => {
@@ -140,7 +140,7 @@ const getSuccessors = (
 };
 
 export const getPredecessors = (
-  node: ExcalidrawBindableElement,
+  node: SveltedrawBindableElement,
   elementsMap: ElementsMap,
   direction: LinkDirection,
 ) => {
@@ -148,8 +148,8 @@ export const getPredecessors = (
 };
 
 const getOffsets = (
-  element: ExcalidrawFlowchartNodeElement,
-  linkedNodes: ExcalidrawElement[],
+  element: SveltedrawFlowchartNodeElement,
+  linkedNodes: SveltedrawElement[],
   direction: LinkDirection,
 ) => {
   const _HORIZONTAL_OFFSET = HORIZONTAL_OFFSET + element.width;
@@ -238,7 +238,7 @@ const getOffsets = (
 };
 
 const addNewNode = (
-  element: ExcalidrawFlowchartNodeElement,
+  element: SveltedrawFlowchartNodeElement,
   appState: AppState,
   direction: LinkDirection,
   scene: Scene,
@@ -272,7 +272,7 @@ const addNewNode = (
 
   invariant(
     isFlowchartNodeElement(nextNode),
-    "not an ExcalidrawFlowchartNodeElement",
+    "not an SveltedrawFlowchartNodeElement",
   );
 
   const bindingArrow = createBindingArrow(
@@ -290,14 +290,14 @@ const addNewNode = (
 };
 
 export const addNewNodes = (
-  startNode: ExcalidrawFlowchartNodeElement,
+  startNode: SveltedrawFlowchartNodeElement,
   appState: AppState,
   direction: LinkDirection,
   scene: Scene,
   numberOfNodes: number,
 ) => {
   // always start from 0 and distribute evenly
-  const newNodes: ExcalidrawElement[] = [];
+  const newNodes: SveltedrawElement[] = [];
 
   for (let i = 0; i < numberOfNodes; i++) {
     let nextX: number;
@@ -350,7 +350,7 @@ export const addNewNodes = (
 
     invariant(
       isFlowchartNodeElement(nextNode),
-      "not an ExcalidrawFlowchartNodeElement",
+      "not an SveltedrawFlowchartNodeElement",
     );
 
     const bindingArrow = createBindingArrow(
@@ -369,8 +369,8 @@ export const addNewNodes = (
 };
 
 const createBindingArrow = (
-  startBindingElement: ExcalidrawFlowchartNodeElement,
-  endBindingElement: ExcalidrawFlowchartNodeElement,
+  startBindingElement: SveltedrawFlowchartNodeElement,
+  endBindingElement: SveltedrawFlowchartNodeElement,
   direction: LinkDirection,
   appState: AppState,
   scene: Scene,
@@ -490,7 +490,7 @@ const createBindingArrow = (
         [startBindingElement.id, startBindingElement],
         [endBindingElement.id, endBindingElement],
         [bindingArrow.id, bindingArrow],
-      ] as [string, Ordered<ExcalidrawElement>][]),
+      ] as [string, Ordered<SveltedrawElement>][]),
     ),
     { points: bindingArrow.points },
   );
@@ -504,12 +504,12 @@ const createBindingArrow = (
 export class FlowChartNavigator {
   isExploring: boolean = false;
   // nodes that are ONE link away (successor and predecessor both included)
-  private sameLevelNodes: ExcalidrawElement[] = [];
+  private sameLevelNodes: SveltedrawElement[] = [];
   private sameLevelIndex: number = 0;
   // set it to the opposite of the defalut creation direction
   private direction: LinkDirection | null = null;
   // for speedier navigation
-  private visitedNodes: Set<ExcalidrawElement["id"]> = new Set();
+  private visitedNodes: Set<SveltedrawElement["id"]> = new Set();
 
   clear() {
     this.isExploring = false;
@@ -520,10 +520,10 @@ export class FlowChartNavigator {
   }
 
   exploreByDirection(
-    element: ExcalidrawElement,
+    element: SveltedrawElement,
     elementsMap: ElementsMap,
     direction: LinkDirection,
-  ): ExcalidrawElement["id"] | null {
+  ): SveltedrawElement["id"] | null {
     if (!isBindableElement(element)) {
       return null;
     }
@@ -639,7 +639,7 @@ export class FlowChartCreator {
   pendingNodes: PendingExcalidrawElements | null = null;
 
   createNodes(
-    startNode: ExcalidrawFlowchartNodeElement,
+    startNode: SveltedrawFlowchartNodeElement,
     appState: AppState,
     direction: LinkDirection,
     scene: Scene,
@@ -679,7 +679,7 @@ export class FlowChartCreator {
 
       invariant(
         frame && isFrameElement(frame),
-        "not an ExcalidrawFrameElement",
+        "not an SveltedrawFrameElement",
       );
 
       if (
@@ -708,7 +708,7 @@ export class FlowChartCreator {
 }
 
 export const isNodeInFlowchart = (
-  element: ExcalidrawFlowchartNodeElement,
+  element: SveltedrawFlowchartNodeElement,
   elementsMap: ElementsMap,
 ) => {
   for (const [, el] of elementsMap) {

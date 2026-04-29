@@ -1,5 +1,5 @@
 import type {
-  ExcalidrawTextElement,
+  SveltedrawTextElement,
   FontFamilyValues,
 } from "@sveltedraw/element/types";
 
@@ -153,8 +153,8 @@ export const LOCAL_FONT_PROTOCOL = "local:";
  * Calculates vertical offset for a text with alphabetic baseline.
  */
 export const getVerticalOffset = (
-  fontFamily: ExcalidrawTextElement["fontFamily"],
-  fontSize: ExcalidrawTextElement["fontSize"],
+  fontFamily: SveltedrawTextElement["fontFamily"],
+  fontSize: SveltedrawTextElement["fontSize"],
   lineHeightPx: number,
 ) => {
   const { unitsPerEm, ascender, descender } =
@@ -177,5 +177,5 @@ export const getLineHeight = (fontFamily: FontFamilyValues) => {
     FONT_METADATA[fontFamily]?.metrics ||
     FONT_METADATA[FONT_FAMILY.Excalifont].metrics;
 
-  return lineHeight as ExcalidrawTextElement["lineHeight"];
+  return lineHeight as SveltedrawTextElement["lineHeight"];
 };

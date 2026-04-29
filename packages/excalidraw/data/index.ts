@@ -16,8 +16,8 @@ import { isFrameLikeElement } from "@sveltedraw/element";
 import { getElementsOverlappingFrame } from "@sveltedraw/element";
 
 import type {
-  ExcalidrawElement,
-  ExcalidrawFrameLikeElement,
+  SveltedrawElement,
+  SveltedrawFrameLikeElement,
   NonDeletedExcalidrawElement,
 } from "@sveltedraw/element/types";
 
@@ -45,7 +45,7 @@ export type ExportedElements = readonly NonDeletedExcalidrawElement[] & {
 };
 
 export const prepareElementsForExport = (
-  elements: readonly ExcalidrawElement[],
+  elements: readonly SveltedrawElement[],
   { selectedElementIds }: Pick<AppState, "selectedElementIds">,
   exportSelectionOnly: boolean,
 ) => {
@@ -56,7 +56,7 @@ export const prepareElementsForExport = (
     exportSelectionOnly &&
     isSomeElementSelected(elements, { selectedElementIds });
 
-  let exportingFrame: ExcalidrawFrameLikeElement | null = null;
+  let exportingFrame: SveltedrawFrameLikeElement | null = null;
   let exportedElements = isExportingSelection
     ? getSelectedElements(
         elements,
@@ -115,7 +115,7 @@ export const exportCanvas = async (
     /** filename, if applicable */
     name?: string;
     fileHandle?: FileSystemFileHandle | null;
-    exportingFrame: ExcalidrawFrameLikeElement | null;
+    exportingFrame: SveltedrawFrameLikeElement | null;
   },
 ) => {
   if (elements.length === 0) {

@@ -402,9 +402,9 @@
     "link_title": "සබැඳි මාතෘකාව",
     "link_details": "සබැඳි විස්තර",
     "link_button": "සබැඳි බොත්තම",
-    "excalidrawplus_description": "ExcalidrawPlus විස්තර",
-    "excalidrawplus_button": "ExcalidrawPlus බොත්තම",
-    "excalidrawplus_exportError": "ExcalidrawPlus නිර්යාත දෝෂය"
+    "excalidrawplus_description": "SveltedrawPlus විස්තර",
+    "excalidrawplus_button": "SveltedrawPlus බොත්තම",
+    "excalidrawplus_exportError": "SveltedrawPlus නිර්යාත දෝෂය"
   },
   "helpDialog": {
     "blog": "බ්ලොග්",
@@ -591,9 +591,9 @@
         "description": "තැටියට සුරැකීම විස්තර"
       },
       "excalidrawPlus": {
-        "title": "ExcalidrawPlus ආවරණය",
-        "button": "ExcalidrawPlus බොත්තම",
-        "description": "ExcalidrawPlus විස්තර"
+        "title": "SveltedrawPlus ආවරණය",
+        "button": "SveltedrawPlus බොත්තම",
+        "description": "SveltedrawPlus විස්තර"
       }
     },
     "modal": {

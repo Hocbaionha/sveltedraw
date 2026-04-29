@@ -43,18 +43,18 @@ import { getCommonBounds } from "./bounds";
 import { Scene } from "./Scene";
 
 import type {
-  ExcalidrawArrowElement,
-  ExcalidrawBindableElement,
-  ExcalidrawElement,
-  ExcalidrawFrameElement,
-  ExcalidrawFreeDrawElement,
-  ExcalidrawGenericElement,
-  ExcalidrawIframeLikeElement,
-  ExcalidrawImageElement,
-  ExcalidrawLinearElement,
-  ExcalidrawMagicFrameElement,
-  ExcalidrawSelectionElement,
-  ExcalidrawTextElement,
+  SveltedrawArrowElement,
+  SveltedrawBindableElement,
+  SveltedrawElement,
+  SveltedrawFrameElement,
+  SveltedrawFreeDrawElement,
+  SveltedrawGenericElement,
+  SveltedrawIframeLikeElement,
+  SveltedrawImageElement,
+  SveltedrawLinearElement,
+  SveltedrawMagicFrameElement,
+  SveltedrawSelectionElement,
+  SveltedrawTextElement,
   FileId,
   FontFamilyValues,
   NonDeletedSceneElementsMap,
@@ -78,7 +78,7 @@ export type ValidLinearElement = {
         | (
             | {
                 type: Exclude<
-                  ExcalidrawBindableElement["type"],
+                  SveltedrawBindableElement["type"],
                   | "image"
                   | "text"
                   | "frame"
@@ -86,12 +86,12 @@ export type ValidLinearElement = {
                   | "embeddable"
                   | "iframe"
                 >;
-                id?: ExcalidrawGenericElement["id"];
+                id?: SveltedrawGenericElement["id"];
               }
             | {
-                id: ExcalidrawGenericElement["id"];
+                id: SveltedrawGenericElement["id"];
                 type?: Exclude<
-                  ExcalidrawBindableElement["type"],
+                  SveltedrawBindableElement["type"],
                   | "image"
                   | "text"
                   | "frame"
@@ -108,11 +108,11 @@ export type ValidLinearElement = {
               }
             | {
                 type?: "text";
-                id: ExcalidrawTextElement["id"];
+                id: SveltedrawTextElement["id"];
                 text: string;
               }
           ) &
-            Partial<ExcalidrawTextElement>)
+            Partial<SveltedrawTextElement>)
       ) &
         MarkOptional<ElementConstructorOpts, "x" | "y">;
   start?:
@@ -120,7 +120,7 @@ export type ValidLinearElement = {
         | (
             | {
                 type: Exclude<
-                  ExcalidrawBindableElement["type"],
+                  SveltedrawBindableElement["type"],
                   | "image"
                   | "text"
                   | "frame"
@@ -128,12 +128,12 @@ export type ValidLinearElement = {
                   | "embeddable"
                   | "iframe"
                 >;
-                id?: ExcalidrawGenericElement["id"];
+                id?: SveltedrawGenericElement["id"];
               }
             | {
-                id: ExcalidrawGenericElement["id"];
+                id: SveltedrawGenericElement["id"];
                 type?: Exclude<
-                  ExcalidrawBindableElement["type"],
+                  SveltedrawBindableElement["type"],
                   | "image"
                   | "text"
                   | "frame"
@@ -150,19 +150,19 @@ export type ValidLinearElement = {
               }
             | {
                 type?: "text";
-                id: ExcalidrawTextElement["id"];
+                id: SveltedrawTextElement["id"];
                 text: string;
               }
           ) &
-            Partial<ExcalidrawTextElement>)
+            Partial<SveltedrawTextElement>)
       ) &
         MarkOptional<ElementConstructorOpts, "x" | "y">;
-} & Partial<ExcalidrawLinearElement>;
+} & Partial<SveltedrawLinearElement>;
 
 export type ValidContainer =
   | {
-      type: Exclude<ExcalidrawGenericElement["type"], "selection">;
-      id?: ExcalidrawGenericElement["id"];
+      type: Exclude<SveltedrawGenericElement["type"], "selection">;
+      id?: SveltedrawGenericElement["id"];
       label?: {
         text: string;
         fontSize?: number;
@@ -172,16 +172,16 @@ export type ValidContainer =
       } & MarkOptional<ElementConstructorOpts, "x" | "y">;
     } & ElementConstructorOpts;
 
-export type ExcalidrawElementSkeleton =
+export type SveltedrawElementSkeleton =
   | Extract<
-      Exclude<ExcalidrawElement, ExcalidrawSelectionElement>,
-      ExcalidrawIframeLikeElement | ExcalidrawFreeDrawElement
+      Exclude<SveltedrawElement, SveltedrawSelectionElement>,
+      SveltedrawIframeLikeElement | SveltedrawFreeDrawElement
     >
   | ({
-      type: Extract<ExcalidrawLinearElement["type"], "line">;
+      type: Extract<SveltedrawLinearElement["type"], "line">;
       x: number;
       y: number;
-    } & Partial<ExcalidrawLinearElement>)
+    } & Partial<SveltedrawLinearElement>)
   | ValidContainer
   | ValidLinearElement
   | ({
@@ -189,24 +189,24 @@ export type ExcalidrawElementSkeleton =
       text: string;
       x: number;
       y: number;
-      id?: ExcalidrawTextElement["id"];
-    } & Partial<ExcalidrawTextElement>)
+      id?: SveltedrawTextElement["id"];
+    } & Partial<SveltedrawTextElement>)
   | ({
-      type: Extract<ExcalidrawImageElement["type"], "image">;
+      type: Extract<SveltedrawImageElement["type"], "image">;
       x: number;
       y: number;
       fileId: FileId;
-    } & Partial<ExcalidrawImageElement>)
+    } & Partial<SveltedrawImageElement>)
   | ({
       type: "frame";
-      children: readonly ExcalidrawElement["id"][];
+      children: readonly SveltedrawElement["id"][];
       name?: string;
-    } & Partial<ExcalidrawFrameElement>)
+    } & Partial<SveltedrawFrameElement>)
   | ({
       type: "magicframe";
-      children: readonly ExcalidrawElement["id"][];
+      children: readonly SveltedrawElement["id"][];
       name?: string;
-    } & Partial<ExcalidrawMagicFrameElement>);
+    } & Partial<SveltedrawMagicFrameElement>);
 
 const DEFAULT_LINEAR_ELEMENT_PROPS = {
   width: 100,
@@ -216,11 +216,11 @@ const DEFAULT_LINEAR_ELEMENT_PROPS = {
 const DEFAULT_DIMENSION = 100;
 
 const bindTextToContainer = (
-  container: ExcalidrawElement,
+  container: SveltedrawElement,
   textProps: { text: string } & MarkOptional<ElementConstructorOpts, "x" | "y">,
   scene: Scene,
 ) => {
-  const textElement: ExcalidrawTextElement = newTextElement({
+  const textElement: SveltedrawTextElement = newTextElement({
     x: 0,
     y: 0,
     textAlign: TEXT_ALIGN.CENTER,
@@ -243,15 +243,15 @@ const bindTextToContainer = (
 };
 
 const bindLinearElementToElement = (
-  linearElement: ExcalidrawArrowElement,
+  linearElement: SveltedrawArrowElement,
   start: ValidLinearElement["start"],
   end: ValidLinearElement["end"],
   elementStore: ElementStore,
   scene: Scene,
 ): {
-  linearElement: ExcalidrawLinearElement;
-  startBoundElement?: ExcalidrawElement;
-  endBoundElement?: ExcalidrawElement;
+  linearElement: SveltedrawLinearElement;
+  startBoundElement?: SveltedrawElement;
+  endBoundElement?: SveltedrawElement;
 } => {
   let startBoundElement;
   let endBoundElement;
@@ -331,7 +331,7 @@ const bindLinearElementToElement = (
 
       bindBindingElement(
         linearElement,
-        startBoundElement as ExcalidrawBindableElement,
+        startBoundElement as SveltedrawBindableElement,
         "orbit",
         "start",
         scene,
@@ -407,7 +407,7 @@ const bindLinearElementToElement = (
 
       bindBindingElement(
         linearElement,
-        endBoundElement as ExcalidrawBindableElement,
+        endBoundElement as SveltedrawBindableElement,
         "orbit",
         "end",
         scene,
@@ -481,9 +481,9 @@ const bindLinearElementToElement = (
 };
 
 class ElementStore {
-  excalidrawElements = new Map<string, ExcalidrawElement>();
+  excalidrawElements = new Map<string, SveltedrawElement>();
 
-  add = (ele?: ExcalidrawElement) => {
+  add = (ele?: SveltedrawElement) => {
     if (!ele) {
       return;
     }
@@ -507,7 +507,7 @@ class ElementStore {
 }
 
 export const convertToExcalidrawElements = (
-  elementsSkeleton: ExcalidrawElementSkeleton[] | null,
+  elementsSkeleton: SveltedrawElementSkeleton[] | null,
   opts?: { regenerateIds: boolean },
 ) => {
   if (!elementsSkeleton) {
@@ -515,12 +515,12 @@ export const convertToExcalidrawElements = (
   }
   const elements = cloneJSON(elementsSkeleton);
   const elementStore = new ElementStore();
-  const elementsWithIds = new Map<string, ExcalidrawElementSkeleton>();
+  const elementsWithIds = new Map<string, SveltedrawElementSkeleton>();
   const oldToNewElementIdMap = new Map<string, string>();
 
   // Create individual elements
   for (const element of elements) {
-    let excalidrawElement: ExcalidrawElement;
+    let excalidrawElement: SveltedrawElement;
     const originalId = element.id;
     if (opts?.regenerateIds !== false) {
       Object.assign(element, { id: randomId() });
@@ -716,7 +716,7 @@ export const convertToExcalidrawElements = (
               }
               const { linearElement, startBoundElement, endBoundElement } =
                 bindLinearElementToElement(
-                  excalidrawElement as ExcalidrawArrowElement,
+                  excalidrawElement as SveltedrawArrowElement,
                   start,
                   end,
                   elementStore,
@@ -747,7 +747,7 @@ export const convertToExcalidrawElements = (
     if (!frame) {
       throw new Error(`Excalidraw element with id ${id} doesn't exist`);
     }
-    const childrenElements: ExcalidrawElement[] = [];
+    const childrenElements: SveltedrawElement[] = [];
 
     element.children.forEach((id) => {
       const newElementId = oldToNewElementIdMap.get(id);

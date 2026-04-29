@@ -1,6 +1,6 @@
 import type { MaybePromise } from "@sveltedraw/common/utility-types";
 
-import type { ExcalidrawElement } from "@sveltedraw/element/types";
+import type { SveltedrawElement } from "@sveltedraw/element/types";
 
 import { getFileHandleType, isImageFileHandleType } from "./blob";
 
@@ -11,7 +11,7 @@ import type { AppState, BinaryFiles } from "../types";
 
 export const resaveAsImageWithScene = async (
   data: MaybePromise<{
-    elements: readonly ExcalidrawElement[];
+    elements: readonly SveltedrawElement[];
     appState: AppState;
     files: BinaryFiles;
   }>,

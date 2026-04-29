@@ -69,12 +69,12 @@ import type { ElementUpdate } from "./mutateElement";
 import type {
   BindMode,
   ElementsMap,
-  ExcalidrawArrowElement,
-  ExcalidrawBindableElement,
-  ExcalidrawElbowArrowElement,
-  ExcalidrawElement,
-  ExcalidrawRectanguloidElement,
-  ExcalidrawTextElement,
+  SveltedrawArrowElement,
+  SveltedrawBindableElement,
+  SveltedrawElbowArrowElement,
+  SveltedrawElement,
+  SveltedrawRectanguloidElement,
+  SveltedrawTextElement,
   FixedPoint,
   FixedPointBinding,
   NonDeleted,
@@ -88,7 +88,7 @@ export type BindingStrategy =
   // Create a new binding with this mode
   | {
       mode: BindMode;
-      element: NonDeleted<ExcalidrawBindableElement>;
+      element: NonDeleted<SveltedrawBindableElement>;
       focusPoint: GlobalPoint;
     }
   // Break the binding
@@ -115,8 +115,8 @@ export const BASE_ARROW_MIN_LENGTH = 10;
 export const FOCUS_POINT_SIZE = 10 / 1.5;
 
 export const getBindingGap = (
-  bindTarget: ExcalidrawBindableElement,
-  opts: Pick<ExcalidrawArrowElement, "elbowed">,
+  bindTarget: SveltedrawBindableElement,
+  opts: Pick<SveltedrawArrowElement, "elbowed">,
 ): number => {
   return (
     (opts.elbowed ? BASE_BINDING_GAP_ELBOW : BASE_BINDING_GAP) +
@@ -143,7 +143,7 @@ export const isBindingEnabled = (appState: {
 };
 
 export const bindOrUnbindBindingElement = (
-  arrow: NonDeleted<ExcalidrawArrowElement>,
+  arrow: NonDeleted<SveltedrawArrowElement>,
   draggingPoints: PointsPositionUpdates,
   scenePointerX: number,
   scenePointerY: number,
@@ -222,7 +222,7 @@ export const bindOrUnbindBindingElement = (
 };
 
 const bindOrUnbindBindingElementEdge = (
-  arrow: NonDeleted<ExcalidrawArrowElement>,
+  arrow: NonDeleted<SveltedrawArrowElement>,
   { mode, element, focusPoint }: BindingStrategy,
   startOrEnd: "start" | "end",
   scene: Scene,
@@ -245,7 +245,7 @@ const bindOrUnbindBindingElementEdge = (
 };
 
 const bindingStrategyForElbowArrowEndpointDragging = (
-  arrow: NonDeleted<ExcalidrawArrowElement>,
+  arrow: NonDeleted<SveltedrawArrowElement>,
   draggingPoints: PointsPositionUpdates,
   elementsMap: NonDeletedSceneElementsMap,
   elements: readonly Ordered<NonDeletedExcalidrawElement>[],
@@ -297,7 +297,7 @@ const bindingStrategyForElbowArrowEndpointDragging = (
 };
 
 const bindingStrategyForNewSimpleArrowEndpointDragging = (
-  arrow: NonDeleted<ExcalidrawArrowElement>,
+  arrow: NonDeleted<SveltedrawArrowElement>,
   draggingPoints: PointsPositionUpdates,
   elementsMap: NonDeletedSceneElementsMap,
   elements: readonly Ordered<NonDeletedExcalidrawElement>[],
@@ -371,7 +371,7 @@ const bindingStrategyForNewSimpleArrowEndpointDragging = (
       if (allHits.find((el) => el.id === startBinding.elementId)) {
         const otherElement = elementsMap.get(
           arrow.startBinding.elementId,
-        ) as ExcalidrawBindableElement;
+        ) as SveltedrawBindableElement;
 
         invariant(otherElement, "Other element must be in the elements map");
 
@@ -396,7 +396,7 @@ const bindingStrategyForNewSimpleArrowEndpointDragging = (
     if (arrow.startBinding && arrow.startBinding.elementId !== hit?.id) {
       const otherElement = elementsMap.get(
         arrow.startBinding.elementId,
-      ) as ExcalidrawBindableElement;
+      ) as SveltedrawBindableElement;
       invariant(otherElement, "Other element must be in the elements map");
 
       const otherIsInsideBinding =
@@ -461,7 +461,7 @@ const bindingStrategyForSimpleArrowEndpointDragging_complex = (
   elementsMap: NonDeletedSceneElementsMap,
   elements: readonly Ordered<NonDeletedExcalidrawElement>[],
   globalBindMode: AppState["bindMode"],
-  arrow: NonDeleted<ExcalidrawArrowElement>,
+  arrow: NonDeleted<SveltedrawArrowElement>,
   finalize?: boolean,
 ): { current: BindingStrategy; other: BindingStrategy } => {
   let current: BindingStrategy = { mode: undefined };
@@ -475,7 +475,7 @@ const bindingStrategyForSimpleArrowEndpointDragging_complex = (
       )
     : false;
   const oppositeElement = oppositeBinding
-    ? (elementsMap.get(oppositeBinding.elementId) as ExcalidrawBindableElement)
+    ? (elementsMap.get(oppositeBinding.elementId) as SveltedrawBindableElement)
     : null;
   const otherIsTransparent =
     isOverlapping && oppositeElement
@@ -579,7 +579,7 @@ const bindingStrategyForSimpleArrowEndpointDragging_complex = (
 };
 
 export const getBindingStrategyForDraggingBindingElementEndpoints = (
-  arrow: NonDeleted<ExcalidrawArrowElement>,
+  arrow: NonDeleted<SveltedrawArrowElement>,
   draggingPoints: PointsPositionUpdates,
   screenPointerX: number,
   screenPointerY: number,
@@ -619,7 +619,7 @@ export const getBindingStrategyForDraggingBindingElementEndpoints = (
 };
 
 const getBindingStrategyForDraggingBindingElementEndpoints_simple = (
-  arrow: NonDeleted<ExcalidrawArrowElement>,
+  arrow: NonDeleted<SveltedrawArrowElement>,
   draggingPoints: PointsPositionUpdates,
   scenePointerX: number,
   scenePointerY: number,
@@ -712,7 +712,7 @@ const getBindingStrategyForDraggingBindingElementEndpoints_simple = (
   const otherBindableElement = otherBinding
     ? (elementsMap.get(
         otherBinding.elementId,
-      ) as NonDeleted<ExcalidrawBindableElement>)
+      ) as NonDeleted<SveltedrawBindableElement>)
     : undefined;
   const otherFocusPoint =
     otherBinding &&
@@ -870,7 +870,7 @@ const getBindingStrategyForDraggingBindingElementEndpoints_simple = (
 };
 
 const getBindingStrategyForDraggingBindingElementEndpoints_complex = (
-  arrow: NonDeleted<ExcalidrawArrowElement>,
+  arrow: NonDeleted<SveltedrawArrowElement>,
   draggingPoints: PointsPositionUpdates,
   elementsMap: NonDeletedSceneElementsMap,
   elements: readonly Ordered<NonDeletedExcalidrawElement>[],
@@ -998,7 +998,7 @@ const getBindingStrategyForDraggingBindingElementEndpoints_complex = (
 };
 
 export const bindOrUnbindBindingElements = (
-  selectedArrows: NonDeleted<ExcalidrawArrowElement>[],
+  selectedArrows: NonDeleted<SveltedrawArrowElement>[],
   scene: Scene,
   appState: AppState,
 ): void => {
@@ -1015,8 +1015,8 @@ export const bindOrUnbindBindingElements = (
 };
 
 export const bindBindingElement = (
-  arrow: NonDeleted<ExcalidrawArrowElement>,
-  hoveredElement: ExcalidrawBindableElement,
+  arrow: NonDeleted<SveltedrawArrowElement>,
+  hoveredElement: SveltedrawBindableElement,
   mode: BindMode,
   startOrEnd: "start" | "end",
   scene: Scene,
@@ -1069,10 +1069,10 @@ export const bindBindingElement = (
 };
 
 export const unbindBindingElement = (
-  arrow: NonDeleted<ExcalidrawArrowElement>,
+  arrow: NonDeleted<SveltedrawArrowElement>,
   startOrEnd: "start" | "end",
   scene: Scene,
-): ExcalidrawBindableElement["id"] | null => {
+): SveltedrawBindableElement["id"] | null => {
   const field = startOrEnd === "start" ? "startBinding" : "endBinding";
   const binding = arrow[field];
 
@@ -1087,7 +1087,7 @@ export const unbindBindingElement = (
     // end is not bound to the same element
     const boundElement = scene
       .getNonDeletedElementsMap()
-      .get(binding.elementId) as ExcalidrawBindableElement;
+      .get(binding.elementId) as SveltedrawBindableElement;
     scene.mutateElement(boundElement, {
       boundElements: boundElement.boundElements?.filter(
         (element) => element.id !== arrow.id,
@@ -1106,8 +1106,8 @@ export const updateBoundElements = (
   changedElement: NonDeletedExcalidrawElement,
   scene: Scene,
   options?: {
-    simultaneouslyUpdated?: readonly ExcalidrawElement[];
-    changedElements?: Map<string, ExcalidrawElement>;
+    simultaneouslyUpdated?: readonly SveltedrawElement[];
+    changedElements?: Map<string, SveltedrawElement>;
   },
 ) => {
   if (!isBindableElement(changedElement)) {
@@ -1127,7 +1127,7 @@ export const updateBoundElements = (
     });
   }
 
-  const visitor = (element: ExcalidrawElement | undefined) => {
+  const visitor = (element: SveltedrawElement | undefined) => {
     if (!isArrowElement(element) || element.isDeleted) {
       return;
     }
@@ -1205,7 +1205,7 @@ export const updateBoundElements = (
 };
 
 const updateArrowBindings = (
-  latestElement: ExcalidrawArrowElement,
+  latestElement: SveltedrawArrowElement,
   startOrEnd: "startBinding" | "endBinding",
   elementsMap: NonDeletedSceneElementsMap,
   scene: Scene,
@@ -1219,7 +1219,7 @@ const updateArrowBindings = (
   const binding = latestElement[startOrEnd];
   const bindableElement =
     binding &&
-    (elementsMap.get(binding.elementId) as ExcalidrawBindableElement);
+    (elementsMap.get(binding.elementId) as SveltedrawBindableElement);
   const point = LinearElementEditor.getPointAtIndexGlobalCoordinates(
     latestElement,
     startOrEnd === "startBinding" ? 0 : -1,
@@ -1267,11 +1267,11 @@ const updateArrowBindings = (
 };
 
 export const updateBindings = (
-  latestElement: ExcalidrawElement,
+  latestElement: SveltedrawElement,
   scene: Scene,
   appState: AppState,
   options?: {
-    simultaneouslyUpdated?: readonly ExcalidrawElement[];
+    simultaneouslyUpdated?: readonly SveltedrawElement[];
     newSize?: { width: number; height: number };
   },
 ) => {
@@ -1306,8 +1306,8 @@ export const updateBindings = (
 };
 
 const doesNeedUpdate = (
-  boundElement: NonDeleted<ExcalidrawArrowElement>,
-  changedElement: ExcalidrawBindableElement,
+  boundElement: NonDeleted<SveltedrawArrowElement>,
+  changedElement: SveltedrawBindableElement,
 ) => {
   return (
     boundElement.startBinding?.elementId === changedElement.id ||
@@ -1316,15 +1316,15 @@ const doesNeedUpdate = (
 };
 
 const getSimultaneouslyUpdatedElementIds = (
-  simultaneouslyUpdated: readonly ExcalidrawElement[] | undefined,
-): Set<ExcalidrawElement["id"]> => {
+  simultaneouslyUpdated: readonly SveltedrawElement[] | undefined,
+): Set<SveltedrawElement["id"]> => {
   return new Set((simultaneouslyUpdated || []).map((element) => element.id));
 };
 
 export const getHeadingForElbowArrowSnap = (
   p: Readonly<GlobalPoint>,
   otherPoint: Readonly<GlobalPoint>,
-  bindableElement: ExcalidrawBindableElement | undefined | null,
+  bindableElement: SveltedrawBindableElement | undefined | null,
   aabb: Bounds | undefined | null,
   origPoint: GlobalPoint,
   elementsMap: ElementsMap,
@@ -1354,7 +1354,7 @@ export const getHeadingForElbowArrowSnap = (
 
 const getDistanceForBinding = (
   point: Readonly<GlobalPoint>,
-  bindableElement: ExcalidrawBindableElement,
+  bindableElement: SveltedrawBindableElement,
   elementsMap: ElementsMap,
   zoom?: AppState["zoom"],
 ) => {
@@ -1365,8 +1365,8 @@ const getDistanceForBinding = (
 };
 
 export const bindPointToSnapToElementOutline = (
-  arrowElement: ExcalidrawArrowElement,
-  bindableElement: ExcalidrawBindableElement,
+  arrowElement: SveltedrawArrowElement,
+  bindableElement: SveltedrawBindableElement,
   startOrEnd: "start" | "end",
   elementsMap: ElementsMap,
   customIntersector?: LineSegment<GlobalPoint>,
@@ -1503,8 +1503,8 @@ export const bindPointToSnapToElementOutline = (
 };
 
 export const avoidRectangularCorner = (
-  arrowElement: ExcalidrawArrowElement,
-  bindTarget: ExcalidrawBindableElement,
+  arrowElement: SveltedrawArrowElement,
+  bindTarget: SveltedrawBindableElement,
   elementsMap: ElementsMap,
   p: GlobalPoint,
 ): GlobalPoint => {
@@ -1594,11 +1594,11 @@ export const avoidRectangularCorner = (
 };
 
 export const snapToMid = (
-  bindTarget: ExcalidrawBindableElement,
+  bindTarget: SveltedrawBindableElement,
   elementsMap: ElementsMap,
   p: GlobalPoint,
   tolerance: number = 0.05,
-  arrowElement?: ExcalidrawArrowElement,
+  arrowElement?: SveltedrawArrowElement,
 ): GlobalPoint | undefined => {
   const { x, y, width, height, angle } = bindTarget;
   const center = elementCenterPoint(bindTarget, elementsMap, -0.1, -0.1);
@@ -1709,7 +1709,7 @@ export const snapToMid = (
 };
 
 const extractBinding = (
-  arrow: ExcalidrawArrowElement,
+  arrow: SveltedrawArrowElement,
   startOrEnd: "startBinding" | "endBinding",
   elementsMap: ElementsMap,
 ) => {
@@ -1726,7 +1726,7 @@ const extractBinding = (
 
   const element = elementsMap.get(
     binding.elementId,
-  ) as ExcalidrawBindableElement;
+  ) as SveltedrawBindableElement;
 
   return {
     element,
@@ -1741,14 +1741,14 @@ const extractBinding = (
   };
 };
 
-const elementArea = (element: ExcalidrawBindableElement) =>
+const elementArea = (element: SveltedrawBindableElement) =>
   element.width * element.height;
 
 export const updateBoundPoint = (
-  arrow: NonDeleted<ExcalidrawArrowElement>,
+  arrow: NonDeleted<SveltedrawArrowElement>,
   startOrEnd: "startBinding" | "endBinding",
   binding: FixedPointBinding | null | undefined,
-  bindableElement: ExcalidrawBindableElement,
+  bindableElement: SveltedrawBindableElement,
   elementsMap: ElementsMap,
   dragging?: boolean,
 ): LocalPoint | null => {
@@ -1903,8 +1903,8 @@ export const updateBoundPoint = (
 };
 
 export const calculateFixedPointForElbowArrowBinding = (
-  linearElement: NonDeleted<ExcalidrawElbowArrowElement>,
-  hoveredElement: ExcalidrawBindableElement,
+  linearElement: NonDeleted<SveltedrawElbowArrowElement>,
+  hoveredElement: SveltedrawBindableElement,
   startOrEnd: "start" | "end",
   elementsMap: ElementsMap,
   shouldSnapToOutline = true,
@@ -1951,8 +1951,8 @@ export const calculateFixedPointForElbowArrowBinding = (
 };
 
 export const calculateFixedPointForNonElbowArrowBinding = (
-  linearElement: NonDeleted<ExcalidrawArrowElement>,
-  hoveredElement: ExcalidrawBindableElement,
+  linearElement: NonDeleted<SveltedrawArrowElement>,
+  hoveredElement: SveltedrawBindableElement,
   startOrEnd: "start" | "end",
   elementsMap: ElementsMap,
   focusPoint?: GlobalPoint,
@@ -1986,8 +1986,8 @@ export const calculateFixedPointForNonElbowArrowBinding = (
 };
 
 export const fixDuplicatedBindingsAfterDuplication = (
-  duplicatedElements: ExcalidrawElement[],
-  origIdToDuplicateId: Map<ExcalidrawElement["id"], ExcalidrawElement["id"]>,
+  duplicatedElements: SveltedrawElement[],
+  origIdToDuplicateId: Map<SveltedrawElement["id"], SveltedrawElement["id"]>,
   duplicateElementsMap: NonDeletedSceneElementsMap,
 ) => {
   for (const duplicateElement of duplicatedElements) {
@@ -1995,7 +1995,7 @@ export const fixDuplicatedBindingsAfterDuplication = (
       Object.assign(duplicateElement, {
         boundElements: duplicateElement.boundElements.reduce(
           (
-            acc: Mutable<NonNullable<ExcalidrawElement["boundElements"]>>,
+            acc: Mutable<NonNullable<SveltedrawElement["boundElements"]>>,
             binding,
           ) => {
             const newBindingId = origIdToDuplicateId.get(binding.id);
@@ -2058,8 +2058,8 @@ export const fixDuplicatedBindingsAfterDuplication = (
 };
 
 export const fixBindingsAfterDeletion = (
-  sceneElements: readonly ExcalidrawElement[],
-  deletedElements: readonly ExcalidrawElement[],
+  sceneElements: readonly SveltedrawElement[],
+  deletedElements: readonly SveltedrawElement[],
 ): void => {
   const elements = arrayToMap(sceneElements);
 
@@ -2074,9 +2074,9 @@ export const fixBindingsAfterDeletion = (
 };
 
 const newBoundElements = (
-  boundElements: ExcalidrawElement["boundElements"],
-  idsToRemove: Set<ExcalidrawElement["id"]>,
-  elementsToAdd: Array<ExcalidrawElement> = [],
+  boundElements: SveltedrawElement["boundElements"],
+  idsToRemove: Set<SveltedrawElement["id"]>,
+  elementsToAdd: Array<SveltedrawElement> = [],
 ) => {
   if (!boundElements) {
     return null;
@@ -2090,8 +2090,8 @@ const newBoundElements = (
     ...elementsToAdd.map(
       (x) =>
         ({ id: x.id, type: x.type } as
-          | ExcalidrawArrowElement
-          | ExcalidrawTextElement),
+          | SveltedrawArrowElement
+          | SveltedrawTextElement),
     ),
   );
 
@@ -2115,13 +2115,13 @@ export type BindingProp =
   | "endBinding";
 
 type BoundElementsVisitingFunc = (
-  boundElement: ExcalidrawElement | undefined,
+  boundElement: SveltedrawElement | undefined,
   bindingProp: BindableProp,
   bindingId: string,
 ) => void;
 
 type BindableElementVisitingFunc<T> = (
-  bindableElement: ExcalidrawElement | undefined,
+  bindableElement: SveltedrawElement | undefined,
   bindingProp: BindingProp,
   bindingId: string,
 ) => T;
@@ -2131,7 +2131,7 @@ type BindableElementVisitingFunc<T> = (
  */
 const boundElementsVisitor = (
   elements: ElementsMap,
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   visit: BoundElementsVisitingFunc,
 ) => {
   if (isBindableElement(element)) {
@@ -2150,7 +2150,7 @@ const boundElementsVisitor = (
  */
 const bindableElementsVisitor = <T>(
   elements: ElementsMap,
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   visit: BindableElementVisitingFunc<T>,
 ): T[] => {
   const result: T[] = [];
@@ -2191,10 +2191,10 @@ export class BoundElement {
    */
   public static unbindAffected(
     elements: ElementsMap,
-    boundElement: ExcalidrawElement | undefined,
+    boundElement: SveltedrawElement | undefined,
     updateElementWith: (
-      affected: ExcalidrawElement,
-      updates: ElementUpdate<ExcalidrawElement>,
+      affected: SveltedrawElement,
+      updates: ElementUpdate<SveltedrawElement>,
     ) => void,
   ) {
     if (!boundElement) {
@@ -2233,10 +2233,10 @@ export class BoundElement {
    */
   public static rebindAffected = (
     elements: ElementsMap,
-    boundElement: ExcalidrawElement | undefined,
+    boundElement: SveltedrawElement | undefined,
     updateElementWith: (
-      affected: ExcalidrawElement,
-      updates: ElementUpdate<ExcalidrawElement>,
+      affected: SveltedrawElement,
+      updates: ElementUpdate<SveltedrawElement>,
     ) => void,
   ) => {
     // don't try to rebind element that is deleted
@@ -2307,10 +2307,10 @@ export class BindableElement {
    */
   public static unbindAffected(
     elements: ElementsMap,
-    bindableElement: ExcalidrawElement | undefined,
+    bindableElement: SveltedrawElement | undefined,
     updateElementWith: (
-      affected: ExcalidrawElement,
-      updates: ElementUpdate<ExcalidrawElement>,
+      affected: SveltedrawElement,
+      updates: ElementUpdate<SveltedrawElement>,
     ) => void,
   ) {
     if (!bindableElement) {
@@ -2345,10 +2345,10 @@ export class BindableElement {
    */
   public static rebindAffected = (
     elements: ElementsMap,
-    bindableElement: ExcalidrawElement | undefined,
+    bindableElement: SveltedrawElement | undefined,
     updateElementWith: (
-      affected: ExcalidrawElement,
-      updates: ElementUpdate<ExcalidrawElement>,
+      affected: SveltedrawElement,
+      updates: ElementUpdate<SveltedrawElement>,
     ) => void,
   ) => {
     // don't try to rebind element that is deleted (i.e. updated as deleted)
@@ -2382,14 +2382,14 @@ export class BindableElement {
               // rebind if not bound already!
               updateElementWith(boundElement, {
                 containerId: bindableElement.id,
-              } as ElementUpdate<ExcalidrawTextElement>);
+              } as ElementUpdate<SveltedrawTextElement>);
             }
           } else {
             if (boundElement.containerId !== null) {
               // unbind if not unbound already
               updateElementWith(boundElement, {
                 containerId: null,
-              } as ElementUpdate<ExcalidrawTextElement>);
+              } as ElementUpdate<SveltedrawTextElement>);
             }
 
             // unbind from boundElements as the element got bound to some other element in the meantime
@@ -2408,7 +2408,7 @@ export class BindableElement {
 
 export const getGlobalFixedPointForBindableElement = (
   fixedPointRatio: FixedPoint,
-  element: ExcalidrawBindableElement,
+  element: SveltedrawBindableElement,
   elementsMap: ElementsMap,
 ): GlobalPoint => {
   const [fixedX, fixedY] = normalizeFixedPoint(fixedPointRatio);
@@ -2424,24 +2424,24 @@ export const getGlobalFixedPointForBindableElement = (
 };
 
 export const getGlobalFixedPoints = (
-  arrow: ExcalidrawArrowElement,
+  arrow: SveltedrawArrowElement,
   elementsMap: ElementsMap,
 ): [GlobalPoint, GlobalPoint] => {
   const startElement =
     arrow.startBinding &&
     (elementsMap.get(arrow.startBinding.elementId) as
-      | ExcalidrawBindableElement
+      | SveltedrawBindableElement
       | undefined);
   const endElement =
     arrow.endBinding &&
     (elementsMap.get(arrow.endBinding.elementId) as
-      | ExcalidrawBindableElement
+      | SveltedrawBindableElement
       | undefined);
   const startPoint =
     startElement && arrow.startBinding
       ? getGlobalFixedPointForBindableElement(
           arrow.startBinding.fixedPoint,
-          startElement as ExcalidrawBindableElement,
+          startElement as SveltedrawBindableElement,
           elementsMap,
         )
       : pointFrom<GlobalPoint>(
@@ -2452,7 +2452,7 @@ export const getGlobalFixedPoints = (
     endElement && arrow.endBinding
       ? getGlobalFixedPointForBindableElement(
           arrow.endBinding.fixedPoint,
-          endElement as ExcalidrawBindableElement,
+          endElement as SveltedrawBindableElement,
           elementsMap,
         )
       : pointFrom<GlobalPoint>(
@@ -2464,7 +2464,7 @@ export const getGlobalFixedPoints = (
 };
 
 export const getArrowLocalFixedPoints = (
-  arrow: ExcalidrawElbowArrowElement,
+  arrow: SveltedrawElbowArrowElement,
   elementsMap: ElementsMap,
 ) => {
   const [startPoint, endPoint] = getGlobalFixedPoints(arrow, elementsMap);
@@ -2518,7 +2518,7 @@ type Side =
   | "left"
   | "top-left";
 type ShapeType = "rectangle" | "ellipse" | "diamond";
-const getShapeType = (element: ExcalidrawBindableElement): ShapeType => {
+const getShapeType = (element: SveltedrawBindableElement): ShapeType => {
   if (element.type === "ellipse" || element.type === "diamond") {
     return element.type;
   }
@@ -2832,7 +2832,7 @@ export const getBindingSideMidPoint = (
 
   if (isRectangularElement(bindableElement)) {
     const [sides, corners] = deconstructRectanguloidElement(
-      bindableElement as ExcalidrawRectanguloidElement,
+      bindableElement as SveltedrawRectanguloidElement,
     );
     const [top, right, bottom, left] = sides;
 

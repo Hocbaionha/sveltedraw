@@ -23,7 +23,7 @@ import {
 
 import type {
   ElementsMap,
-  ExcalidrawElement,
+  SveltedrawElement,
   NonDeletedExcalidrawElement,
   PointerType,
 } from "./types";
@@ -270,7 +270,7 @@ export const getTransformHandlesFromCoords = (
 };
 
 export const getTransformHandles = (
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   zoom: Zoom,
   elementsMap: ElementsMap,
   pointerType: PointerType = "mouse",

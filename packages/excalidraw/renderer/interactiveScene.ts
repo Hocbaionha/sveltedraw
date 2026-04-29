@@ -68,13 +68,13 @@ import type {
 
 import type {
   ElementsMap,
-  ExcalidrawArrowElement,
-  ExcalidrawBindableElement,
-  ExcalidrawElement,
-  ExcalidrawFrameLikeElement,
-  ExcalidrawImageElement,
-  ExcalidrawLinearElement,
-  ExcalidrawTextElement,
+  SveltedrawArrowElement,
+  SveltedrawBindableElement,
+  SveltedrawElement,
+  SveltedrawFrameLikeElement,
+  SveltedrawImageElement,
+  SveltedrawLinearElement,
+  SveltedrawTextElement,
   GroupId,
   NonDeleted,
   NonDeletedSceneElementsMap,
@@ -558,7 +558,7 @@ const renderBindingHighlightForBindableElement_simple = (
 const renderBindingHighlightForBindableElement_complex = (
   app: AppClassProperties,
   context: CanvasRenderingContext2D,
-  element: ExcalidrawBindableElement,
+  element: SveltedrawBindableElement,
   allElementsMap: NonDeletedSceneElementsMap,
   appState: InteractiveCanvasAppState,
   deltaTime: number,
@@ -1002,7 +1002,7 @@ const renderSelectionBorder = (
 const renderFrameHighlight = (
   context: CanvasRenderingContext2D,
   appState: InteractiveCanvasAppState,
-  frame: NonDeleted<ExcalidrawFrameLikeElement>,
+  frame: NonDeleted<SveltedrawFrameLikeElement>,
   elementsMap: ElementsMap,
 ) => {
   const [x1, y1, x2, y2] = getElementAbsoluteCoords(frame, elementsMap);
@@ -1032,7 +1032,7 @@ const renderFrameHighlight = (
 const renderElementsBoxHighlight = (
   context: CanvasRenderingContext2D,
   appState: InteractiveCanvasAppState,
-  elements: NonDeleted<ExcalidrawElement>[],
+  elements: NonDeleted<SveltedrawElement>[],
   config?: { colors?: string[]; dashed?: boolean },
 ) => {
   const { colors = ["rgb(0,118,255)"], dashed = false } = config || {};
@@ -1044,7 +1044,7 @@ const renderElementsBoxHighlight = (
     (element) => element.groupIds.length > 0,
   );
 
-  const getSelectionFromElements = (elements: ExcalidrawElement[]) => {
+  const getSelectionFromElements = (elements: SveltedrawElement[]) => {
     const [x1, y1, x2, y2] = getCommonBounds(elements);
     return {
       angle: 0,
@@ -1080,7 +1080,7 @@ const renderElementsBoxHighlight = (
 const renderLinearPointHandles = (
   context: CanvasRenderingContext2D,
   appState: InteractiveCanvasAppState,
-  element: NonDeleted<ExcalidrawLinearElement>,
+  element: NonDeleted<SveltedrawLinearElement>,
   elementsMap: RenderableElementsMap,
 ) => {
   if (!appState.selectedLinearElement) {
@@ -1257,7 +1257,7 @@ const renderFocusPointIndicator = ({
   context,
   elementsMap,
 }: {
-  arrow: NonDeleted<ExcalidrawArrowElement>;
+  arrow: NonDeleted<SveltedrawArrowElement>;
   appState: InteractiveCanvasAppState;
   context: CanvasRenderingContext2D;
   elementsMap: NonDeletedSceneElementsMap;
@@ -1389,7 +1389,7 @@ const renderCropHandles = (
   context: CanvasRenderingContext2D,
   renderConfig: InteractiveCanvasRenderConfig,
   appState: InteractiveCanvasAppState,
-  croppingElement: ExcalidrawImageElement,
+  croppingElement: SveltedrawImageElement,
   elementsMap: ElementsMap,
 ): void => {
   const [x1, y1, , , cx, cy] = getElementAbsoluteCoords(
@@ -1491,7 +1491,7 @@ const renderCropHandles = (
 };
 
 const renderTextBox = (
-  text: NonDeleted<ExcalidrawTextElement>,
+  text: NonDeleted<SveltedrawTextElement>,
   context: CanvasRenderingContext2D,
   appState: InteractiveCanvasAppState,
   selectionColor: InteractiveCanvasRenderConfig["selectionColor"],
@@ -1515,7 +1515,7 @@ const renderTextBox = (
 };
 
 const renderResetAutoResizeHandle = (
-  text: NonDeleted<ExcalidrawTextElement>,
+  text: NonDeleted<SveltedrawTextElement>,
   context: CanvasRenderingContext2D,
   appState: InteractiveCanvasAppState,
   selectionColor: InteractiveCanvasRenderConfig["selectionColor"],
@@ -1589,7 +1589,7 @@ const _renderInteractiveScene = ({
   context.save();
   context.scale(appState.zoom.value, appState.zoom.value);
 
-  let editingLinearElement: NonDeleted<ExcalidrawLinearElement> | undefined =
+  let editingLinearElement: NonDeleted<SveltedrawLinearElement> | undefined =
     undefined;
 
   visibleElements.forEach((element) => {
@@ -1601,7 +1601,7 @@ const _renderInteractiveScene = ({
       appState.selectedLinearElement.elementId === element.id
     ) {
       if (element) {
-        editingLinearElement = element as NonDeleted<ExcalidrawLinearElement>;
+        editingLinearElement = element as NonDeleted<SveltedrawLinearElement>;
       }
     }
   });
@@ -1643,7 +1643,7 @@ const _renderInteractiveScene = ({
 
   if (appState.editingTextElement) {
     const textElement = allElementsMap.get(appState.editingTextElement.id) as
-      | ExcalidrawTextElement
+      | SveltedrawTextElement
       | undefined;
     if (textElement && !textElement.autoResize) {
       renderTextBox(
@@ -1714,7 +1714,7 @@ const _renderInteractiveScene = ({
     renderLinearPointHandles(
       context,
       appState,
-      selectedElements[0] as NonDeleted<ExcalidrawLinearElement>,
+      selectedElements[0] as NonDeleted<SveltedrawLinearElement>,
       elementsMap,
     );
   }
@@ -1782,7 +1782,7 @@ const _renderInteractiveScene = ({
       renderLinearPointHandles(
         context,
         appState,
-        selectedElements[0] as ExcalidrawLinearElement,
+        selectedElements[0] as SveltedrawLinearElement,
         elementsMap,
       );
     }

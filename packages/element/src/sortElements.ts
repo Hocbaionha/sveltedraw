@@ -1,17 +1,17 @@
 import { arrayToMapWithIndex } from "@sveltedraw/common";
 
-import type { ExcalidrawElement } from "./types";
+import type { SveltedrawElement } from "./types";
 
-const normalizeGroupElementOrder = (elements: readonly ExcalidrawElement[]) => {
-  const origElements: ExcalidrawElement[] = elements.slice();
-  const sortedElements = new Set<ExcalidrawElement>();
+const normalizeGroupElementOrder = (elements: readonly SveltedrawElement[]) => {
+  const origElements: SveltedrawElement[] = elements.slice();
+  const sortedElements = new Set<SveltedrawElement>();
 
   const orderInnerGroups = (
-    elements: readonly ExcalidrawElement[],
-  ): ExcalidrawElement[] => {
+    elements: readonly SveltedrawElement[],
+  ): SveltedrawElement[] => {
     const firstGroupSig = elements[0]?.groupIds?.join("");
-    const aGroup: ExcalidrawElement[] = [elements[0]];
-    const bGroup: ExcalidrawElement[] = [];
+    const aGroup: SveltedrawElement[] = [elements[0]];
+    const bGroup: SveltedrawElement[] = [];
     for (const element of elements.slice(1)) {
       if (element.groupIds?.join("") === firstGroupSig) {
         aGroup.push(element);
@@ -66,12 +66,12 @@ const normalizeGroupElementOrder = (elements: readonly ExcalidrawElement[]) => {
  * containers).
  */
 const normalizeBoundElementsOrder = (
-  elements: readonly ExcalidrawElement[],
+  elements: readonly SveltedrawElement[],
 ) => {
   const elementsMap = arrayToMapWithIndex(elements);
 
-  const origElements: (ExcalidrawElement | null)[] = elements.slice();
-  const sortedElements = new Set<ExcalidrawElement>();
+  const origElements: (SveltedrawElement | null)[] = elements.slice();
+  const sortedElements = new Set<SveltedrawElement>();
 
   origElements.forEach((element, idx) => {
     if (!element) {
@@ -115,7 +115,7 @@ const normalizeBoundElementsOrder = (
 };
 
 export const normalizeElementOrder = (
-  elements: readonly ExcalidrawElement[],
+  elements: readonly SveltedrawElement[],
 ) => {
   return normalizeBoundElementsOrder(normalizeGroupElementOrder(elements));
 };

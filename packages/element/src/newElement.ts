@@ -28,30 +28,30 @@ import { wrapText } from "./textWrapping";
 import { isLineElement } from "./typeChecks";
 
 import type {
-  ExcalidrawElement,
-  ExcalidrawImageElement,
-  ExcalidrawTextElement,
-  ExcalidrawLinearElement,
-  ExcalidrawGenericElement,
+  SveltedrawElement,
+  SveltedrawImageElement,
+  SveltedrawTextElement,
+  SveltedrawLinearElement,
+  SveltedrawGenericElement,
   NonDeleted,
   TextAlign,
   VerticalAlign,
   Arrowhead,
-  ExcalidrawFreeDrawElement,
+  SveltedrawFreeDrawElement,
   FontFamilyValues,
-  ExcalidrawTextContainer,
-  ExcalidrawFrameElement,
-  ExcalidrawEmbeddableElement,
-  ExcalidrawMagicFrameElement,
-  ExcalidrawIframeElement,
+  SveltedrawTextContainer,
+  SveltedrawFrameElement,
+  SveltedrawEmbeddableElement,
+  SveltedrawMagicFrameElement,
+  SveltedrawIframeElement,
   ElementsMap,
-  ExcalidrawArrowElement,
-  ExcalidrawElbowArrowElement,
-  ExcalidrawLineElement,
+  SveltedrawArrowElement,
+  SveltedrawElbowArrowElement,
+  SveltedrawLineElement,
 } from "./types";
 
 export type ElementConstructorOpts = MarkOptional<
-  Omit<ExcalidrawGenericElement, "id" | "type" | "isDeleted" | "updated">,
+  Omit<SveltedrawGenericElement, "id" | "type" | "isDeleted" | "updated">,
   | "width"
   | "height"
   | "angle"
@@ -75,7 +75,7 @@ export type ElementConstructorOpts = MarkOptional<
   | "customData"
 >;
 
-const _newElementBase = <T extends ExcalidrawElement>(
+const _newElementBase = <T extends SveltedrawElement>(
   type: T["type"],
   {
     x,
@@ -98,7 +98,7 @@ const _newElementBase = <T extends ExcalidrawElement>(
     link = null,
     locked = DEFAULT_ELEMENT_PROPS.locked,
     ...rest
-  }: ElementConstructorOpts & Omit<Partial<ExcalidrawGenericElement>, "type">,
+  }: ElementConstructorOpts & Omit<Partial<SveltedrawGenericElement>, "type">,
 ) => {
   // NOTE (mtolmacs): This is a temporary check to detect extremely large
   // element position or sizing
@@ -123,7 +123,7 @@ const _newElementBase = <T extends ExcalidrawElement>(
   }
 
   // assign type to guard against excess properties
-  const element: Merge<ExcalidrawGenericElement, { type: T["type"] }> = {
+  const element: Merge<SveltedrawGenericElement, { type: T["type"] }> = {
     id: rest.id || randomId(),
     type,
     x,
@@ -157,26 +157,26 @@ const _newElementBase = <T extends ExcalidrawElement>(
 
 export const newElement = (
   opts: {
-    type: ExcalidrawGenericElement["type"];
+    type: SveltedrawGenericElement["type"];
   } & ElementConstructorOpts,
-): NonDeleted<ExcalidrawGenericElement> =>
-  _newElementBase<ExcalidrawGenericElement>(opts.type, opts);
+): NonDeleted<SveltedrawGenericElement> =>
+  _newElementBase<SveltedrawGenericElement>(opts.type, opts);
 
 export const newEmbeddableElement = (
   opts: {
     type: "embeddable";
   } & ElementConstructorOpts,
-): NonDeleted<ExcalidrawEmbeddableElement> => {
-  return _newElementBase<ExcalidrawEmbeddableElement>("embeddable", opts);
+): NonDeleted<SveltedrawEmbeddableElement> => {
+  return _newElementBase<SveltedrawEmbeddableElement>("embeddable", opts);
 };
 
 export const newIframeElement = (
   opts: {
     type: "iframe";
   } & ElementConstructorOpts,
-): NonDeleted<ExcalidrawIframeElement> => {
+): NonDeleted<SveltedrawIframeElement> => {
   return {
-    ..._newElementBase<ExcalidrawIframeElement>("iframe", opts),
+    ..._newElementBase<SveltedrawIframeElement>("iframe", opts),
   };
 };
 
@@ -184,10 +184,10 @@ export const newFrameElement = (
   opts: {
     name?: string;
   } & ElementConstructorOpts,
-): NonDeleted<ExcalidrawFrameElement> => {
+): NonDeleted<SveltedrawFrameElement> => {
   const frameElement = newElementWith(
     {
-      ..._newElementBase<ExcalidrawFrameElement>("frame", opts),
+      ..._newElementBase<SveltedrawFrameElement>("frame", opts),
       type: "frame",
       name: opts?.name || null,
     },
@@ -201,10 +201,10 @@ export const newMagicFrameElement = (
   opts: {
     name?: string;
   } & ElementConstructorOpts,
-): NonDeleted<ExcalidrawMagicFrameElement> => {
+): NonDeleted<SveltedrawMagicFrameElement> => {
   const frameElement = newElementWith(
     {
-      ..._newElementBase<ExcalidrawMagicFrameElement>("magicframe", opts),
+      ..._newElementBase<SveltedrawMagicFrameElement>("magicframe", opts),
       type: "magicframe",
       name: opts?.name || null,
     },
@@ -217,8 +217,8 @@ export const newMagicFrameElement = (
 /** computes element x/y offset based on textAlign/verticalAlign */
 const getTextElementPositionOffsets = (
   opts: {
-    textAlign: ExcalidrawTextElement["textAlign"];
-    verticalAlign: ExcalidrawTextElement["verticalAlign"];
+    textAlign: SveltedrawTextElement["textAlign"];
+    verticalAlign: SveltedrawTextElement["verticalAlign"];
   },
   metrics: {
     width: number;
@@ -244,11 +244,11 @@ export const newTextElement = (
     fontFamily?: FontFamilyValues;
     textAlign?: TextAlign;
     verticalAlign?: VerticalAlign;
-    containerId?: ExcalidrawTextContainer["id"] | null;
-    lineHeight?: ExcalidrawTextElement["lineHeight"];
-    autoResize?: ExcalidrawTextElement["autoResize"];
+    containerId?: SveltedrawTextContainer["id"] | null;
+    lineHeight?: SveltedrawTextElement["lineHeight"];
+    autoResize?: SveltedrawTextElement["autoResize"];
   } & ElementConstructorOpts,
-): NonDeleted<ExcalidrawTextElement> => {
+): NonDeleted<SveltedrawTextElement> => {
   const fontFamily = opts.fontFamily || DEFAULT_FONT_FAMILY;
   const fontSize = opts.fontSize || DEFAULT_FONT_SIZE;
   const lineHeight = opts.lineHeight || getLineHeight(fontFamily);
@@ -265,8 +265,8 @@ export const newTextElement = (
     metrics,
   );
 
-  const textElementProps: ExcalidrawTextElement = {
-    ..._newElementBase<ExcalidrawTextElement>("text", opts),
+  const textElementProps: SveltedrawTextElement = {
+    ..._newElementBase<SveltedrawTextElement>("text", opts),
     text,
     fontSize,
     fontFamily,
@@ -282,7 +282,7 @@ export const newTextElement = (
     lineHeight,
   };
 
-  const textElement: ExcalidrawTextElement = newElementWith(
+  const textElement: SveltedrawTextElement = newElementWith(
     textElementProps,
     {},
   );
@@ -291,7 +291,7 @@ export const newTextElement = (
 };
 
 const getAdjustedDimensions = (
-  element: ExcalidrawTextElement,
+  element: SveltedrawTextElement,
   elementsMap: ElementsMap,
   nextText: string,
 ): {
@@ -418,8 +418,8 @@ const adjustXYWithRotation = (
 };
 
 export const refreshTextDimensions = (
-  textElement: ExcalidrawTextElement,
-  container: ExcalidrawTextContainer | null,
+  textElement: SveltedrawTextElement,
+  container: SveltedrawTextContainer | null,
   elementsMap: ElementsMap,
   text = textElement.text,
 ) => {
@@ -442,13 +442,13 @@ export const refreshTextDimensions = (
 export const newFreeDrawElement = (
   opts: {
     type: "freedraw";
-    points?: ExcalidrawFreeDrawElement["points"];
+    points?: SveltedrawFreeDrawElement["points"];
     simulatePressure: boolean;
-    pressures?: ExcalidrawFreeDrawElement["pressures"];
+    pressures?: SveltedrawFreeDrawElement["pressures"];
   } & ElementConstructorOpts,
-): NonDeleted<ExcalidrawFreeDrawElement> => {
+): NonDeleted<SveltedrawFreeDrawElement> => {
   return {
-    ..._newElementBase<ExcalidrawFreeDrawElement>(opts.type, opts),
+    ..._newElementBase<SveltedrawFreeDrawElement>(opts.type, opts),
     points: opts.points || [],
     pressures: opts.pressures || [],
     simulatePressure: opts.simulatePressure,
@@ -457,13 +457,13 @@ export const newFreeDrawElement = (
 
 export const newLinearElement = (
   opts: {
-    type: ExcalidrawLinearElement["type"];
-    points?: ExcalidrawLinearElement["points"];
-    polygon?: ExcalidrawLineElement["polygon"];
+    type: SveltedrawLinearElement["type"];
+    points?: SveltedrawLinearElement["points"];
+    polygon?: SveltedrawLineElement["polygon"];
   } & ElementConstructorOpts,
-): NonDeleted<ExcalidrawLinearElement> => {
+): NonDeleted<SveltedrawLinearElement> => {
   const element = {
-    ..._newElementBase<ExcalidrawLinearElement>(opts.type, opts),
+    ..._newElementBase<SveltedrawLinearElement>(opts.type, opts),
     points: opts.points || [],
 
     startBinding: null,
@@ -473,7 +473,7 @@ export const newLinearElement = (
   };
 
   if (isLineElement(element)) {
-    const lineElement: NonDeleted<ExcalidrawLineElement> = {
+    const lineElement: NonDeleted<SveltedrawLineElement> = {
       ...element,
       polygon: opts.polygon ?? false,
     };
@@ -486,19 +486,19 @@ export const newLinearElement = (
 
 export const newArrowElement = <T extends boolean>(
   opts: {
-    type: ExcalidrawArrowElement["type"];
+    type: SveltedrawArrowElement["type"];
     startArrowhead?: Arrowhead | null;
     endArrowhead?: Arrowhead | null;
-    points?: ExcalidrawArrowElement["points"];
+    points?: SveltedrawArrowElement["points"];
     elbowed?: T;
-    fixedSegments?: ExcalidrawElbowArrowElement["fixedSegments"] | null;
+    fixedSegments?: SveltedrawElbowArrowElement["fixedSegments"] | null;
   } & ElementConstructorOpts,
 ): T extends true
-  ? NonDeleted<ExcalidrawElbowArrowElement>
-  : NonDeleted<ExcalidrawArrowElement> => {
+  ? NonDeleted<SveltedrawElbowArrowElement>
+  : NonDeleted<SveltedrawArrowElement> => {
   if (opts.elbowed) {
     return {
-      ..._newElementBase<ExcalidrawElbowArrowElement>(opts.type, opts),
+      ..._newElementBase<SveltedrawElbowArrowElement>(opts.type, opts),
       points: opts.points || [],
       startBinding: null,
       endBinding: null,
@@ -508,11 +508,11 @@ export const newArrowElement = <T extends boolean>(
       fixedSegments: opts.fixedSegments || [],
       startIsSpecial: false,
       endIsSpecial: false,
-    } as NonDeleted<ExcalidrawElbowArrowElement>;
+    } as NonDeleted<SveltedrawElbowArrowElement>;
   }
 
   return {
-    ..._newElementBase<ExcalidrawArrowElement>(opts.type, opts),
+    ..._newElementBase<SveltedrawArrowElement>(opts.type, opts),
     points: opts.points || [],
     startBinding: null,
     endBinding: null,
@@ -520,21 +520,21 @@ export const newArrowElement = <T extends boolean>(
     endArrowhead: opts.endArrowhead || null,
     elbowed: false,
   } as T extends true
-    ? NonDeleted<ExcalidrawElbowArrowElement>
-    : NonDeleted<ExcalidrawArrowElement>;
+    ? NonDeleted<SveltedrawElbowArrowElement>
+    : NonDeleted<SveltedrawArrowElement>;
 };
 
 export const newImageElement = (
   opts: {
-    type: ExcalidrawImageElement["type"];
-    status?: ExcalidrawImageElement["status"];
-    fileId?: ExcalidrawImageElement["fileId"];
-    scale?: ExcalidrawImageElement["scale"];
-    crop?: ExcalidrawImageElement["crop"];
+    type: SveltedrawImageElement["type"];
+    status?: SveltedrawImageElement["status"];
+    fileId?: SveltedrawImageElement["fileId"];
+    scale?: SveltedrawImageElement["scale"];
+    crop?: SveltedrawImageElement["crop"];
   } & ElementConstructorOpts,
-): NonDeleted<ExcalidrawImageElement> => {
+): NonDeleted<SveltedrawImageElement> => {
   return {
-    ..._newElementBase<ExcalidrawImageElement>("image", opts),
+    ..._newElementBase<SveltedrawImageElement>("image", opts),
     // in the future we'll support changing stroke color for some SVG elements,
     // and `transparent` will likely mean "use original colors of the image"
     strokeColor: "transparent",

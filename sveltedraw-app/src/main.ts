@@ -12,7 +12,7 @@ import AppRoot from './AppRoot.svelte';
 import { registerSW } from 'virtual:pwa-register';
 registerSW({ immediate: true });
 
-// Upstream Excalidraw's `ExcalidrawFontFace.createUrls` treats raw asset
+// Upstream Excalidraw's `SveltedrawFontFace.createUrls` treats raw asset
 // paths as relative and needs `window.EXCALIDRAW_ASSET_PATH` to build a
 // correct absolute URL. In our Vite dev setup, the font imports resolve
 // to `/@fs/C:/.../fonts/Excalifont/...woff2` — an absolute path on THIS

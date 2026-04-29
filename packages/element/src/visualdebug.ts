@@ -15,7 +15,7 @@ import {
   isPathALoop,
 } from "@sveltedraw/element";
 
-import type { ElementsMap, ExcalidrawElement } from "@sveltedraw/element/types";
+import type { ElementsMap, SveltedrawElement } from "@sveltedraw/element/types";
 import type { Curve } from "@sveltedraw/math";
 import type { LineSegment } from "@sveltedraw/utils";
 
@@ -43,7 +43,7 @@ export type DebugPolygon = {
 };
 
 export const debugDrawHitVolume = (
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   elementsMap: ElementsMap,
   options?: {
     rays?: number;

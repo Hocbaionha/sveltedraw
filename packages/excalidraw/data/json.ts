@@ -5,7 +5,7 @@ import {
   VERSIONS,
 } from "@sveltedraw/common";
 
-import type { ExcalidrawElement, NonDeleted } from "@sveltedraw/element/types";
+import type { SveltedrawElement, NonDeleted } from "@sveltedraw/element/types";
 
 import type { MaybePromise } from "@sveltedraw/common/utility-types";
 
@@ -23,7 +23,7 @@ import type {
 } from "./types";
 
 export type JSONExportData = {
-  elements: readonly NonDeleted<ExcalidrawElement>[];
+  elements: readonly NonDeleted<SveltedrawElement>[];
   appState: AppState;
   files: BinaryFiles;
 };
@@ -32,7 +32,7 @@ export type JSONExportData = {
  * Strips out files which are only referenced by deleted elements
  */
 const filterOutDeletedFiles = (
-  elements: readonly ExcalidrawElement[],
+  elements: readonly SveltedrawElement[],
   files: BinaryFiles,
 ) => {
   const nextFiles: BinaryFiles = {};
@@ -50,7 +50,7 @@ const filterOutDeletedFiles = (
 };
 
 export const serializeAsJSON = (
-  elements: readonly ExcalidrawElement[],
+  elements: readonly SveltedrawElement[],
   appState: Partial<AppState>,
   files: BinaryFiles,
   type: "local" | "database",
@@ -101,7 +101,7 @@ export const saveAsJSON = async ({
 
 export const loadFromJSON = async (
   localAppState: AppState,
-  localElements: readonly ExcalidrawElement[] | null,
+  localElements: readonly SveltedrawElement[] | null,
 ) => {
   const file = await fileOpen({
     description: "Excalidraw files",

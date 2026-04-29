@@ -8,7 +8,7 @@ import {
 
 import type { EditorInterface } from "@sveltedraw/common";
 
-import type { ExcalidrawTextElement } from "@sveltedraw/element/types";
+import type { SveltedrawTextElement } from "@sveltedraw/element/types";
 
 const TEXT_AUTO_RESIZE_HANDLE_GAP = 12;
 const TEXT_AUTO_RESIZE_HANDLE_LENGTH = 16;
@@ -21,7 +21,7 @@ export const getTextBoxPadding = (zoomValue: number) =>
   (DEFAULT_TRANSFORM_HANDLE_SPACING * 2) / zoomValue;
 
 export const getTextAutoResizeHandle = (
-  textElement: ExcalidrawTextElement,
+  textElement: SveltedrawTextElement,
   zoomValue: number,
   formFactor: EditorInterface["formFactor"],
 ) => {
@@ -65,7 +65,7 @@ export const getTextAutoResizeHandle = (
 
 export const isPointHittingTextAutoResizeHandle = (
   point: Readonly<{ x: number; y: number }>,
-  textElement: ExcalidrawTextElement,
+  textElement: SveltedrawTextElement,
   zoomValue: number,
   formFactor: EditorInterface["formFactor"],
 ) => {

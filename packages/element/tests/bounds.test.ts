@@ -6,7 +6,7 @@ import type { LocalPoint } from "@sveltedraw/math";
 
 import { getElementAbsoluteCoords, getElementBounds } from "../src/bounds";
 
-import type { ExcalidrawElement, ExcalidrawLinearElement } from "../src/types";
+import type { SveltedrawElement, SveltedrawLinearElement } from "../src/types";
 
 const _ce = ({
   x,
@@ -37,7 +37,7 @@ const _ce = ({
     width: w,
     height: h,
     angle: a,
-  } as ExcalidrawElement);
+  } as SveltedrawElement);
 
 describe("getElementAbsoluteCoords", () => {
   it("test x1 coordinate", () => {
@@ -132,7 +132,7 @@ describe("getElementBounds", () => {
         pointFrom<LocalPoint>(67.33984375, 92.48828125),
         pointFrom<LocalPoint>(-102.7890625, 52.15625),
       ],
-    } as ExcalidrawLinearElement;
+    } as SveltedrawLinearElement;
 
     const [x1, y1, x2, y2] = getElementBounds(element, arrayToMap([element]));
     expect(x1).toEqual(360.9291017525165);

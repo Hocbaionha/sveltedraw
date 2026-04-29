@@ -23,8 +23,8 @@ import { ShapeCache } from "@sveltedraw/element";
 import { isTextElement } from "@sveltedraw/element";
 
 import type {
-  ExcalidrawElement,
-  ExcalidrawTextElement,
+  SveltedrawElement,
+  SveltedrawTextElement,
 } from "@sveltedraw/element/types";
 
 import type { ValueOf } from "@sveltedraw/common/utility-types";
@@ -34,7 +34,7 @@ import type { Scene } from "@sveltedraw/element";
 import { CascadiaFontFaces } from "./Cascadia";
 import { ComicShannsFontFaces } from "./ComicShanns";
 import { EmojiFontFaces } from "./Emoji";
-import { ExcalidrawFontFace } from "./ExcalidrawFontFace";
+import { SveltedrawFontFace } from "./SveltedrawFontFace";
 import { ExcalifontFontFaces } from "./Excalifont";
 import { HelveticaFontFaces } from "./Helvetica";
 import { LiberationFontFaces } from "./Liberation";
@@ -53,7 +53,7 @@ export class Fonts {
         number,
         {
           metadata: FontMetadata;
-          fontFaces: ExcalidrawFontFace[];
+          fontFaces: SveltedrawFontFace[];
         }
       >
     | undefined;
@@ -161,7 +161,7 @@ export class Fonts {
    * Load font faces for passed elements - use when the scene is unavailable (i.e. export).
    */
   public static loadElementsFonts = async (
-    elements: readonly ExcalidrawElement[],
+    elements: readonly SveltedrawElement[],
   ): Promise<FontFace[]> => {
     const fontFamilies = Fonts.getUniqueFamilies(elements);
     const charsPerFamily = Fonts.getCharsPerFamily(elements);
@@ -173,7 +173,7 @@ export class Fonts {
    * Generate CSS @font-face declarations for the given elements.
    */
   public static async generateFontFaceDeclarations(
-    elements: readonly ExcalidrawElement[],
+    elements: readonly SveltedrawElement[],
   ) {
     const families = Fonts.getUniqueFamilies(elements);
     const charsPerFamily = Fonts.getCharsPerFamily(elements);
@@ -210,7 +210,7 @@ export class Fonts {
   }
 
   private static async loadFontFaces(
-    fontFamilies: Array<ExcalidrawTextElement["fontFamily"]>,
+    fontFamilies: Array<SveltedrawTextElement["fontFamily"]>,
     charsPerFamily: Record<number, Set<string>>,
   ) {
     // add all registered font faces into the `document.fonts` (if not added already)
@@ -235,7 +235,7 @@ export class Fonts {
   }
 
   private static *fontFacesLoader(
-    fontFamilies: Array<ExcalidrawTextElement["fontFamily"]>,
+    fontFamilies: Array<SveltedrawTextElement["fontFamily"]>,
     charsPerFamily: Record<number, Set<string>>,
   ): Generator<Promise<void | readonly [number, FontFace[]]>> {
     for (const [index, fontFamily] of fontFamilies.entries()) {
@@ -329,12 +329,12 @@ export class Fonts {
       | {
           registered: Map<
             number,
-            { metadata: FontMetadata; fontFaces: ExcalidrawFontFace[] }
+            { metadata: FontMetadata; fontFaces: SveltedrawFontFace[] }
           >;
         },
     family: string,
     metadata: FontMetadata,
-    ...fontFacesDecriptors: ExcalidrawFontFaceDescriptor[]
+    ...fontFacesDecriptors: SveltedrawFontFaceDescriptor[]
   ) {
     // TODO: likely we will need to abandon number value in order to support custom fonts
     const fontFamily =
@@ -348,7 +348,7 @@ export class Fonts {
         metadata,
         fontFaces: fontFacesDecriptors.map(
           ({ uri, descriptors }) =>
-            new ExcalidrawFontFace(family, uri, descriptors),
+            new SveltedrawFontFace(family, uri, descriptors),
         ),
       });
     }
@@ -363,13 +363,13 @@ export class Fonts {
     const fonts = {
       registered: new Map<
         ValueOf<typeof FONT_FAMILY | typeof FONT_FAMILY_FALLBACKS>,
-        { metadata: FontMetadata; fontFaces: ExcalidrawFontFace[] }
+        { metadata: FontMetadata; fontFaces: SveltedrawFontFace[] }
       >(),
     };
 
     const init = (
       family: keyof typeof FONT_FAMILY | keyof typeof FONT_FAMILY_FALLBACKS,
-      ...fontFacesDescriptors: ExcalidrawFontFaceDescriptor[]
+      ...fontFacesDescriptors: SveltedrawFontFaceDescriptor[]
     ) => {
       const fontFamily =
         FONT_FAMILY[family as keyof typeof FONT_FAMILY] ??
@@ -406,8 +406,8 @@ export class Fonts {
    * Get all the unique font families for the given elements.
    */
   private static getUniqueFamilies(
-    elements: ReadonlyArray<ExcalidrawElement>,
-  ): Array<ExcalidrawTextElement["fontFamily"]> {
+    elements: ReadonlyArray<SveltedrawElement>,
+  ): Array<SveltedrawTextElement["fontFamily"]> {
     return Array.from(
       elements.reduce((families, element) => {
         if (isTextElement(element)) {
@@ -422,7 +422,7 @@ export class Fonts {
    * Get all the unique characters per font family for the given scene.
    */
   private static getCharsPerFamily(
-    elements: ReadonlyArray<ExcalidrawElement>,
+    elements: ReadonlyArray<SveltedrawElement>,
   ): Record<number, Set<string>> {
     const charsPerFamily: Record<number, Set<string>> = {};
 
@@ -464,7 +464,7 @@ export class Fonts {
   }
 }
 
-export interface ExcalidrawFontFaceDescriptor {
+export interface SveltedrawFontFaceDescriptor {
   uri: string;
   descriptors?: FontFaceDescriptors;
 }

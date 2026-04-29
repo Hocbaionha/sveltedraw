@@ -63,21 +63,21 @@ import { getBindingGap } from "./binding";
 
 import type {
   ElementsMap,
-  ExcalidrawArrowElement,
-  ExcalidrawBindableElement,
-  ExcalidrawDiamondElement,
-  ExcalidrawElement,
-  ExcalidrawEllipseElement,
-  ExcalidrawFreeDrawElement,
-  ExcalidrawLinearElement,
-  ExcalidrawRectanguloidElement,
+  SveltedrawArrowElement,
+  SveltedrawBindableElement,
+  SveltedrawDiamondElement,
+  SveltedrawElement,
+  SveltedrawEllipseElement,
+  SveltedrawFreeDrawElement,
+  SveltedrawLinearElement,
+  SveltedrawRectanguloidElement,
   NonDeleted,
   NonDeletedExcalidrawElement,
   NonDeletedSceneElementsMap,
   Ordered,
 } from "./types";
 
-export const shouldTestInside = (element: ExcalidrawElement) => {
+export const shouldTestInside = (element: SveltedrawElement) => {
   if (element.type === "arrow") {
     return false;
   }
@@ -101,7 +101,7 @@ export const shouldTestInside = (element: ExcalidrawElement) => {
 
 export type HitTestArgs = {
   point: GlobalPoint;
-  element: ExcalidrawElement;
+  element: SveltedrawElement;
   threshold: number;
   elementsMap: ElementsMap;
   frameNameBound?: FrameNameBounds | null;
@@ -109,7 +109,7 @@ export type HitTestArgs = {
 };
 
 let cachedPoint: GlobalPoint | null = null;
-let cachedElement: WeakRef<ExcalidrawElement> | null = null;
+let cachedElement: WeakRef<SveltedrawElement> | null = null;
 let cachedThreshold: number = Infinity;
 let cachedHit: boolean = false;
 let cachedOverrideShouldTestInside = false;
@@ -209,7 +209,7 @@ const isPointInRotatedBounds = (
 
 export const hitElementBoundingBox = (
   point: GlobalPoint,
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   elementsMap: ElementsMap,
   tolerance = 0,
 ) => {
@@ -228,7 +228,7 @@ export const hitElementBoundingBoxOnly = (
 
 export const hitElementBoundText = (
   point: GlobalPoint,
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   elementsMap: ElementsMap,
 ): boolean => {
   const boundTextElementCandidate = getBoundTextElement(element, elementsMap);
@@ -253,7 +253,7 @@ export const hitElementBoundText = (
 };
 
 const bindingBorderTest = (
-  element: NonDeleted<ExcalidrawBindableElement>,
+  element: NonDeleted<SveltedrawBindableElement>,
   [x, y]: Readonly<GlobalPoint>,
   elementsMap: NonDeletedSceneElementsMap,
   tolerance: number = 0,
@@ -305,8 +305,8 @@ export const getAllHoveredElementAtPoint = (
   elements: readonly Ordered<NonDeletedExcalidrawElement>[],
   elementsMap: NonDeletedSceneElementsMap,
   tolerance?: number,
-): NonDeleted<ExcalidrawBindableElement>[] => {
-  const candidateElements: NonDeleted<ExcalidrawBindableElement>[] = [];
+): NonDeleted<SveltedrawBindableElement>[] => {
+  const candidateElements: NonDeleted<SveltedrawBindableElement>[] = [];
   // We need to to hit testing from front (end of the array) to back (beginning of the array)
   // because array is ordered from lower z-index to highest and we want element z-index
   // with higher z-index
@@ -338,7 +338,7 @@ export const getHoveredElementForBinding = (
   elements: readonly Ordered<NonDeletedExcalidrawElement>[],
   elementsMap: NonDeletedSceneElementsMap,
   tolerance?: number,
-): NonDeleted<ExcalidrawBindableElement> | null => {
+): NonDeleted<SveltedrawBindableElement> | null => {
   const candidateElements = getAllHoveredElementAtPoint(
     point,
     elements,
@@ -359,17 +359,17 @@ export const getHoveredElementForBinding = (
     .sort(
       (a, b) => b.width ** 2 + b.height ** 2 - (a.width ** 2 + a.height ** 2),
     )
-    .pop() as NonDeleted<ExcalidrawBindableElement>;
+    .pop() as NonDeleted<SveltedrawBindableElement>;
 };
 
 export const getHoveredElementForFocusPoint = (
   point: GlobalPoint,
-  arrow: ExcalidrawArrowElement,
+  arrow: SveltedrawArrowElement,
   elements: readonly Ordered<NonDeletedExcalidrawElement>[],
   elementsMap: NonDeletedSceneElementsMap,
   tolerance?: number,
-): ExcalidrawBindableElement | null => {
-  const candidateElements: NonDeleted<ExcalidrawBindableElement>[] = [];
+): SveltedrawBindableElement | null => {
+  const candidateElements: NonDeleted<SveltedrawBindableElement>[] = [];
   // We need to to hit testing from front (end of the array) to back (beginning of the array)
   // because array is ordered from lower z-index to highest and we want element z-index
   // with higher z-index
@@ -409,7 +409,7 @@ export const getHoveredElementForFocusPoint = (
     return null;
   }
 
-  return distanceFilteredCandidateElements[0] as NonDeleted<ExcalidrawBindableElement>;
+  return distanceFilteredCandidateElements[0] as NonDeleted<SveltedrawBindableElement>;
 };
 
 /**
@@ -421,7 +421,7 @@ export const getHoveredElementForFocusPoint = (
  * @returns
  */
 export const intersectElementWithLineSegment = (
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   elementsMap: ElementsMap,
   line: LineSegment<GlobalPoint>,
   offset: number = 0,
@@ -546,7 +546,7 @@ const lineIntersections = (
 };
 
 const intersectLinearOrFreeDrawWithLineSegment = (
-  element: ExcalidrawLinearElement | ExcalidrawFreeDrawElement,
+  element: SveltedrawLinearElement | SveltedrawFreeDrawElement,
   segment: LineSegment<GlobalPoint>,
   elementsMap: ElementsMap,
   onlyFirst = false,
@@ -601,7 +601,7 @@ const intersectLinearOrFreeDrawWithLineSegment = (
 };
 
 const intersectRectanguloidWithLineSegment = (
-  element: ExcalidrawRectanguloidElement,
+  element: SveltedrawRectanguloidElement,
   elementsMap: ElementsMap,
   segment: LineSegment<GlobalPoint>,
   offset: number = 0,
@@ -660,7 +660,7 @@ const intersectRectanguloidWithLineSegment = (
  * @returns
  */
 const intersectDiamondWithLineSegment = (
-  element: ExcalidrawDiamondElement,
+  element: SveltedrawDiamondElement,
   elementsMap: ElementsMap,
   l: LineSegment<GlobalPoint>,
   offset: number = 0,
@@ -710,7 +710,7 @@ const intersectDiamondWithLineSegment = (
  * @returns
  */
 const intersectEllipseWithLineSegment = (
-  element: ExcalidrawEllipseElement,
+  element: SveltedrawEllipseElement,
   elementsMap: ElementsMap,
   l: LineSegment<GlobalPoint>,
   offset: number = 0,
@@ -736,7 +736,7 @@ const intersectEllipseWithLineSegment = (
  */
 const isPointOnElementOutline = (
   point: GlobalPoint,
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   elementsMap: ElementsMap,
   tolerance = 1,
 ) => distanceToElement(element, elementsMap, point) <= tolerance;
@@ -750,7 +750,7 @@ const isPointOnElementOutline = (
  */
 export const isPointInElement = (
   point: GlobalPoint,
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   elementsMap: ElementsMap,
 ) => {
   if (
@@ -786,13 +786,13 @@ export const isPointInElement = (
 };
 
 export const isBindableElementInsideOtherBindable = (
-  innerElement: ExcalidrawBindableElement,
-  outerElement: ExcalidrawBindableElement,
+  innerElement: SveltedrawBindableElement,
+  outerElement: SveltedrawBindableElement,
   elementsMap: ElementsMap,
 ): boolean => {
   // Get corner points of the inner element based on its type
   const getCornerPoints = (
-    element: ExcalidrawElement,
+    element: SveltedrawElement,
     offset: number,
   ): GlobalPoint[] => {
     const { x, y, width, height, angle } = element;

@@ -56,7 +56,7 @@
     ErrorDialog,
     // Misc
     Avatar,
-    ExcalidrawLogo,
+    SveltedrawLogo,
     FollowMode,
     Collapsible,
     // Icons
@@ -223,8 +223,8 @@
       </div>
 
       <div class="demo">
-        <h2>ExcalidrawLogo</h2>
-        <ExcalidrawLogo withText size="normal" />
+        <h2>SveltedrawLogo</h2>
+        <SveltedrawLogo withText size="normal" />
       </div>
 
       <div class="demo">

@@ -1,6 +1,6 @@
 import type { VERSIONS } from "@sveltedraw/common";
 
-import type { ExcalidrawElement } from "@sveltedraw/element/types";
+import type { SveltedrawElement } from "@sveltedraw/element/types";
 
 import type { cleanAppStateForExport } from "../appState";
 import type {
@@ -15,7 +15,7 @@ export interface ExportedDataState {
   type: string;
   version: number;
   source: string;
-  elements: readonly ExcalidrawElement[];
+  elements: readonly SveltedrawElement[];
   appState: ReturnType<typeof cleanAppStateForExport>;
   files: BinaryFiles | undefined;
 }
@@ -36,7 +36,7 @@ export interface ImportedDataState {
   type?: string;
   version?: number;
   source?: string;
-  elements?: readonly ExcalidrawElement[] | null;
+  elements?: readonly SveltedrawElement[] | null;
   appState?: Readonly<
     Partial<
       AppState & {
@@ -61,6 +61,6 @@ export interface ImportedLibraryData extends Partial<ExportedLibraryData> {
   library?: LibraryItems;
 }
 
-export type ExcalidrawLibraryIds = {
+export type SveltedrawLibraryIds = {
   itemIds: LibraryItem["id"][];
 };

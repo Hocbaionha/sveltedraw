@@ -8,7 +8,7 @@ import type { AppProps, AppState } from "@sveltedraw/engine/types";
 
 import { elementsAreInSameGroup } from "./groups";
 
-import type { ExcalidrawElement } from "./types";
+import type { SveltedrawElement } from "./types";
 
 export const defaultGetElementLinkFromSelection: Exclude<
   AppProps["generateLinkForSelection"],
@@ -29,7 +29,7 @@ export const defaultGetElementLinkFromSelection: Exclude<
 };
 
 export const getLinkIdAndTypeFromSelection = (
-  selectedElements: ExcalidrawElement[],
+  selectedElements: SveltedrawElement[],
   appState: AppState,
 ): {
   id: string;
@@ -66,7 +66,7 @@ export const getLinkIdAndTypeFromSelection = (
 };
 
 export const canCreateLinkFromElements = (
-  selectedElements: ExcalidrawElement[],
+  selectedElements: SveltedrawElement[],
 ) => {
   if (selectedElements.length === 1) {
     return true;

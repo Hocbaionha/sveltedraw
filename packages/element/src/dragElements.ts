@@ -30,7 +30,7 @@ import {
 
 import type { Scene } from "./Scene";
 
-import type { ExcalidrawElement } from "./types";
+import type { SveltedrawElement } from "./types";
 
 export const dragSelectedElements = (
   pointerDownState: PointerDownState,
@@ -84,7 +84,7 @@ export const dragSelectedElements = (
     }
   }
 
-  const origElements: ExcalidrawElement[] = [];
+  const origElements: SveltedrawElement[] = [];
 
   for (const element of elementsToUpdate) {
     const origElement = pointerDownState.originalElements.get(element.id);

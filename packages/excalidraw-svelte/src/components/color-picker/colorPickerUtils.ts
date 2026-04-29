@@ -9,7 +9,7 @@ import type {
 } from "@sveltedraw/common";
 // @ts-ignore
 import { MAX_CUSTOM_COLORS_USED_IN_CANVAS } from "@sveltedraw/common";
-import type { ExcalidrawElement } from "@sveltedraw/element/types";
+import type { SveltedrawElement } from "@sveltedraw/element/types";
 
 export type ColorPickerType =
   | "canvasBackground"
@@ -53,7 +53,7 @@ export function isCustomColor({
 }
 
 export function getMostUsedCustomColors(
-  elements: readonly ExcalidrawElement[],
+  elements: readonly SveltedrawElement[],
   type: "elementBackground" | "elementStroke",
   palette: ColorPaletteCustom,
 ) {

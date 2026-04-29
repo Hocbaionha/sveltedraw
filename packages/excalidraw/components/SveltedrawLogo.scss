@@ -1,5 +1,5 @@
 .excalidraw {
-  .ExcalidrawLogo {
+  .SveltedrawLogo {
     --logo-icon--mobile: 1rem;
     --logo-text--mobile: 0.75rem;
 
@@ -22,64 +22,64 @@
       flex: 0 0 auto;
     }
 
-    .ExcalidrawLogo-icon {
+    .SveltedrawLogo-icon {
       width: auto;
       color: var(--color-logo-icon);
     }
 
-    .ExcalidrawLogo-text {
+    .SveltedrawLogo-text {
       margin-left: 0.75rem;
       width: auto;
       color: var(--color-logo-text);
     }
 
     &.is-mobile {
-      .ExcalidrawLogo-icon {
+      .SveltedrawLogo-icon {
         height: var(--logo-icon--mobile);
       }
 
-      .ExcalidrawLogo-text {
+      .SveltedrawLogo-text {
         height: var(--logo-text--mobile);
         margin-left: 0.5rem;
       }
     }
 
     &.is-xs {
-      .ExcalidrawLogo-icon {
+      .SveltedrawLogo-icon {
         height: var(--logo-icon--xs);
       }
 
-      .ExcalidrawLogo-text {
+      .SveltedrawLogo-text {
         height: var(--logo-text--xs);
       }
     }
 
     &.is-small {
-      .ExcalidrawLogo-icon {
+      .SveltedrawLogo-icon {
         height: var(--logo-icon--small);
       }
 
-      .ExcalidrawLogo-text {
+      .SveltedrawLogo-text {
         height: var(--logo-text--small);
       }
     }
 
     &.is-normal {
-      .ExcalidrawLogo-icon {
+      .SveltedrawLogo-icon {
         height: var(--logo-icon--normal);
       }
 
-      .ExcalidrawLogo-text {
+      .SveltedrawLogo-text {
         height: var(--logo-text--normal);
       }
     }
 
     &.is-large {
-      .ExcalidrawLogo-icon {
+      .SveltedrawLogo-icon {
         height: var(--logo-icon--large);
       }
 
-      .ExcalidrawLogo-text {
+      .SveltedrawLogo-text {
         height: var(--logo-text--large);
       }
     }

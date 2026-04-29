@@ -69,13 +69,13 @@ import { getCornerRadius } from "./utils";
 import { ShapeCache } from "./shape";
 
 import type {
-  ExcalidrawElement,
-  ExcalidrawTextElement,
+  SveltedrawElement,
+  SveltedrawTextElement,
   NonDeletedExcalidrawElement,
-  ExcalidrawFreeDrawElement,
-  ExcalidrawImageElement,
-  ExcalidrawTextElementWithContainer,
-  ExcalidrawFrameLikeElement,
+  SveltedrawFreeDrawElement,
+  SveltedrawImageElement,
+  SveltedrawTextElementWithContainer,
+  SveltedrawFrameLikeElement,
   NonDeletedSceneElementsMap,
   ElementsMap,
 } from "./types";
@@ -83,13 +83,13 @@ import type {
 import type { RoughCanvas } from "roughjs/bin/canvas";
 
 const isPendingImageElement = (
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   renderConfig: StaticCanvasRenderConfig,
 ) =>
   isInitializedImageElement(element) &&
   !renderConfig.imageCache.has(element.fileId);
 
-const getCanvasPadding = (element: ExcalidrawElement) => {
+const getCanvasPadding = (element: SveltedrawElement) => {
   switch (element.type) {
     case "freedraw":
       return element.strokeWidth * 12;
@@ -106,8 +106,8 @@ const getCanvasPadding = (element: ExcalidrawElement) => {
 };
 
 export const getRenderOpacity = (
-  element: ExcalidrawElement,
-  containingFrame: ExcalidrawFrameLikeElement | null,
+  element: SveltedrawElement,
+  containingFrame: SveltedrawFrameLikeElement | null,
   elementsPendingErasure: ElementsPendingErasure,
   pendingNodes: Readonly<PendingExcalidrawElements> | null,
   globalAlpha: number = 1,
@@ -131,8 +131,8 @@ export const getRenderOpacity = (
   return opacity;
 };
 
-export interface ExcalidrawElementWithCanvas {
-  element: ExcalidrawElement | ExcalidrawTextElement;
+export interface SveltedrawElementWithCanvas {
+  element: SveltedrawElement | SveltedrawTextElement;
   canvas: HTMLCanvasElement;
   theme: AppState["theme"];
   scale: number;
@@ -148,7 +148,7 @@ export interface ExcalidrawElementWithCanvas {
   // strokeColor / roughness ...) keep painting the previous frame's bitmap.
   elementVersion: number;
   boundTextElementVersion: number | null;
-  imageCrop: ExcalidrawImageElement["crop"] | null;
+  imageCrop: SveltedrawImageElement["crop"] | null;
   containingFrameOpacity: number;
   boundTextCanvas: HTMLCanvasElement;
 }
@@ -214,7 +214,7 @@ const generateElementCanvas = (
   zoom: Zoom,
   renderConfig: StaticCanvasRenderConfig,
   appState: StaticCanvasAppState | InteractiveCanvasAppState,
-): ExcalidrawElementWithCanvas | null => {
+): SveltedrawElementWithCanvas | null => {
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d")!;
   const padding = getCanvasPadding(element);
@@ -367,7 +367,7 @@ IMAGE_ERROR_PLACEHOLDER_IMG.src = `data:${MIME_TYPES.svg},${encodeURIComponent(
 )}`;
 
 const drawImagePlaceholder = (
-  element: ExcalidrawImageElement,
+  element: SveltedrawImageElement,
   context: CanvasRenderingContext2D,
   theme: StaticCanvasRenderConfig["theme"],
 ) => {
@@ -636,8 +636,8 @@ const drawElementOnCanvas = (
 };
 
 export const elementWithCanvasCache = new WeakMap<
-  ExcalidrawElement,
-  ExcalidrawElementWithCanvas
+  SveltedrawElement,
+  SveltedrawElementWithCanvas
 >();
 
 const generateElementWithCanvas = (
@@ -705,7 +705,7 @@ const generateElementWithCanvas = (
 };
 
 const drawElementFromCanvas = (
-  elementWithCanvas: ExcalidrawElementWithCanvas,
+  elementWithCanvas: SveltedrawElementWithCanvas,
   context: CanvasRenderingContext2D,
   renderConfig: StaticCanvasRenderConfig,
   appState: StaticCanvasAppState | InteractiveCanvasAppState,
@@ -778,7 +778,7 @@ const drawElementFromCanvas = (
       const textElement = getBoundTextElement(
         element,
         allElementsMap,
-      ) as ExcalidrawTextElementWithContainer;
+      ) as SveltedrawTextElementWithContainer;
       const coords = getContainerCoords(element);
       context.strokeStyle = "#c92a2a";
       context.lineWidth = 3;
@@ -973,7 +973,7 @@ const renderElementCore = (
             const boundTextCoords =
               LinearElementEditor.getBoundTextElementPosition(
                 container,
-                element as ExcalidrawTextElementWithContainer,
+                element as SveltedrawTextElementWithContainer,
                 elementsMap,
               );
             shiftX = (x2 - x1) / 2 - (boundTextCoords.x - x1);
@@ -1146,7 +1146,7 @@ const renderElementCore = (
 };
 
 export function getFreedrawOutlineAsSegments(
-  element: ExcalidrawFreeDrawElement,
+  element: SveltedrawFreeDrawElement,
   points: [number, number][],
   elementsMap: ElementsMap,
 ) {

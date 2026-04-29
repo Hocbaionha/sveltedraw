@@ -17,7 +17,7 @@
   //  - Scene-mutation nonce wiring (Renderer repaints via appState deps only
   //    so far; batch 4 adds a sceneNonce $state bumped on every mutation).
   //  - syncActionResult / actionManager / history integration → batch 5.
-  //  - ExcalidrawImperativeAPI (`onExcalidrawAPI` callback) → batch 6.
+  //  - SveltedrawImperativeAPI (`onExcalidrawAPI` callback) → batch 6.
   //  - textWysiwyg.ts port → batch 7.
 
   // @ts-ignore — upstream, resolved via Vite alias; tsconfig path mapping

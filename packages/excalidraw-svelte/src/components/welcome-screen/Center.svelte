@@ -3,7 +3,7 @@
   //
   // The original renders a default <Logo />, <Heading>, and <Menu> with
   // <MenuItemHelp /> + <MenuItemLoadScene /> when no children are supplied.
-  // Those defaults depend on ExcalidrawLogo, ActionManager and i18n which
+  // Those defaults depend on SveltedrawLogo, ActionManager and i18n which
   // are not yet ported — so for now Center requires `children`. The default
   // content will land alongside Phase 6 (App-context bridge).
 

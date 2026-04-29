@@ -37,8 +37,8 @@ import { ShapeCache } from "@sveltedraw/element";
 import { getElementAbsoluteCoords } from "@sveltedraw/element";
 
 import type {
-  ExcalidrawElement,
-  ExcalidrawTextElementWithContainer,
+  SveltedrawElement,
+  SveltedrawTextElementWithContainer,
   NonDeletedExcalidrawElement,
 } from "@sveltedraw/element/types";
 
@@ -105,7 +105,7 @@ const renderElementToSvg = (
 
       const boundTextCoords = LinearElementEditor.getBoundTextElementPosition(
         container,
-        element as ExcalidrawTextElementWithContainer,
+        element as SveltedrawTextElementWithContainer,
         elementsMap,
       );
       cx = (x2 - x1) / 2 - (boundTextCoords.x - x1);
@@ -127,7 +127,7 @@ const renderElementToSvg = (
     root = anchorTag;
   }
 
-  const addToRoot = (node: SVGElement, element: ExcalidrawElement) => {
+  const addToRoot = (node: SVGElement, element: SveltedrawElement) => {
     if (isTestEnv()) {
       node.setAttribute("data-id", element.id);
     }
@@ -257,7 +257,7 @@ const renderElementToSvg = (
       );
       addToRoot(node, element);
 
-      const label: ExcalidrawElement =
+      const label: SveltedrawElement =
         createPlaceholderEmbeddableLabel(element);
       renderElementToSvg(
         label,

@@ -50,23 +50,23 @@ import {
 
 import type {
   ElementsMap,
-  ExcalidrawArrowElement,
-  ExcalidrawBindableElement,
-  ExcalidrawDiamondElement,
-  ExcalidrawElement,
-  ExcalidrawFreeDrawElement,
-  ExcalidrawLinearElement,
-  ExcalidrawRectanguloidElement,
+  SveltedrawArrowElement,
+  SveltedrawBindableElement,
+  SveltedrawDiamondElement,
+  SveltedrawElement,
+  SveltedrawFreeDrawElement,
+  SveltedrawLinearElement,
+  SveltedrawRectanguloidElement,
 } from "./types";
 
 type ElementShape = [LineSegment<GlobalPoint>[], Curve<GlobalPoint>[]];
 
 const ElementShapesCache = new WeakMap<
-  ExcalidrawElement,
-  { version: ExcalidrawElement["version"]; shapes: Map<number, ElementShape> }
+  SveltedrawElement,
+  { version: SveltedrawElement["version"]; shapes: Map<number, ElementShape> }
 >();
 
-const getElementShapesCacheEntry = <T extends ExcalidrawElement>(
+const getElementShapesCacheEntry = <T extends SveltedrawElement>(
   element: T,
   offset: number,
 ): ElementShape | undefined => {
@@ -86,7 +86,7 @@ const getElementShapesCacheEntry = <T extends ExcalidrawElement>(
   return shapes.get(offset);
 };
 
-const setElementShapesCacheEntry = <T extends ExcalidrawElement>(
+const setElementShapesCacheEntry = <T extends SveltedrawElement>(
   element: T,
   shape: ElementShape,
   offset: number,
@@ -123,7 +123,7 @@ const setElementShapesCacheEntry = <T extends ExcalidrawElement>(
  * @returns The rotated in components.
  */
 export function deconstructLinearOrFreeDrawElement(
-  element: ExcalidrawLinearElement | ExcalidrawFreeDrawElement,
+  element: SveltedrawLinearElement | SveltedrawFreeDrawElement,
   elementsMap: ElementsMap,
 ): [LineSegment<GlobalPoint>[], Curve<GlobalPoint>[]] {
   const cachedShape = getElementShapesCacheEntry(element, 0);
@@ -208,7 +208,7 @@ export function deconstructLinearOrFreeDrawElement(
  * @returns Tuple of **unrotated** line segments (0) and curves (1)
  */
 export function deconstructRectanguloidElement(
-  element: ExcalidrawRectanguloidElement,
+  element: SveltedrawRectanguloidElement,
   offset: number = 0,
 ): [LineSegment<GlobalPoint>[], Curve<GlobalPoint>[]] {
   const cachedShape = getElementShapesCacheEntry(element, offset);
@@ -340,7 +340,7 @@ export function deconstructRectanguloidElement(
 }
 
 export function getDiamondBaseCorners(
-  element: ExcalidrawDiamondElement,
+  element: SveltedrawDiamondElement,
   offset: number = 0,
 ): Curve<GlobalPoint>[] {
   const [topX, topY, rightX, rightY, bottomX, bottomY, leftX, leftY] =
@@ -420,7 +420,7 @@ export function getDiamondBaseCorners(
  * @returns Tuple of line **unrotated** segments (0) and curves (1)
  */
 export function deconstructDiamondElement(
-  element: ExcalidrawDiamondElement,
+  element: SveltedrawDiamondElement,
   offset: number = 0,
 ): [LineSegment<GlobalPoint>[], Curve<GlobalPoint>[]] {
   const cachedShape = getElementShapesCacheEntry(element, offset);
@@ -465,7 +465,7 @@ export function deconstructDiamondElement(
 // Checks if the first and last point are close enough
 // to be considered a loop
 export const isPathALoop = (
-  points: ExcalidrawLinearElement["points"],
+  points: SveltedrawLinearElement["points"],
   /** supply if you want the loop detection to account for current zoom */
   zoomValue: Zoom["value"] = 1 as NormalizedZoomValue,
 ): boolean => {
@@ -480,7 +480,7 @@ export const isPathALoop = (
   return false;
 };
 
-export const getCornerRadius = (x: number, element: ExcalidrawElement) => {
+export const getCornerRadius = (x: number, element: SveltedrawElement) => {
   if (
     element.roundness?.type === ROUNDNESS.PROPORTIONAL_RADIUS ||
     element.roundness?.type === ROUNDNESS.LEGACY
@@ -504,7 +504,7 @@ export const getCornerRadius = (x: number, element: ExcalidrawElement) => {
 };
 
 const getDiagonalsForBindableElement = (
-  element: ExcalidrawElement,
+  element: SveltedrawElement,
   elementsMap: ElementsMap,
 ) => {
   // for rectangles, shrink the diagonals a bit because there's something
@@ -589,7 +589,7 @@ const getDiagonalsForBindableElement = (
 
 export const getSnapOutlineMidPoint = (
   point: GlobalPoint,
-  element: ExcalidrawBindableElement,
+  element: SveltedrawBindableElement,
   elementsMap: ElementsMap,
   zoom: AppState["zoom"],
 ) => {
@@ -651,9 +651,9 @@ export const getSnapOutlineMidPoint = (
 };
 
 export const projectFixedPointOntoDiagonal = (
-  arrow: ExcalidrawArrowElement,
+  arrow: SveltedrawArrowElement,
   point: GlobalPoint,
-  element: ExcalidrawBindableElement,
+  element: SveltedrawBindableElement,
   startOrEnd: "start" | "end",
   elementsMap: ElementsMap,
   zoom: AppState["zoom"],
@@ -697,7 +697,7 @@ export const projectFixedPointOntoDiagonal = (
     const otherBindable =
       otherBinding &&
       (elementsMap.get(otherBinding.elementId) as
-        | ExcalidrawBindableElement
+        | SveltedrawBindableElement
         | undefined);
     const otherFocusPoint =
       otherBinding &&

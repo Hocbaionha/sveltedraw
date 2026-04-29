@@ -12,27 +12,27 @@ import type { MaybeTransformHandleType } from "@sveltedraw/element";
 
 import type {
   PointerType,
-  ExcalidrawLinearElement,
+  SveltedrawLinearElement,
   NonDeletedExcalidrawElement,
   NonDeleted,
   TextAlign,
-  ExcalidrawElement,
+  SveltedrawElement,
   GroupId,
-  ExcalidrawBindableElement,
+  SveltedrawBindableElement,
   Arrowhead,
   FontFamilyValues,
   FileId,
   Theme,
   StrokeRoundness,
-  ExcalidrawEmbeddableElement,
-  ExcalidrawMagicFrameElement,
-  ExcalidrawFrameLikeElement,
-  ExcalidrawElementType,
-  ExcalidrawIframeLikeElement,
+  SveltedrawEmbeddableElement,
+  SveltedrawMagicFrameElement,
+  SveltedrawFrameLikeElement,
+  SveltedrawElementType,
+  SveltedrawIframeLikeElement,
   OrderedExcalidrawElement,
-  ExcalidrawNonSelectionElement,
+  SveltedrawNonSelectionElement,
   BindMode,
-  ExcalidrawTextElement,
+  SveltedrawTextElement,
 } from "@sveltedraw/element/types";
 
 import type {
@@ -162,7 +162,7 @@ export type BinaryFileData = {
 
 export type BinaryFileMetadata = Omit<BinaryFileData, "dataURL">;
 
-export type BinaryFiles = Record<ExcalidrawElement["id"], BinaryFileData>;
+export type BinaryFiles = Record<SveltedrawElement["id"], BinaryFileData>;
 
 export type ToolType =
   | "selection"
@@ -182,7 +182,7 @@ export type ToolType =
   | "embeddable"
   | "laser";
 
-export type ElementOrToolType = ExcalidrawElementType | ToolType | "custom";
+export type ElementOrToolType = SveltedrawElementType | ToolType | "custom";
 
 export type ActiveTool =
   | {
@@ -312,7 +312,7 @@ export interface AppState {
    * for a newly created element
    * - set on pointer down, updated during pointer move, used on pointer up
    */
-  newElement: NonDeleted<ExcalidrawNonSelectionElement> | null;
+  newElement: NonDeleted<SveltedrawNonSelectionElement> | null;
   /**
    * for a single element that's being resized
    * - set on pointer down when it's selected and the active tool is selection
@@ -322,7 +322,7 @@ export interface AppState {
    * multiElement is for multi-point linear element that's created by clicking as opposed to dragging
    * - when set and present, the editor will handle linear element creation logic accordingly
    */
-  multiElement: NonDeleted<ExcalidrawLinearElement> | null;
+  multiElement: NonDeleted<SveltedrawLinearElement> | null;
   /**
    * decoupled from newElement, dragging selection only creates selectionElement
    * - set on pointer down, updated during pointer move
@@ -339,12 +339,12 @@ export interface AppState {
   bindingPreference: "enabled" | "disabled";
   /** user preference whether arrow snap to midpoints while binding */
   isMidpointSnappingEnabled: boolean;
-  startBoundElement: NonDeleted<ExcalidrawBindableElement> | null;
+  startBoundElement: NonDeleted<SveltedrawBindableElement> | null;
   suggestedBinding: {
-    element: NonDeleted<ExcalidrawBindableElement>;
+    element: NonDeleted<SveltedrawBindableElement>;
     midPoint?: GlobalPoint;
   } | null;
-  frameToHighlight: NonDeleted<ExcalidrawFrameLikeElement> | null;
+  frameToHighlight: NonDeleted<SveltedrawFrameLikeElement> | null;
   frameRendering: {
     enabled: boolean;
     name: boolean;
@@ -352,11 +352,11 @@ export interface AppState {
     clip: boolean;
   };
   editingFrame: string | null;
-  elementsToHighlight: NonDeleted<ExcalidrawElement>[] | null;
+  elementsToHighlight: NonDeleted<SveltedrawElement>[] | null;
   /**
    * set when a new text is created or when an existing text is being edited
    */
-  editingTextElement: ExcalidrawTextElement | null;
+  editingTextElement: SveltedrawTextElement | null;
   activeTool: {
     /**
      * indicates a previous tool we should revert back to if we deselect the
@@ -379,9 +379,9 @@ export interface AppState {
   exportScale: number;
   currentItemStrokeColor: string;
   currentItemBackgroundColor: string;
-  currentItemFillStyle: ExcalidrawElement["fillStyle"];
+  currentItemFillStyle: SveltedrawElement["fillStyle"];
   currentItemStrokeWidth: number;
-  currentItemStrokeStyle: ExcalidrawElement["strokeStyle"];
+  currentItemStrokeStyle: SveltedrawElement["strokeStyle"];
   currentItemRoughness: number;
   currentItemOpacity: number;
   currentItemFontFamily: FontFamilyValues;
@@ -419,7 +419,7 @@ export interface AppState {
     | { name: "ttd"; tab: "text-to-diagram" | "mermaid" }
     | { name: "commandPalette" }
     | { name: "settings" }
-    | { name: "elementLinkSelector"; sourceElementId: ExcalidrawElement["id"] }
+    | { name: "elementLinkSelector"; sourceElementId: SveltedrawElement["id"] }
     | { name: "charts"; data: Spreadsheet; rawText: string };
   /**
    * Reflects user preference for whether the default sidebar should be docked.
@@ -481,11 +481,11 @@ export interface AppState {
 
   /** image cropping */
   isCropping: boolean;
-  croppingElementId: ExcalidrawElement["id"] | null;
+  croppingElementId: SveltedrawElement["id"] | null;
 
   /** null if no search matches found / search closed */
   searchMatches: Readonly<{
-    focusedId: ExcalidrawElement["id"] | null;
+    focusedId: SveltedrawElement["id"] | null;
     matches: readonly SearchMatch[];
   }> | null;
 
@@ -542,7 +542,7 @@ export declare class GestureEvent extends UIEvent {
 // libraries
 // -----------------------------------------------------------------------------
 /** @deprecated legacy: do not use outside of migration paths */
-export type LibraryItem_v1 = readonly NonDeleted<ExcalidrawElement>[];
+export type LibraryItem_v1 = readonly NonDeleted<SveltedrawElement>[];
 /** @deprecated legacy: do not use outside of migration paths */
 type LibraryItems_v1 = readonly LibraryItem_v1[];
 
@@ -550,7 +550,7 @@ type LibraryItems_v1 = readonly LibraryItem_v1[];
 export type LibraryItem = {
   id: string;
   status: "published" | "unpublished";
-  elements: readonly NonDeleted<ExcalidrawElement>[];
+  elements: readonly NonDeleted<SveltedrawElement>[];
   /** timestamp in epoch (ms) */
   created: number;
   name?: string;
@@ -566,7 +566,7 @@ export type LibraryItemsSource =
   | MaybePromise<LibraryItems_anyVersion | Blob>;
 // -----------------------------------------------------------------------------
 
-export type ExcalidrawInitialDataState = Merge<
+export type SveltedrawInitialDataState = Merge<
   ImportedDataState,
   {
     libraryItems?: MaybePromise<Required<ImportedDataState>["libraryItems"]>;
@@ -585,7 +585,7 @@ export type OnExportProgress = {
   progress?: number;
 };
 
-export interface ExcalidrawProps {
+export interface SveltedrawProps {
   onChange?: (
     elements: readonly OrderedExcalidrawElement[],
     appState: AppState,
@@ -596,17 +596,17 @@ export interface ExcalidrawProps {
    */
   onIncrement?: (event: DurableIncrement | EphemeralIncrement) => void;
   initialData?:
-    | (() => MaybePromise<ExcalidrawInitialDataState | null>)
-    | MaybePromise<ExcalidrawInitialDataState | null>;
+    | (() => MaybePromise<SveltedrawInitialDataState | null>)
+    | MaybePromise<SveltedrawInitialDataState | null>;
   /**
    * Invoked as soon as the Excalidraw API is available
    * NOTE editor is not yet mounted, and state is not yet initialized
    */
-  onExcalidrawAPI?: (api: ExcalidrawImperativeAPI | null) => void;
+  onExcalidrawAPI?: (api: SveltedrawImperativeAPI | null) => void;
   /**
    * Invoked once the editor root is mounted.
    */
-  onMount?: (payload: ExcalidrawMountPayload) => void;
+  onMount?: (payload: SveltedrawMountPayload) => void;
   /**
    * Invoked when the editor root is unmounted.
    */
@@ -614,7 +614,7 @@ export interface ExcalidrawProps {
   /**
    * Invoked once the initial scene is loaded.
    */
-  onInitialize?: (api: ExcalidrawImperativeAPI) => void;
+  onInitialize?: (api: SveltedrawImperativeAPI) => void;
   isCollaborating?: boolean;
   onPointerUpdate?: (payload: {
     pointer: { x: number; y: number; tool: "pointer" | "laser" };
@@ -637,10 +637,10 @@ export interface ExcalidrawProps {
    * the element if changes are made)
    */
   onDuplicate?: (
-    nextElements: readonly ExcalidrawElement[],
+    nextElements: readonly SveltedrawElement[],
     /** excludes the duplicated elements */
-    prevElements: readonly ExcalidrawElement[],
-  ) => ExcalidrawElement[] | void;
+    prevElements: readonly SveltedrawElement[],
+  ) => SveltedrawElement[] | void;
   renderTopLeftUI?: (
     isMobile: boolean,
     appState: UIAppState,
@@ -693,7 +693,7 @@ export interface ExcalidrawProps {
     | RegExp[]
     | ((link: string) => boolean | undefined);
   renderEmbeddable?: (
-    element: NonDeleted<ExcalidrawEmbeddableElement>,
+    element: NonDeleted<SveltedrawEmbeddableElement>,
     appState: AppState,
   ) => JSX.Element | null;
   aiEnabled?: boolean;
@@ -713,7 +713,7 @@ export interface ExcalidrawProps {
      * JSON-embedded PNG (which is also identified as `json` type here)*/
     type: "json",
     data: {
-      elements: readonly ExcalidrawElement[];
+      elements: readonly SveltedrawElement[];
       appState: AppState;
       files: BinaryFiles;
     },
@@ -782,7 +782,7 @@ export type UIOptions = Partial<{
 }>;
 
 export type AppProps = Merge<
-  ExcalidrawProps,
+  SveltedrawProps,
   {
     UIOptions: Merge<
       UIOptions,
@@ -869,7 +869,7 @@ export type PointerDownState = Readonly<{
   lastCoords: { x: number; y: number };
   // original element frozen snapshots so we can access the original
   // element attribute values at time of pointerdown
-  originalElements: Map<string, NonDeleted<ExcalidrawElement>>;
+  originalElements: Map<string, NonDeleted<SveltedrawElement>>;
   resize: {
     // Handle when resizing, might change during the pointer interaction
     handleType: MaybeTransformHandleType;
@@ -885,10 +885,10 @@ export type PointerDownState = Readonly<{
   hit: {
     // The element the pointer is "hitting", is determined on the initial
     // pointer down event
-    element: NonDeleted<ExcalidrawElement> | null;
+    element: NonDeleted<SveltedrawElement> | null;
     // The elements the pointer is "hitting", is determined on the initial
     // pointer down event
-    allHitElements: NonDeleted<ExcalidrawElement>[];
+    allHitElements: NonDeleted<SveltedrawElement>[];
     // This is determined on the initial pointer down event
     wasAddedToSelection: boolean;
     // Whether selected element(s) were duplicated, might change during the
@@ -927,8 +927,8 @@ export type PointerDownState = Readonly<{
 
 export type UnsubscribeCallback = () => void;
 
-export type ExcalidrawMountPayload = {
-  excalidrawAPI: ExcalidrawImperativeAPI;
+export type SveltedrawMountPayload = {
+  excalidrawAPI: SveltedrawImperativeAPI;
   /*
    *Excalidraw container.
    * should never be null, but just to be safe
@@ -936,13 +936,13 @@ export type ExcalidrawMountPayload = {
   container: HTMLDivElement | null;
 };
 
-export type ExcalidrawImperativeAPIEventMap = {
-  "editor:mount": [payload: ExcalidrawMountPayload];
-  "editor:initialize": [api: ExcalidrawImperativeAPI];
+export type SveltedrawImperativeAPIEventMap = {
+  "editor:mount": [payload: SveltedrawMountPayload];
+  "editor:initialize": [api: SveltedrawImperativeAPI];
   "editor:unmount": [];
 };
 
-export interface ExcalidrawImperativeAPI {
+export interface SveltedrawImperativeAPI {
   /** Whether the editor has been unmounted and the API is no longer usable. */
   isDestroyed: boolean;
   updateScene: InstanceType<typeof App>["updateScene"];
@@ -982,7 +982,7 @@ export interface ExcalidrawImperativeAPI {
   updateFrameRendering: InstanceType<typeof App>["updateFrameRendering"];
   onChange: (
     callback: (
-      elements: readonly ExcalidrawElement[],
+      elements: readonly SveltedrawElement[],
       appState: AppState,
       files: BinaryFiles,
     ) => void,
@@ -1024,13 +1024,13 @@ export type FrameNameBounds = {
 
 export type FrameNameBoundsCache = {
   get: (
-    frameElement: ExcalidrawFrameLikeElement | ExcalidrawMagicFrameElement,
+    frameElement: SveltedrawFrameLikeElement | SveltedrawMagicFrameElement,
   ) => FrameNameBounds | null;
   _cache: Map<
     string,
     FrameNameBounds & {
       zoom: AppState["zoom"]["value"];
-      versionNonce: ExcalidrawFrameLikeElement["versionNonce"];
+      versionNonce: SveltedrawFrameLikeElement["versionNonce"];
     }
   >;
 };
@@ -1054,13 +1054,13 @@ export type Primitive =
 export type JSONValue = string | number | boolean | null | object;
 
 export type EmbedsValidationStatus = Map<
-  ExcalidrawIframeLikeElement["id"],
+  SveltedrawIframeLikeElement["id"],
   boolean
 >;
 
-export type ElementsPendingErasure = Set<ExcalidrawElement["id"]>;
+export type ElementsPendingErasure = Set<SveltedrawElement["id"]>;
 
-export type PendingExcalidrawElements = ExcalidrawElement[];
+export type PendingExcalidrawElements = SveltedrawElement[];
 
 /** Runtime gridSize value. Null indicates disabled grid. */
 export type NullableGridSize =
@@ -1068,8 +1068,8 @@ export type NullableGridSize =
   | null;
 
 export type GenerateDiagramToCode = (props: {
-  frame: ExcalidrawMagicFrameElement;
-  children: readonly ExcalidrawElement[];
+  frame: SveltedrawMagicFrameElement;
+  children: readonly SveltedrawElement[];
 }) => MaybePromise<{ html: string }>;
 
 export type Offsets = Partial<{
