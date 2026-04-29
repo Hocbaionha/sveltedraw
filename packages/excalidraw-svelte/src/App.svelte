@@ -157,6 +157,9 @@
   import ZoomControls from "./components/ZoomControls.svelte";
   import FloatingLibraryPanel from "./components/FloatingLibraryPanel.svelte";
   import LiveCollaborationTrigger from "./components/LiveCollaborationTrigger.svelte";
+  import CollabIdentityDialog, {
+    type IdentityResult,
+  } from "./components/CollabIdentityDialog.svelte";
   import {
     createCollabStore,
     COLLAB_STORE_KEY,
@@ -1212,10 +1215,24 @@
     }
   };
 
+  // ── Identity dialog state (Phase 17 / A3) ───────────────────────────
+  // The dialog is opened only on explicit button-click flows when no
+  // identity has been persisted. Auto-start (URL/env) bypasses it and
+  // uses anon-fallback so embedded scenarios stay silent.
+  let collabDialogOpen = $state(false);
+  // Server URL captured at click time; remembered across the dialog's
+  // lifetime so submit knows where to connect. Reset on close.
+  let pendingCollabServerUrl: string | null = $state(null);
+  // Stable id offered to the dialog as the default (so re-opening the
+  // dialog after a cancel keeps the same anon id). Regenerated only
+  // when the dialog actually opens with no prior identity.
+  let pendingAnonId: string | null = $state(null);
+
   /**
    * Toggle handler for the LiveCollaborationTrigger button.
    * - If already in a session: leave.
-   * - Otherwise: resolve server + identity, then join.
+   * - Otherwise: resolve server, then either join with persisted
+   *   identity (fast path) or open the identity dialog.
    * - If no server URL is configured: warn (Commit 4 will surface a toast).
    */
   const handleCollabButtonClick = (): void => {
@@ -1231,11 +1248,52 @@
       );
       return;
     }
-    // Commit 2 will replace this with the identity dialog when no
-    // identity is persisted yet. For now, anon-fallback keeps the
-    // button functional out of the box.
-    const identity = loadStoredIdentity() ?? makeAnonIdentity();
-    void startCollabSession(serverUrl, identity);
+    const stored = loadStoredIdentity();
+    if (stored) {
+      // Fast path: known identity, skip dialog.
+      void startCollabSession(serverUrl, stored);
+      return;
+    }
+    // First-time user: prompt for name + color before joining. We
+    // generate a stable anon id up front so canceling and reopening
+    // the dialog doesn't churn awareness ids on retry.
+    pendingCollabServerUrl = serverUrl;
+    pendingAnonId = makeAnonIdentity().id;
+    collabDialogOpen = true;
+  };
+
+  /**
+   * Identity dialog submit handler. Persists if requested, then joins.
+   * Persisted form omits the volatile `persist` flag — only the
+   * identity triple is durable.
+   */
+  const onCollabIdentitySubmit = (result: IdentityResult): void => {
+    const identity: StoredIdentity = {
+      id: result.id,
+      name: result.name,
+      color: result.color,
+    };
+    if (result.persist) {
+      try {
+        window.localStorage.setItem(
+          COLLAB_IDENTITY_KEY,
+          JSON.stringify(identity),
+        );
+      } catch (err) {
+        console.warn("[collab] Failed to persist identity:", err);
+      }
+    }
+    const serverUrl = pendingCollabServerUrl;
+    collabDialogOpen = false;
+    pendingCollabServerUrl = null;
+    pendingAnonId = null;
+    if (serverUrl) void startCollabSession(serverUrl, identity);
+  };
+
+  const onCollabIdentityCancel = (): void => {
+    collabDialogOpen = false;
+    pendingCollabServerUrl = null;
+    pendingAnonId = null;
   };
 
   // Phase 11 frames Map (read by handleStartPresentation + createFrameAtCenter
@@ -5454,6 +5512,19 @@
       collaboratorCount={collabStore.users.size}
     />
   </div>
+
+  <!-- Phase 17 / A3: identity capture dialog. Mounted only while open
+       (avoids paying the Modal/portal cost when collab is dormant).
+       pendingAnonId is always set when the dialog opens — see
+       handleCollabButtonClick — so the `??` fallback is defensive only. -->
+  {#if collabDialogOpen}
+    <CollabIdentityDialog
+      palette={COLLAB_PALETTE}
+      suggestedId={pendingAnonId ?? makeAnonIdentity().id}
+      onSubmit={onCollabIdentitySubmit}
+      onCancel={onCollabIdentityCancel}
+    />
+  {/if}
 
   <!-- Connector tool panel — Phase 13 -->
   {#if connectorToolActive}
