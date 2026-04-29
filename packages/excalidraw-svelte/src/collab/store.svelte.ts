@@ -45,6 +45,9 @@ export function createCollabStore(api: SveltedrawAPI) {
 
   let provider: WebsocketProvider | null = null;
   let changeCleanup: (() => void) | null = null;
+  // Cleanup for Y.js observers and awareness listeners registered in joinRoom.
+  // Y.js observers survive provider.destroy() and must be explicitly removed.
+  let sessionCleanup: (() => void) | null = null;
 
   function joinRoom(opts: JoinRoomOpts): Promise<void> {
     // Clean up previous session first.
@@ -71,6 +74,9 @@ export function createCollabStore(api: SveltedrawAPI) {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        // Guard: if leaveRoom() was called while this Promise was in flight,
+        // the state has already been reset — don't overwrite it.
+        if (provider !== ws) { resolve(); return; }
         fn();
       };
 
@@ -95,7 +101,7 @@ export function createCollabStore(api: SveltedrawAPI) {
         settle(() => reject(new Error(`WebSocket connection error: ${(event as ErrorEvent).message ?? "unknown"}`)));
       });
 
-      ws.awareness.on("change", () => {
+      const onAwarenessChange = () => {
         const states = new Map<number, CollabUser>();
         ws.awareness.getStates().forEach((state: Record<string, unknown>, clientId: number) => {
           if (state.user) {
@@ -115,24 +121,34 @@ export function createCollabStore(api: SveltedrawAPI) {
           }
         });
         users = states;
-      });
+      };
+      ws.awareness.on("change", onAwarenessChange);
 
       // Teacher writes zone assignments into zonesMap; observe it so students
       // pick up their zone immediately without waiting for awareness gossip.
-      zonesMap.observe(() => {
-        const frame = zonesMap.get(opts.user.id) ?? null;
+      const onZonesChange = () => {
+        const frame = zonesMap.get(myUserId ?? opts.user.id) ?? null;
         myZone = frame;
         ws.awareness.setLocalStateField("zone", frame);
-      });
+      };
+      zonesMap.observe(onZonesChange);
 
       // Remote elements → update local scene.
-      ymap.observe(() => {
+      const onYmapChange = () => {
         const remote = ymap.get("elements");
         if (Array.isArray(remote)) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           api.updateScene({ elements: remote as any[] });
         }
-      });
+      };
+      ymap.observe(onYmapChange);
+
+      // Store cleanup so leaveRoom() can unregister all observers.
+      sessionCleanup = () => {
+        zonesMap.unobserve(onZonesChange);
+        ymap.unobserve(onYmapChange);
+        ws.awareness.off("change", onAwarenessChange);
+      };
 
       // Local changes → broadcast.
       changeCleanup = api.onChange((elements) => {
@@ -142,6 +158,8 @@ export function createCollabStore(api: SveltedrawAPI) {
   }
 
   function leaveRoom(): void {
+    sessionCleanup?.();
+    sessionCleanup = null;
     changeCleanup?.();
     changeCleanup = null;
     provider?.destroy();
@@ -159,8 +177,6 @@ export function createCollabStore(api: SveltedrawAPI) {
     if (myRole === "viewer") return false;
     // student: only elements inside their assigned zone frame.
     if (!myZone) return false;
-    // Use a fast Map lookup if the scene exposes getElementById, otherwise
-    // fall back to the linear scan via getElements().
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const element = api.getElements().find((e: any) => e.id === elementId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -177,11 +193,12 @@ export function createCollabStore(api: SveltedrawAPI) {
     } else {
       zonesMap.set(userId, frameId);
     }
-    // Also push into awareness for the target client to pick up immediately.
-    // We can only mutate our own awareness; other clients watch the zonesMap.
+    // Clients observe the zonesMap directly (see joinRoom) so they pick up
+    // the assignment without any additional awareness push from us.
   }
 
   function updateCursor(x: number, y: number, sceneX: number, sceneY: number): void {
+    if (!connected) return;
     provider?.awareness.setLocalStateField("cursor", { x, y, sceneX, sceneY });
   }
 
