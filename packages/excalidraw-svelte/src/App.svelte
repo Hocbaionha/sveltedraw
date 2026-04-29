@@ -309,7 +309,7 @@
     contextSymbols.set(key, value);
     return value;
   };
-  const contextResolver = (key: symbol): unknown => contextSymbols.get(key);
+  const contextResolver = <T>(key: symbol): T => contextSymbols.get(key) as T;
 
   const imperativeAPI = createImperativeAPI(
     {

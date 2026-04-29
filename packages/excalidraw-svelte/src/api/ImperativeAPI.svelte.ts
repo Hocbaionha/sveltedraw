@@ -24,7 +24,7 @@ export interface ImperativeAPIWithNotify extends SveltedrawAPI {
 
 export function createImperativeAPI(
   engine: EngineDeps,
-  contextResolver: (key: symbol) => unknown,
+  contextResolver: <T>(key: symbol) => T,
 ): ImperativeAPIWithNotify {
   const changeListeners = new Set<ChangeListener>();
   const selectionListeners = new Set<SelectionListener>();
@@ -156,7 +156,7 @@ export function createImperativeAPI(
     },
 
     getContext<T>(key: symbol): T {
-      return contextResolver(key) as T;
+      return contextResolver<T>(key);
     },
 
     notifyChange,

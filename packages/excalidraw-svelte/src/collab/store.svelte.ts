@@ -91,8 +91,8 @@ export function createCollabStore(api: SveltedrawAPI) {
         }
       });
 
-      ws.on("connection-error", (err: Error) => {
-        settle(() => reject(err));
+      ws.on("connection-error", (event: Event) => {
+        settle(() => reject(new Error(`WebSocket connection error: ${(event as ErrorEvent).message ?? "unknown"}`)));
       });
 
       ws.awareness.on("change", () => {
