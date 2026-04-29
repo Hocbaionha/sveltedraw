@@ -14,6 +14,17 @@ import { updateElbowArrowPoints } from "./elbowArrow";
 
 import { isElbowArrow } from "./typeChecks";
 
+const SHAPE_AFFECTING_KEYS = new Set([
+  "strokeColor",
+  "backgroundColor",
+  "fillStyle",
+  "strokeWidth",
+  "strokeStyle",
+  "roundness",
+  "roughness",
+  "seed",
+]);
+
 import type {
   ElementsMap,
   ExcalidrawElbowArrowElement,
@@ -127,29 +138,6 @@ export const mutateElement = <TElement extends Mutable<ExcalidrawElement>>(
     return element;
   }
 
-  // ShapeCache stores the roughjs `Drawable` baked from `generateRoughOptions`,
-  // which embeds strokeColor / backgroundColor / fillStyle / strokeStyle /
-  // strokeWidth / roughness / roundness / seed directly into the path + fill
-  // geometry. The cache is a `WeakMap<element, shape>` keyed on element
-  // identity, so in-place mutation (Scene.mutateElement) never bumps the key.
-  // Upstream only invalidated on layout changes (height/width/fileId/points),
-  // which leaves style-only mutations (e.g. clicking a color swatch) painting
-  // the previous frame's colors until something layout-ish bumps the cache.
-  // Symptom pre-fix: users reported "click color panel → nothing happens,
-  // have to resize to see the change". We invalidate on the full set of
-  // visual keys that feed `generateRoughOptions` so in-place mutations repaint
-  // correctly without forcing every caller onto the immutable `newElementWith`
-  // path.
-  const SHAPE_AFFECTING_KEYS = new Set([
-    "strokeColor",
-    "backgroundColor",
-    "fillStyle",
-    "strokeWidth",
-    "strokeStyle",
-    "roundness",
-    "roughness",
-    "seed",
-  ]);
   const hasShapeAffectingStyleUpdate = Object.keys(updates).some((k) =>
     SHAPE_AFFECTING_KEYS.has(k),
   );
