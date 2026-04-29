@@ -1,124 +1,78 @@
-<a href="https://excalidraw.com/" target="_blank" rel="noopener">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" alt="Excalidraw" srcset="https://excalidraw.nyc3.cdn.digitaloceanspaces.com/github/excalidraw_github_cover_2_dark.png" />
-    <img alt="Excalidraw" src="https://excalidraw.nyc3.cdn.digitaloceanspaces.com/github/excalidraw_github_cover_2.png" />
-  </picture>
-</a>
+<h1 align="center">Sveltedraw</h1>
 
-<h4 align="center">
-  <a href="https://excalidraw.com">Excalidraw Editor</a> |
-  <a href="https://plus.excalidraw.com/blog">Blog</a> |
-  <a href="https://docs.excalidraw.com">Documentation</a> |
-  <a href="https://plus.excalidraw.com">Excalidraw+</a>
-</h4>
-
-<div align="center">
-  <h2>
-    An open source virtual hand-drawn style whiteboard. </br>
-    Collaborative and end-to-end encrypted. </br>
-  <br />
-  </h2>
-</div>
-
-<br />
 <p align="center">
-  <a href="https://github.com/excalidraw/excalidraw/blob/master/LICENSE">
-    <img alt="Excalidraw is released under the MIT license." src="https://img.shields.io/badge/license-MIT-blue.svg"  /></a>
-  <a href="https://www.npmjs.com/package/@excalidraw/excalidraw">
-    <img alt="npm downloads/month" src="https://img.shields.io/npm/dm/@excalidraw/excalidraw"  /></a>
-  <a href="https://docs.excalidraw.com/docs/introduction/contributing">
-    <img alt="PRs welcome!" src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat"  /></a>
-  <a href="https://discord.gg/UexuTaE">
-    <img alt="Chat on Discord" src="https://img.shields.io/discord/723672430744174682?color=738ad6&label=Chat%20on%20Discord&logo=discord&logoColor=ffffff&widget=false"/></a>
-  <a href="https://deepwiki.com/excalidraw/excalidraw">
-    <img alt="Ask DeepWiki" src="https://deepwiki.com/badge.svg" /></a>
-  <a href="https://twitter.com/excalidraw">
-    <img alt="Follow Excalidraw on Twitter" src="https://img.shields.io/twitter/follow/excalidraw.svg?label=follow+@excalidraw&style=social&logo=twitter"/></a>
+  An open-source virtual hand-drawn style whiteboard. Svelte 5 port of
+  the Excalidraw editor.
 </p>
 
-<div align="center">
-  <figure>
-    <a href="https://excalidraw.com" target="_blank" rel="noopener">
-      <img src="https://excalidraw.nyc3.cdn.digitaloceanspaces.com/github%2Fproduct_showcase.png" alt="Product showcase" />
-    </a>
-    <figcaption>
-      <p align="center">
-        Create beautiful hand-drawn like diagrams, wireframes, or whatever you like.
-      </p>
-    </figcaption>
-  </figure>
-</div>
+<p align="center">
+  <a href="https://github.com/Hocbaionha/sveltedraw/blob/master/LICENSE">
+    <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue.svg" />
+  </a>
+</p>
 
-## Features
+---
 
-The Excalidraw editor (npm package) supports:
+## What this is
 
-- 💯&nbsp;Free & open-source.
-- 🎨&nbsp;Infinite, canvas-based whiteboard.
-- ✍️&nbsp;Hand-drawn like style.
-- 🌓&nbsp;Dark mode.
-- 🏗️&nbsp;Customizable.
-- 📷&nbsp;Image support.
-- 😀&nbsp;Shape libraries support.
-- 🌐&nbsp;Localization (i18n) support.
-- 🖼️&nbsp;Export to PNG, SVG & clipboard.
-- 💾&nbsp;Open format - export drawings as an `.excalidraw` json file.
-- ⚒️&nbsp;Wide range of tools - rectangle, circle, diamond, arrow, line, free-draw, eraser...
-- ➡️&nbsp;Arrow-binding & labeled arrows.
-- 🔙&nbsp;Undo / Redo.
-- 🔍&nbsp;Zoom and panning support.
+Sveltedraw is a fork of [Excalidraw](https://github.com/excalidraw/excalidraw)
+that replaces the React UI with a Svelte 5 application. The editor
+component, state stores, panels, dialogs, presentation mode, library, and
+collaboration layer are all native Svelte. The original React editor
+shell (`excalidraw-app/`) has been deleted; React is no longer a runtime
+dependency.
 
-## Excalidraw.com
+The drawing engine itself — scene graph, renderer, element math, fonts,
+clipboard, file format — is preserved as a headless engine under
+`packages/excalidraw/` and consumed by the Svelte UI through subpath
+imports.
 
-The app hosted at [excalidraw.com](https://excalidraw.com) is a minimal showcase of what you can build with Excalidraw. Its [source code](https://github.com/excalidraw/excalidraw/tree/master/excalidraw-app) is part of this repository as well, and the app features:
+## Status
 
-- 📡&nbsp;PWA support (works offline).
-- 🤼&nbsp;Real-time collaboration.
-- 🔒&nbsp;End-to-end encryption.
-- 💾&nbsp;Local-first support (autosaves to the browser).
-- 🔗&nbsp;Shareable links (export to a readonly link you can share with others).
+Past Phase 17 — collaborative editing over Y.js + WebSocket is in. See
+`MEMORY.md` for the running progress log.
 
-We'll be adding these features as drop-in plugins for the npm package in the future.
-
-## Quick start
-
-**Note:** following instructions are for installing the Excalidraw [npm package](https://www.npmjs.com/package/@excalidraw/excalidraw) when integrating Excalidraw into your own app. To run the repository locally for development, please refer to our [Development Guide](https://docs.excalidraw.com/docs/introduction/development).
-
-Use `npm` or `yarn` to install the package.
+## Getting started
 
 ```bash
-npm install react react-dom @excalidraw/excalidraw
-# or
-yarn add react react-dom @excalidraw/excalidraw
+yarn install     # node ≥ 18, yarn 1.22 (classic, via "packageManager")
+yarn start       # dev server on port 3001
+yarn build       # production build of sveltedraw-app/
+yarn smoke       # puppeteer smoke test that the app mounts
 ```
 
-Check out our [documentation](https://docs.excalidraw.com/docs/@excalidraw/excalidraw/installation) for more details!
+## Layout
 
-## Contributing
+- `sveltedraw-app/` — Vite + Svelte 5 application (the thing you run).
+- `packages/excalidraw-svelte/` — the editor component, panels, and all
+  feature modules (alignment, autolayout, connectors, export, history,
+  layers, library, presentation, snap, templates, texteditor, …).
+- `packages/excalidraw/` — headless engine (scene, renderer, data,
+  fonts). Subpath imports only; the bare entry point is gone.
+- `packages/{common,element,math,utils}/` — shared engine packages,
+  imported via `@excalidraw/<name>` aliases.
 
-- Missing something or found a bug? [Report here](https://github.com/excalidraw/excalidraw/issues).
-- Want to contribute? Check out our [contribution guide](https://docs.excalidraw.com/docs/introduction/contributing) or let us know on [Discord](https://discord.gg/UexuTaE).
-- Want to help with translations? See the [translation guide](https://docs.excalidraw.com/docs/introduction/contributing#translating).
+## Testing
 
-## Integrations
+```bash
+yarn check:svelte         # svelte-check (Svelte + TS diagnostics)
+yarn test:typecheck       # tsc across the monorepo
+yarn test:app             # vitest (jsdom)
+yarn test:puppeteer       # full puppeteer suite (4 workers)
+yarn test:puppeteer:fast  # fast subset
+```
 
-- [VScode extension](https://marketplace.visualstudio.com/items?itemName=pomdtr.excalidraw-editor)
-- [npm package](https://www.npmjs.com/package/@excalidraw/excalidraw)
+Honest-tests live under `sveltedraw-app/scripts/honest-tests/` and
+cover end-to-end paths the unit tests cannot (multi-tab collaboration,
+PNG metadata round-trip, presentation slicing, …).
 
-## Who's integrating Excalidraw
+## Credits
 
-[Google Cloud](https://googlecloudcheatsheet.withgoogle.com/architecture) • [Meta](https://meta.com/) • [CodeSandbox](https://codesandbox.io/) • [Obsidian Excalidraw](https://github.com/zsviczian/obsidian-excalidraw-plugin) • [Replit](https://replit.com/) • [Slite](https://slite.com/) • [Notion](https://notion.so/) • [HackerRank](https://www.hackerrank.com/) • and many others
+Sveltedraw is a fork of [Excalidraw](https://github.com/excalidraw/excalidraw).
+The drawing engine, file format, and rendering pipeline come from the
+upstream project. The Svelte UI, collaboration layer, and the
+re-architected packaging are this fork's contributions.
 
-## Sponsors & support
+## License
 
-If you like the project, you can become a sponsor at [Open Collective](https://opencollective.com/excalidraw) or use [Excalidraw+](https://plus.excalidraw.com/).
-
-## Thank you for supporting Excalidraw
-
-[<img src="https://opencollective.com/excalidraw/tiers/sponsors/0/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/0/website) [<img src="https://opencollective.com/excalidraw/tiers/sponsors/1/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/1/website) [<img src="https://opencollective.com/excalidraw/tiers/sponsors/2/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/2/website) [<img src="https://opencollective.com/excalidraw/tiers/sponsors/3/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/3/website) [<img src="https://opencollective.com/excalidraw/tiers/sponsors/4/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/4/website) [<img src="https://opencollective.com/excalidraw/tiers/sponsors/5/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/5/website) [<img src="https://opencollective.com/excalidraw/tiers/sponsors/6/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/6/website) [<img src="https://opencollective.com/excalidraw/tiers/sponsors/7/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/7/website) [<img src="https://opencollective.com/excalidraw/tiers/sponsors/8/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/8/website) [<img src="https://opencollective.com/excalidraw/tiers/sponsors/9/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/9/website) [<img src="https://opencollective.com/excalidraw/tiers/sponsors/10/avatar.svg?avatarHeight=120"/>](https://opencollective.com/excalidraw/tiers/sponsors/10/website)
-
-<a href="https://opencollective.com/excalidraw#category-CONTRIBUTE" target="_blank"><img src="https://opencollective.com/excalidraw/tiers/backers.svg?avatarHeight=32"/></a>
-
-Last but not least, we're thankful to these companies for offering their services for free:
-
-[![Vercel](./.github/assets/vercel.svg)](https://vercel.com) [![Sentry](./.github/assets/sentry.svg)](https://sentry.io) [![Crowdin](./.github/assets/crowdin.svg)](https://crowdin.com)
+MIT — same as upstream.

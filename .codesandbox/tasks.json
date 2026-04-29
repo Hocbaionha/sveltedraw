@@ -25,11 +25,11 @@
       "runAtStart": false
     },
     "start": {
-      "name": "Start Excalidraw",
+      "name": "Start Sveltedraw",
       "command": "yarn start",
       "runAtStart": true,
       "preview": {
-        "port": 3000
+        "port": 3001
       }
     },
     "test": {

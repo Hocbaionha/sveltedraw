@@ -22,13 +22,14 @@
   "files": [
     "dist/*"
   ],
-  "description": "Excalidraw math functions",
+  "description": "Sveltedraw fork of Excalidraw math functions",
   "publishConfig": {
     "access": "public"
   },
   "license": "MIT",
   "keywords": [
     "excalidraw",
+    "sveltedraw",
     "excalidraw-math",
     "math",
     "vector",
@@ -54,8 +55,8 @@
       "last 1 safari version"
     ]
   },
-  "bugs": "https://github.com/excalidraw/excalidraw/issues",
-  "repository": "https://github.com/excalidraw/excalidraw",
+  "bugs": "https://github.com/Hocbaionha/sveltedraw/issues",
+  "repository": "https://github.com/Hocbaionha/sveltedraw",
   "scripts": {
     "gen:types": "rimraf types && tsc",
     "build:esm": "rimraf dist && node ../../scripts/buildBase.js && yarn gen:types"
