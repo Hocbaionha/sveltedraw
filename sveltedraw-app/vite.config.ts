@@ -6,6 +6,16 @@ import { VitePWA } from 'vite-plugin-pwa';
 const resolve = (rel: string) => fileURLToPath(new URL(rel, import.meta.url));
 
 export default defineConfig({
+  // Svelte's `each_key_duplicate` / `each_key_volatile` / many other
+  // runtime diagnostics are gated on `process.env.NODE_ENV` being a
+  // non-"prod"-prefixed string (see esm-env's dev-fallback.js). Vite does
+  // not define this for the browser by default, so in dev the browser
+  // sees `undefined` and Svelte falls through to the terse prod error
+  // message (just the URL, no key / index context). Forcing the define
+  // restores the detailed messages that tell you *which* key collided.
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV ?? 'development'),
+  },
   plugins: [
     svelte(),
     // Service-worker + install manifest. Lifted from upstream's

@@ -156,6 +156,12 @@
   import UtilityBar from "./components/UtilityBar.svelte";
   import ZoomControls from "./components/ZoomControls.svelte";
   import FloatingLibraryPanel from "./components/FloatingLibraryPanel.svelte";
+  import LiveCollaborationTrigger from "./components/LiveCollaborationTrigger.svelte";
+  import {
+    createCollabStore,
+    COLLAB_STORE_KEY,
+    type CollabStore,
+  } from "./collab/store.svelte.js";
   import type { HistoryState } from "./history/types.js";
   import { createHistoryStore } from "./history/store.js";
   import { triggerDownload } from "./data/download.js";
@@ -365,6 +371,15 @@
     contextResolver,
   );
   registerCtx(SVELTEDRAW_API_KEY, imperativeAPI);
+
+  // ── Collab store (Phase 17) ─────────────────────────────────────────
+  // Lifecycle: created with the editor, never destroyed (its `leaveRoom`
+  // is idempotent and called from onMount cleanup). UI components read
+  // it via getContext(COLLAB_STORE_KEY); honest-tests reach it through
+  // the probe surface below. The store is dormant until `joinRoom` is
+  // called — no socket, no observers — so creating it eagerly is free.
+  const collabStore: CollabStore = createCollabStore(imperativeAPI);
+  registerCtx(COLLAB_STORE_KEY, collabStore);
 
   const pluginRegistry = new PluginRegistry();
   registerCtx(PLUGIN_REGISTRY_KEY, pluginRegistry);
@@ -918,6 +933,19 @@
     // Notify host app that the API is ready (one-time callback).
     onmount?.(imperativeAPI);
 
+    // Phase 17: auto-start collab if a server URL is configured. Runs
+    // after `onmount?.()` so a host app embedding sveltedraw has a chance
+    // to set its own collab policy before we connect on its behalf. Errors
+    // are swallowed inside startCollabSession; the status indicator will
+    // surface failure once Commit 4 lands.
+    {
+      const autoServerUrl = resolveCollabServerUrl();
+      if (autoServerUrl) {
+        const identity = loadStoredIdentity() ?? makeAnonIdentity();
+        void startCollabSession(autoServerUrl, identity);
+      }
+    }
+
     // Flush any pending save on page unload so nothing is lost.
     const onBeforeUnload = () => {
       flushPendingSave();
@@ -944,6 +972,9 @@
       }
       // Flush the pending save synchronously on unmount too.
       flushPendingSave();
+      // Phase 17: tear down any active collab session. leaveRoom is
+      // idempotent — safe to call regardless of whether joinRoom ran.
+      collabStore.leaveRoom();
       AnimationController.cancel(INTERACTIVE_SCENE_ANIMATION_KEY);
       renderer?.destroy?.();
     };
@@ -1063,6 +1094,149 @@
     },
   });
   const { pushHistory, undo, redo } = historyStore;
+
+  // ── Collab wiring (Phase 17) ─────────────────────────────────────────
+  // Identity is persisted across sessions in localStorage; the dialog
+  // (Commit 2) updates it. For now, anon-fallback covers auto-start +
+  // direct button click flows.
+  const COLLAB_IDENTITY_KEY = "sveltedraw-collab-identity";
+  const COLLAB_PALETTE = [
+    "#1971c2", // blue
+    "#2f9e44", // green
+    "#e67700", // amber
+    "#c92a2a", // red
+    "#9c36b5", // purple
+    "#0c8599", // teal
+    "#e8590c", // orange
+    "#5f3dc4", // indigo
+  ];
+
+  type StoredIdentity = { id: string; name: string; color: string };
+
+  /**
+   * Read persisted identity from localStorage. Returns null on first
+   * run / corrupted JSON / SSR. Caller must handle the null path
+   * (either fall back to anon-default or prompt the dialog).
+   */
+  const loadStoredIdentity = (): StoredIdentity | null => {
+    try {
+      const raw = window.localStorage.getItem(COLLAB_IDENTITY_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (
+        typeof parsed?.id === "string" &&
+        typeof parsed?.name === "string" &&
+        typeof parsed?.color === "string"
+      ) {
+        return parsed as StoredIdentity;
+      }
+    } catch { /* swallow */ }
+    return null;
+  };
+
+  /**
+   * Generate an ephemeral anonymous identity for users who join without
+   * having gone through the identity dialog (e.g. auto-start via URL).
+   * The id includes 4 random hex chars so two anon tabs in the same
+   * room don't collide on awareness deduplication.
+   */
+  const makeAnonIdentity = (): StoredIdentity => {
+    const slug = Math.random().toString(16).slice(2, 6);
+    const color = COLLAB_PALETTE[Math.floor(Math.random() * COLLAB_PALETTE.length)];
+    return {
+      id: `anon-${slug}`,
+      name: `Guest ${slug.toUpperCase()}`,
+      color,
+    };
+  };
+
+  /**
+   * Read collab params from the URL. Sveltedraw runs under a hash
+   * router (#app), so query params usually live inside the hash
+   * fragment (`#app?collab=ws://...`). We check both top-level
+   * `URL.searchParams` and the hash fragment so either form works.
+   */
+  const readCollabUrlParam = (name: string): string | null => {
+    try {
+      const url = new URL(window.location.href);
+      const top = url.searchParams.get(name);
+      if (top) return top;
+      const hash = url.hash || "";
+      const qIdx = hash.indexOf("?");
+      if (qIdx === -1) return null;
+      return new URLSearchParams(hash.slice(qIdx + 1)).get(name);
+    } catch { return null; }
+  };
+
+  /**
+   * Resolve the collab server URL. Priority:
+   *   1. `?collab=ws://...` query param (per-session override)
+   *   2. `VITE_COLLAB_SERVER` env var (deployment default)
+   *   3. null → no auto-start
+   */
+  const resolveCollabServerUrl = (): string | null => {
+    const fromUrl = readCollabUrlParam("collab");
+    if (fromUrl) return fromUrl;
+    const fromEnv = import.meta.env.VITE_COLLAB_SERVER as string | undefined;
+    return fromEnv || null;
+  };
+
+  /**
+   * Resolve the room id. `?room=foo` overrides; default room name lets
+   * two tabs of the same browser converge without any URL params.
+   */
+  const resolveCollabRoomId = (): string =>
+    readCollabUrlParam("room") ?? "sveltedraw-default";
+
+  /**
+   * Start a collab session with the given identity. Wraps `joinRoom` so
+   * the button handler and auto-start share the same call site.
+   */
+  const startCollabSession = async (
+    serverUrl: string,
+    identity: StoredIdentity,
+  ): Promise<void> => {
+    if (collabStore.status !== "idle") return; // already active
+    try {
+      await collabStore.joinRoom({
+        serverUrl,
+        roomId: resolveCollabRoomId(),
+        // Phase 17 / A1: role is hardcoded teacher until A3 ships role
+        // selection. canEdit() returns true for teachers regardless of
+        // zone, which is what we want for a generic 2-tab demo.
+        role: "teacher",
+        user: { id: identity.id, name: identity.name, color: identity.color },
+      });
+    } catch (err) {
+      console.warn("[collab] joinRoom failed:", err);
+    }
+  };
+
+  /**
+   * Toggle handler for the LiveCollaborationTrigger button.
+   * - If already in a session: leave.
+   * - Otherwise: resolve server + identity, then join.
+   * - If no server URL is configured: warn (Commit 4 will surface a toast).
+   */
+  const handleCollabButtonClick = (): void => {
+    if (collabStore.status !== "idle") {
+      collabStore.leaveRoom();
+      return;
+    }
+    const serverUrl = resolveCollabServerUrl();
+    if (!serverUrl) {
+      console.warn(
+        "[collab] No collab server configured. Set VITE_COLLAB_SERVER " +
+          "or use ?collab=ws://host:port",
+      );
+      return;
+    }
+    // Commit 2 will replace this with the identity dialog when no
+    // identity is persisted yet. For now, anon-fallback keeps the
+    // button functional out of the box.
+    const identity = loadStoredIdentity() ?? makeAnonIdentity();
+    void startCollabSession(serverUrl, identity);
+  };
 
   // Phase 11 frames Map (read by handleStartPresentation + createFrameAtCenter
   // for slide segmentation + new-frame naming) is populated by createFrameAtCenter
@@ -5265,6 +5439,22 @@
     onOpenHelp={() => (showHelpPanel = true)}
   />
 
+  <!-- Phase 17: Live collaboration trigger. Tucked under the utility bar
+       on the top-right. Click toggles join/leave; if no collab server is
+       configured (VITE_COLLAB_SERVER or ?collab=ws://...) the button
+       logs a warning and otherwise does nothing — Commit 4 will surface
+       the misconfig as a toast. The collaborator badge mirrors the
+       awareness Map size, populated from store.users (built via the
+       awareness "change" listener inside joinRoom). -->
+  <div class="sveltedraw-collab-trigger">
+    <LiveCollaborationTrigger
+      isCollaborating={collabStore.status === "connected"}
+      onSelect={handleCollabButtonClick}
+      width={appState.width}
+      collaboratorCount={collabStore.users.size}
+    />
+  </div>
+
   <!-- Connector tool panel — Phase 13 -->
   {#if connectorToolActive}
     <div class="sveltedraw-connector-panel">
@@ -6386,6 +6576,17 @@
   /* Utility bar styles live with components/UtilityBar.svelte. */
 
   /* FloatingLibraryPanel styles live with components/FloatingLibraryPanel.svelte. */
+
+  /* Phase 17: LiveCollaborationTrigger placement. Sits below the utility
+     bar (top: 56px ≈ utility bar bottom + 8px gap) so it doesn't overlap
+     the language/theme controls. Button visuals come from the component's
+     own SCSS sidecar; this rule is purely about position + z-index. */
+  .sveltedraw-collab-trigger {
+    position: absolute;
+    top: 56px;
+    right: 20px;
+    z-index: 30;
+  }
 
   .sveltedraw-connector-panel {
     position: absolute;
