@@ -600,13 +600,13 @@
             <DropdownMenuGroup title="Recent">
               {#snippet children()}
                 <DropdownMenuItem
-                  onSelect={() => console.log("open project")}
+                  onSelect={() => {}}
                   shortcut="⌘O"
                 >
                   {#snippet children()}Open project{/snippet}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onSelect={() => console.log("save")}
+                  onSelect={() => {}}
                   shortcut="⌘S"
                   selected
                 >

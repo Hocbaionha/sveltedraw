@@ -41,8 +41,6 @@
 
 <script lang="ts">
   import { setContext, untrack, onMount } from "svelte";
-  import * as Y from "yjs";
-  import { WebsocketProvider } from "y-websocket";
   // @ts-ignore — upstream, resolved via Vite alias
   import { getDefaultAppState } from "@excalidraw/excalidraw/appState";
   // @ts-ignore — upstream
@@ -165,6 +163,10 @@
     saveAsExcalidrawFile as saveExcalidrawFileImpl,
     openExcalidrawFilePicker as openExcalidrawFilePickerImpl,
   } from "./data/excalidrawFile.js";
+  import { createImperativeAPI } from "./api/ImperativeAPI.svelte.js";
+  import { SVELTEDRAW_API_KEY, type SveltedrawAPI } from "./api/types.js";
+  import { PluginRegistry, PLUGIN_REGISTRY_KEY } from "./plugins/registry.svelte.js";
+  import type { SveltedrawPlugin } from "./plugins/types.js";
   import { installSveltedrawProbe } from "./dev/probe.js";
   import { handleExport as handleExportImpl } from "./export/handleExport.js";
   import { createLibraryHandlers } from "./library/handlers.js";
@@ -202,6 +204,8 @@
     objectsSnapModeEnabled = false,
     theme,
     name,
+    plugins = [],
+    onmount,
   }: {
     viewModeEnabled?: boolean;
     zenModeEnabled?: boolean;
@@ -209,6 +213,8 @@
     objectsSnapModeEnabled?: boolean;
     theme?: "light" | "dark";
     name?: string;
+    plugins?: SveltedrawPlugin[];
+    onmount?: (api: SveltedrawAPI) => void;
   } = $props();
 
   // ── AppState ───────────────────────────────────────────────────────────
@@ -290,6 +296,66 @@
   // Use upstream `randomId` (nanoid in prod, deterministic in test) for parity
   // with the React side — `App.tsx` does `this.id = nanoid()`.
   setContext(EXCAL_ID_KEY, randomId());
+
+  // ── ImperativeAPI + PluginRegistry ─────────────────────────────────────
+  // contextSymbols mirrors setContext for Symbol-keyed stores so that
+  // plugins can reach any store via api.getContext(KEY) without depending
+  // on the Svelte component tree.
+  const contextSymbols = new Map<symbol, unknown>();
+
+  // Helper: register in both Svelte context and the symbol map.
+  const registerCtx = <T>(key: symbol, value: T): T => {
+    setContext(key, value);
+    contextSymbols.set(key, value);
+    return value;
+  };
+  const contextResolver = <T>(key: symbol): T => contextSymbols.get(key) as T;
+
+  const imperativeAPI = createImperativeAPI(
+    {
+      getScene: () => scene,
+      getAppState: () => appState,
+      patchAppState: (patch) => {
+        for (const [k, v] of Object.entries(patch)) {
+          (appState as Record<string, unknown>)[k] = v;
+        }
+      },
+      setActiveTool: (tool) => setActiveTool(tool),
+      pushHistory: () => historyStore?.pushHistory(),
+      bumpSceneRepaint: () => bumpSceneRepaint(),
+      toSceneCoords: (clientX, clientY) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return viewportCoordsToSceneCoords({ clientX, clientY }, appState as any);
+      },
+    },
+    contextResolver,
+  );
+  registerCtx(SVELTEDRAW_API_KEY, imperativeAPI);
+
+  const pluginRegistry = new PluginRegistry();
+  registerCtx(PLUGIN_REGISTRY_KEY, pluginRegistry);
+
+  // Reactively install/uninstall plugins when the `plugins` prop changes.
+  // Runs on mount (initial install) and on every subsequent prop update.
+  const buildCtx = (pluginId: string) =>
+    pluginRegistry.buildContext(pluginId, imperativeAPI, tunnels, contextResolver);
+
+  $effect(() => {
+    const currentIds = new Set(plugins.map((p) => p.id));
+
+    // Uninstall plugins that were removed from the prop array.
+    // installedIds allocates a snapshot Set — only called once per effect run.
+    for (const id of pluginRegistry.installedIds) {
+      if (!currentIds.has(id)) pluginRegistry.uninstall(id);
+    }
+
+    // Install any plugins not yet registered.
+    for (const plugin of plugins) {
+      if (!pluginRegistry.isInstalled(plugin.id)) {
+        pluginRegistry.install(plugin, buildCtx(plugin.id));
+      }
+    }
+  });
 
   // ── Canvas refs ────────────────────────────────────────────────────────
   const staticCanvas =
@@ -796,73 +862,11 @@
       ro.observe(containerEl);
     }
 
-    // ── Phase 10: Real-time Collaboration with Yjs ──────────────────
-    // Initialize CRDT document for multi-user synchronization.
-    // Check for collaboration server URL (env var or query param).
-    const getCollabServerUrl = (): string | null => {
-      try {
-        const url = new URL(window.location.href);
-        const urlParam = url.searchParams.get("collab");
-        if (urlParam) return urlParam;
-      } catch {
-        // ignore
-      }
-      return import.meta.env.VITE_COLLAB_SERVER || null;
-    };
-
-    const collabServerUrl = getCollabServerUrl();
-    let provider: WebsocketProvider | null = null;
-    let ydoc: Y.Doc | null = null;
-
-    if (collabServerUrl) {
-      try {
-        // Create Yjs doc and map for elements
-        ydoc = new Y.Doc();
-        ymap = ydoc.getMap("excalidraw-elements");
-
-        // Connect to collaboration server
-        provider = new WebsocketProvider(collabServerUrl, "sveltedraw-room", ydoc);
-
-        // Set local awareness state (cursor, user info)
-        provider.awareness.setLocalState({
-          user: {
-            name: `User-${Math.random().toString(36).substr(2, 9)}`,
-            color: `#${Math.floor(Math.random() * 16777215).toString(16)}`,
-          },
-          cursor: null,
-        });
-
-        // Sync local elements to Yjs
-        const elements = scene?.getElementsIncludingDeleted() ?? [];
-        ymap!.set("elements", elements);
-
-        // Listen for remote changes
-        ymap!.observe((event: Y.YMapEvent<any>) => {
-          // Yjs YMapEvent.changes is `{added, deleted, keys, delta}`; the
-          // per-key change records live on `.keys` (Map<string, {action}>),
-          // not on `event.changes` itself.
-          for (const [key, change] of event.changes.keys.entries()) {
-            if (key === "elements" && change.action === "update") {
-              const remoteElements = ymap!.get("elements");
-              if (remoteElements && Array.isArray(remoteElements)) {
-                // Update scene with remote elements
-                scene?.replaceAllElements(
-                  remoteElements.map((el: any) => deepCopyElement(el)),
-                  { skipValidation: true }
-                );
-                bumpSceneRepaint();
-              }
-            }
-          }
-        });
-      } catch (err) {
-        console.warn("Collaboration setup failed:", err);
-        // Continue without collaboration if server unavailable
-      }
-    }
-
     window.addEventListener("resize", measure);
     measure();
+
+    // Notify host app that the API is ready (one-time callback).
+    onmount?.(imperativeAPI);
 
     // Flush any pending save on page unload so nothing is lost.
     const onBeforeUnload = () => {
@@ -887,13 +891,6 @@
       if (laserRafId !== null) {
         cancelAnimationFrame(laserRafId);
         laserRafId = null;
-      }
-      // Cleanup collaboration provider
-      if (provider) {
-        provider.destroy();
-      }
-      if (ydoc) {
-        ydoc.destroy();
       }
       // Flush the pending save synchronously on unmount too.
       flushPendingSave();
@@ -979,6 +976,7 @@
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       lastActiveTool: (appState as any).activeTool ?? null,
     };
+    imperativeAPI.notifyToolChange(type);
   };
 
   // Toggle tool lock (Q in upstream). When on, the current drawing
@@ -1001,16 +999,14 @@
 
   // ── History (undo/redo) ──────────────────────────────────────────────
   // Implementation lives in ./history/store.ts. App.svelte owns the reactive
-  // panel state ($state below) and yjs collab map; the store mutates them via
-  // a setUI callback and reads ymap via a getter so collab init can come
-  // later in onMount without ordering hazards.
-  let ymap: Y.Map<any> | null = null; // Phase 10: collab map (set in onMount)
+  // panel state ($state below); collab broadcasting is handled by CollabStore
+  // (injected via the `onmount` callback), not wired here.
   const historyStore = createHistoryStore({
     getScene: () => scene,
     appState,
     scheduleSave,
     bumpSceneRepaint: () => bumpSceneRepaint(),
-    getYmap: () => ymap,
+    getYmap: () => null,
     setUI: (entries, idx) => {
       editorHistory = entries;
       historyCurrentIndex = idx;
@@ -3184,8 +3180,13 @@
   // when no appState field changed (e.g. after scene.replaceAllElements).
   // The $effect tracks sceneReady; we reuse it as a generic "something
   // scene-level happened" ticker.
+  // Also fires imperativeAPI.notifyChange() so ALL callers — pointer handlers,
+  // text editor, drag, etc. — automatically reach onChange subscribers without
+  // any per-call wiring. imperativeAPI is declared before bumpSceneRepaint so
+  // the closure safely captures the binding.
   const bumpSceneRepaint = () => {
     sceneReady++;
+    imperativeAPI.notifyChange();
   };
 
   // Build the AppState slice needed by `viewportCoordsToSceneCoords`.

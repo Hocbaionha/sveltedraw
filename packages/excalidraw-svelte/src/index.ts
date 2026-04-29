@@ -1,10 +1,16 @@
 // @sveltedraw/excalidraw — Svelte 5 port of @excalidraw/excalidraw
-// Phase 3: leaf UI components added
 
 export * from './components/index.js';
 export * from './icons/index.js';
 
-// Phase 6 batch 1: App.svelte shell (no event wiring yet — canvases mount
-// with no-op handlers and a no-op renderer; call it to validate context
-// plumbing, not to actually draw).
 export { default as App } from './App.svelte';
+
+// Public API surface for host apps and plugins
+export { SVELTEDRAW_API_KEY } from './api/types.js';
+export type { SveltedrawAPI } from './api/types.js';
+export { PLUGIN_REGISTRY_KEY } from './plugins/registry.svelte.js';
+export { PluginRegistry } from './plugins/registry.svelte.js';
+export type { SveltedrawPlugin, SveltedrawPluginContext, ToolbarItemDef, SidePanelDef, CanvasOverlayDef } from './plugins/types.js';
+export { COLLAB_STORE_KEY } from './collab/store.svelte.js';
+export { createCollabStore } from './collab/store.svelte.js';
+export type { CollabStore, CollabRole, CollabUser } from './collab/store.svelte.js';
