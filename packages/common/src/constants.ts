@@ -250,20 +250,20 @@ export const STRING_MIME_TYPES = {
   text: "text/plain",
   html: "text/html",
   json: "application/json",
-  // excalidraw data
-  excalidraw: "application/vnd.excalidraw+json",
-  excalidrawClipboard: "application/vnd.excalidraw.clipboard+json",
+  // sveltedraw scene data
+  sveltedraw: "application/vnd.sveltedraw+json",
+  sveltedrawClipboard: "application/vnd.sveltedraw.clipboard+json",
   // LEGACY: fully-qualified library JSON data
-  excalidrawlib: "application/vnd.excalidrawlib+json",
-  // list of excalidraw library item ids
-  excalidrawlibIds: "application/vnd.excalidrawlib.ids+json",
+  sveltedrawlib: "application/vnd.sveltedrawlib+json",
+  // list of sveltedraw library item ids
+  sveltedrawlibIds: "application/vnd.sveltedrawlib.ids+json",
 } as const;
 
 export const MIME_TYPES = {
   ...STRING_MIME_TYPES,
-  // image-encoded excalidraw data
-  "excalidraw.svg": "image/svg+xml",
-  "excalidraw.png": "image/png",
+  // image-encoded sveltedraw data
+  "sveltedraw.svg": "image/svg+xml",
+  "sveltedraw.png": "image/png",
   // binary
   binary: "application/octet-stream",
   // image
@@ -283,10 +283,10 @@ export const EXPORT_IMAGE_TYPES = {
 } as const;
 
 export const EXPORT_DATA_TYPES = {
-  excalidraw: "excalidraw",
-  excalidrawClipboard: "excalidraw/clipboard",
-  excalidrawLibrary: "excalidrawlib",
-  excalidrawClipboardWithAPI: "excalidraw-api/clipboard",
+  sveltedraw: "sveltedraw",
+  sveltedrawClipboard: "sveltedraw/clipboard",
+  sveltedrawLibrary: "sveltedrawlib",
+  sveltedrawClipboardWithAPI: "sveltedraw-api/clipboard",
 } as const;
 
 export const getExportSource = () =>
@@ -349,8 +349,8 @@ export const SVG_DOCUMENT_PREAMBLE = `<?xml version="1.0" standalone="no"?>
 export const ENCRYPTION_KEY_BITS = 128;
 
 export const VERSIONS = {
-  excalidraw: 2,
-  excalidrawLibrary: 2,
+  sveltedraw: 2,
+  sveltedrawLibrary: 2,
 } as const;
 
 export const BOUND_TEXT_PADDING = 5;

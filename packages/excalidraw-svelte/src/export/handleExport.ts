@@ -63,7 +63,7 @@ export const handleExport = async (
       case "json": {
         const json = JSON.stringify(
           {
-            type: "excalidraw",
+            type: "sveltedraw",
             version: 2,
             source: window.location.origin,
             elements,

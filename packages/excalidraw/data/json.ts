@@ -56,8 +56,8 @@ export const serializeAsJSON = (
   type: "local" | "database",
 ): string => {
   const data: ExportedDataState = {
-    type: EXPORT_DATA_TYPES.excalidraw,
-    version: VERSIONS.excalidraw,
+    type: EXPORT_DATA_TYPES.sveltedraw,
+    version: VERSIONS.sveltedraw,
     source: getExportSource(),
     elements,
     appState:
@@ -86,14 +86,14 @@ export const saveAsJSON = async ({
   const blob = Promise.resolve(data).then(({ elements, appState, files }) => {
     const serialized = serializeAsJSON(elements, appState, files, "local");
     return new Blob([serialized], {
-      type: MIME_TYPES.excalidraw,
+      type: MIME_TYPES.sveltedraw,
     });
   });
 
   const savedFileHandle = await fileSave(blob, {
     name: filename,
-    extension: "excalidraw",
-    description: "Excalidraw file",
+    extension: "sveltedraw",
+    description: "Sveltedraw file",
     fileHandle: isImageFileHandle(fileHandle) ? null : fileHandle,
   });
   return { fileHandle: savedFileHandle };
@@ -104,7 +104,7 @@ export const loadFromJSON = async (
   localElements: readonly SveltedrawElement[] | null,
 ) => {
   const file = await fileOpen({
-    description: "Excalidraw files",
+    description: "Sveltedraw files",
     // ToDo: Be over-permissive until https://bugs.webkit.org/show_bug.cgi?id=34442
     // gets resolved. Else, iOS users cannot open `.excalidraw` files.
     // extensions: ["json", "excalidraw", "png", "svg"],
@@ -118,7 +118,7 @@ export const isValidExcalidrawData = (data?: {
   appState?: any;
 }): data is ImportedDataState => {
   return (
-    data?.type === EXPORT_DATA_TYPES.excalidraw &&
+    data?.type === EXPORT_DATA_TYPES.sveltedraw &&
     (!data.elements ||
       (Array.isArray(data.elements) &&
         (!data.appState || typeof data.appState === "object")))
@@ -129,15 +129,15 @@ export const isValidLibrary = (json: any): json is ImportedLibraryData => {
   return (
     typeof json === "object" &&
     json &&
-    json.type === EXPORT_DATA_TYPES.excalidrawLibrary &&
+    json.type === EXPORT_DATA_TYPES.sveltedrawLibrary &&
     (json.version === 1 || json.version === 2)
   );
 };
 
 export const serializeLibraryAsJSON = (libraryItems: LibraryItems) => {
   const data: ExportedLibraryData = {
-    type: EXPORT_DATA_TYPES.excalidrawLibrary,
-    version: VERSIONS.excalidrawLibrary,
+    type: EXPORT_DATA_TYPES.sveltedrawLibrary,
+    version: VERSIONS.sveltedrawLibrary,
     source: getExportSource(),
     libraryItems,
   };
@@ -148,12 +148,12 @@ export const saveLibraryAsJSON = async (libraryItems: LibraryItems) => {
   const serialized = serializeLibraryAsJSON(libraryItems);
   await fileSave(
     new Blob([serialized], {
-      type: MIME_TYPES.excalidrawlib,
+      type: MIME_TYPES.sveltedrawlib,
     }),
     {
       name: "library",
-      extension: "excalidrawlib",
-      description: "Excalidraw library file",
+      extension: "sveltedrawlib",
+      description: "Sveltedraw library file",
     },
   );
 };

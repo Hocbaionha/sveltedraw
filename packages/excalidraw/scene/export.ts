@@ -518,7 +518,7 @@ export const encodeSvgBase64Payload = ({
   );
 
   metadataElement.appendChild(
-    createHTMLComment(`payload-type:${MIME_TYPES.excalidraw}`),
+    createHTMLComment(`payload-type:${MIME_TYPES.sveltedraw}`),
   );
   metadataElement.appendChild(createHTMLComment("payload-version:2"));
   metadataElement.appendChild(createHTMLComment("payload-start"));
@@ -527,7 +527,7 @@ export const encodeSvgBase64Payload = ({
 };
 
 export const decodeSvgBase64Payload = ({ svg }: { svg: string }) => {
-  if (svg.includes(`payload-type:${MIME_TYPES.excalidraw}`)) {
+  if (svg.includes(`payload-type:${MIME_TYPES.sveltedraw}`)) {
     const match = svg.match(
       /<!-- payload-start -->\s*(.+?)\s*<!-- payload-end -->/,
     );
@@ -545,7 +545,7 @@ export const decodeSvgBase64Payload = ({ svg }: { svg: string }) => {
         // legacy, un-encoded scene JSON
         if (
           "type" in encodedData &&
-          encodedData.type === EXPORT_DATA_TYPES.excalidraw
+          encodedData.type === EXPORT_DATA_TYPES.sveltedraw
         ) {
           return json;
         }

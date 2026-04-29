@@ -97,8 +97,8 @@ export const getMimeType = (blob: Blob | string): string => {
     return MIME_TYPES.jpg;
   } else if (/\.svg$/.test(name)) {
     return MIME_TYPES.svg;
-  } else if (/\.excalidrawlib$/.test(name)) {
-    return MIME_TYPES.excalidrawlib;
+  } else if (/.sveltedrawlib$/.test(name)) {
+    return MIME_TYPES.sveltedrawlib;
   }
   return "";
 };
@@ -159,7 +159,7 @@ export const loadSceneOrLibraryFromBlob = async (
     }
     if (isValidExcalidrawData(data)) {
       return {
-        type: MIME_TYPES.excalidraw,
+        type: MIME_TYPES.sveltedraw,
         data: {
           elements: restoreElements(data.elements, localElements, {
             repairBindings: true,
@@ -181,7 +181,7 @@ export const loadSceneOrLibraryFromBlob = async (
       };
     } else if (isValidLibrary(data)) {
       return {
-        type: MIME_TYPES.excalidrawlib,
+        type: MIME_TYPES.sveltedrawlib,
         data,
       };
     }
@@ -208,7 +208,7 @@ export const loadFromBlob = async (
     localElements,
     fileHandle,
   );
-  if (ret.type !== MIME_TYPES.excalidraw) {
+  if (ret.type !== MIME_TYPES.sveltedraw) {
     throw new Error("Error: invalid file");
   }
   return ret.data;
@@ -473,10 +473,10 @@ export const normalizeFile = async (file: File) => {
     return file;
   }
 
-  if (file?.name?.endsWith(".excalidrawlib")) {
-    file = createFile(file, MIME_TYPES.excalidrawlib, file.name);
-  } else if (file?.name?.endsWith(".excalidraw")) {
-    file = createFile(file, MIME_TYPES.excalidraw, file.name);
+  if (file?.name?.endsWith(".sveltedrawlib")) {
+    file = createFile(file, MIME_TYPES.sveltedrawlib, file.name);
+  } else if (file?.name?.endsWith(".sveltedraw")) {
+    file = createFile(file, MIME_TYPES.sveltedraw, file.name);
   } else if (!file.type || file.type?.startsWith("image/")) {
     // when the file is an image, make sure the extension corresponds to the
     // actual mimeType (this is an edge case, but happens - especially

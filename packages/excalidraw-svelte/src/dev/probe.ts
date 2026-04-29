@@ -136,7 +136,7 @@ export function installSveltedrawProbe(b: ProbeBindings): void {
     return encodePngMetadata({
       blob,
       metadata: JSON.stringify({
-        type: "excalidraw",
+        type: "sveltedraw",
         version: 2,
         source: window.location.origin,
         elements,

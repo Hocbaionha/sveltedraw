@@ -24,7 +24,7 @@ export const saveAsExcalidrawFile = async (opts: {
   const elements = scene.getNonDeletedElements();
   const json = JSON.stringify(
     {
-      type: "excalidraw",
+      type: "sveltedraw",
       version: 2,
       source: window.location.origin,
       elements,
@@ -40,7 +40,7 @@ export const saveAsExcalidrawFile = async (opts: {
     null,
     2,
   );
-  const blob = new Blob([json], { type: "application/vnd.excalidraw+json" });
+  const blob = new Blob([json], { type: "application/vnd.sveltedraw+json" });
   const name = appState.name || "sveltedraw";
   triggerDownload(blob, `${name}.excalidraw`);
 };
@@ -55,7 +55,7 @@ export const openExcalidrawFilePicker = (opts: {
 }): void => {
   const input = document.createElement("input");
   input.type = "file";
-  input.accept = ".excalidraw,application/json,application/vnd.excalidraw+json";
+  input.accept = ".excalidraw,application/json,application/vnd.sveltedraw+json";
   input.onchange = async () => {
     const file = input.files?.[0];
     const { scene, appState, clearSelection, pushHistory, bumpSceneRepaint } = opts;

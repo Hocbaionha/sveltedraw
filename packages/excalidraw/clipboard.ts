@@ -36,7 +36,7 @@ import {
 import type { BinaryFiles } from "./types";
 
 type ElementsClipboard = {
-  type: typeof EXPORT_DATA_TYPES.excalidrawClipboard;
+  type: typeof EXPORT_DATA_TYPES.sveltedrawClipboard;
   elements: readonly NonDeletedExcalidrawElement[];
   files: BinaryFiles | undefined;
 };
@@ -75,9 +75,9 @@ const clipboardContainsElements = (
 ): contents is { elements: SveltedrawElement[]; files?: BinaryFiles } => {
   if (
     [
-      EXPORT_DATA_TYPES.excalidraw,
-      EXPORT_DATA_TYPES.excalidrawClipboard,
-      EXPORT_DATA_TYPES.excalidrawClipboardWithAPI,
+      EXPORT_DATA_TYPES.sveltedraw,
+      EXPORT_DATA_TYPES.sveltedrawClipboard,
+      EXPORT_DATA_TYPES.sveltedrawClipboardWithAPI,
     ].includes(contents?.type) &&
     Array.isArray(contents.elements)
   ) {
@@ -170,7 +170,7 @@ export const serializeAsClipboardJSON = ({
 
   // select bound text elements when copying
   const contents: ElementsClipboard = {
-    type: EXPORT_DATA_TYPES.excalidrawClipboard,
+    type: EXPORT_DATA_TYPES.sveltedrawClipboard,
     elements: elements.map((element) => {
       if (
         getContainingFrame(element, elementsMap) &&
@@ -201,7 +201,7 @@ export const copyToClipboard = async (
 
   await copyTextToSystemClipboard(
     {
-      [MIME_TYPES.excalidrawClipboard]: json,
+      [MIME_TYPES.sveltedrawClipboard]: json,
       [MIME_TYPES.text]: json,
     },
     clipboardEvent,
@@ -537,7 +537,7 @@ export const parseClipboard = async (
   try {
     const systemClipboardData = JSON.parse(parsedEventData.value);
     const programmaticAPI =
-      systemClipboardData.type === EXPORT_DATA_TYPES.excalidrawClipboardWithAPI;
+      systemClipboardData.type === EXPORT_DATA_TYPES.sveltedrawClipboardWithAPI;
     if (clipboardContainsElements(systemClipboardData)) {
       return {
         elements: systemClipboardData.elements,

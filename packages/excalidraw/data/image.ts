@@ -34,7 +34,7 @@ export const encodePngMetadata = async ({
   const chunks = decodePng(new Uint8Array(await blobToArrayBuffer(blob)));
 
   const metadataChunk = tEXt.encode(
-    MIME_TYPES.excalidraw,
+    MIME_TYPES.sveltedraw,
     JSON.stringify(
       encode({
         text: metadata,
@@ -50,14 +50,14 @@ export const encodePngMetadata = async ({
 
 export const decodePngMetadata = async (blob: Blob) => {
   const metadata = await getTEXtChunk(blob);
-  if (metadata?.keyword === MIME_TYPES.excalidraw) {
+  if (metadata?.keyword === MIME_TYPES.sveltedraw) {
     try {
       const encodedData = JSON.parse(metadata.text);
       if (!("encoded" in encodedData)) {
         // legacy, un-encoded scene JSON
         if (
           "type" in encodedData &&
-          encodedData.type === EXPORT_DATA_TYPES.excalidraw
+          encodedData.type === EXPORT_DATA_TYPES.sveltedraw
         ) {
           return metadata.text;
         }
