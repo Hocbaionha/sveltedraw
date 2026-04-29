@@ -161,6 +161,7 @@
     type IdentityResult,
   } from "./components/CollabIdentityDialog.svelte";
   import CollabCursors from "./components/CollabCursors.svelte";
+  import Toast from "./components/Toast.svelte";
   import {
     createCollabStore,
     COLLAB_STORE_KEY,
@@ -1296,6 +1297,33 @@
     pendingCollabServerUrl = null;
     pendingAnonId = null;
   };
+
+  // ── Connection status toast (Phase 17 / A4) ─────────────────────────
+  // We track the previous status so we can fire toasts only on actual
+  // transitions (mid-session drop, reconnect). The initial idle →
+  // connecting → connected sequence is already conveyed by the button's
+  // own state and would just be noise as a toast.
+  let collabToast: { message: string; tone: "info" | "warn" | "ok" } | null =
+    $state(null);
+  let prevCollabStatus: typeof collabStore.status = "idle";
+  $effect(() => {
+    const cur = collabStore.status;
+    const prev = prevCollabStatus;
+    prevCollabStatus = cur;
+
+    if (prev === "connected" && cur === "disconnected") {
+      // Mid-session drop. y-websocket auto-reconnects so we promise the
+      // user it's coming back; the connected→toast (below) confirms.
+      collabToast = {
+        message: "Connection lost. Reconnecting…",
+        tone: "warn",
+      };
+    } else if (prev === "disconnected" && cur === "connected") {
+      collabToast = { message: "Reconnected", tone: "ok" };
+    }
+    // All other transitions (idle ↔ connecting, connecting → connected
+    // initial join, leaveRoom) are silent.
+  });
 
   // ── Cursor broadcast (Phase 17 / A2) ────────────────────────────────
   // Throttled to ~20fps. Native pointermove can fire at 60-1000Hz on
@@ -5538,6 +5566,22 @@
       width={appState.width}
       collaboratorCount={collabStore.users.size}
     />
+    <!-- Phase 17 / A4: status pill. Shown only for transient/error
+         states; idle hides it (no session) and connected hides it
+         (the button itself already reads as active via its .active
+         class). Putting the dot color in CSS rather than inline keeps
+         theme overrides simple. -->
+    {#if collabStore.status === "connecting"}
+      <div class="sveltedraw-collab-status sveltedraw-collab-status--connecting">
+        <span class="sveltedraw-collab-status__dot"></span>
+        Connecting…
+      </div>
+    {:else if collabStore.status === "disconnected"}
+      <div class="sveltedraw-collab-status sveltedraw-collab-status--disconnected">
+        <span class="sveltedraw-collab-status__dot"></span>
+        Disconnected
+      </div>
+    {/if}
   </div>
 
   <!-- Phase 17 / A3: identity capture dialog. Mounted only while open
@@ -5566,6 +5610,23 @@
       scrollY: appState.scrollY as number,
     }}
   />
+
+  <!-- Phase 17 / A4: connection status toast. Appears bottom-center
+       on mid-session drop / reconnect; auto-dismisses on default 5s.
+       Tone classes pick the background color via CSS. -->
+  {#if collabToast}
+    <div
+      class="sveltedraw-collab-toast"
+      class:sveltedraw-collab-toast--warn={collabToast.tone === "warn"}
+      class:sveltedraw-collab-toast--ok={collabToast.tone === "ok"}
+    >
+      <Toast
+        message={collabToast.message}
+        onClose={() => (collabToast = null)}
+        closable
+      />
+    </div>
+  {/if}
 
   <!-- Connector tool panel — Phase 13 -->
   {#if connectorToolActive}
@@ -6698,6 +6759,75 @@
     top: 56px;
     right: 20px;
     z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    /* Pill follows the button to its left so the row reads:
+       [ status pill ] [ button ]. flex-direction reverse keeps the
+       button anchored to the right edge of the trigger box. */
+    flex-direction: row-reverse;
+  }
+
+  /* Phase 17 / A4: connection status pill. Sits next to the collab
+     button while the session is in a non-steady state. The dot color
+     is the only difference between connecting/disconnected; the rest
+     of the box is theme-driven. */
+  .sveltedraw-collab-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background: var(--island-bg-color, #fff);
+    border: 1px solid var(--border-color-medium, #d1d4da);
+    color: var(--text-primary-color, #1b1b1f);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .sveltedraw-collab-status__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .sveltedraw-collab-status--connecting .sveltedraw-collab-status__dot {
+    background: #f59f00; /* amber */
+    /* Pulse so users can tell connecting from "stuck" at a glance. */
+    animation: sveltedraw-collab-pulse 1.2s ease-in-out infinite;
+  }
+
+  .sveltedraw-collab-status--disconnected .sveltedraw-collab-status__dot {
+    background: #e03131; /* red */
+  }
+
+  @keyframes sveltedraw-collab-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+
+  /* Phase 17 / A4: collab status toast container. Bottom-center
+     placement matches typical app-level toast convention; the inner
+     Toast component handles its own padding/typography. We only own
+     positioning + the tone-driven background ring. */
+  .sveltedraw-collab-toast {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+  }
+
+  .sveltedraw-collab-toast--warn :global(.Toast) {
+    border-left: 4px solid #f59f00;
+  }
+
+  .sveltedraw-collab-toast--ok :global(.Toast) {
+    border-left: 4px solid #2f9e44;
   }
 
   .sveltedraw-connector-panel {
