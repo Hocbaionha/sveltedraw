@@ -1,4 +1,4 @@
-// @sveltedraw/editor — Svelte 5 port of @sveltedraw/editor
+// @sveltedraw/editor — Svelte 5 editor
 
 export * from './components/index.js';
 export * from './icons/index.js';
@@ -10,7 +10,15 @@ export { SVELTEDRAW_API_KEY } from './api/types.js';
 export type { SveltedrawAPI } from './api/types.js';
 export { PLUGIN_REGISTRY_KEY } from './plugins/registry.svelte.js';
 export { PluginRegistry } from './plugins/registry.svelte.js';
-export type { SveltedrawPlugin, SveltedrawPluginContext, ToolbarItemDef, SidePanelDef, CanvasOverlayDef } from './plugins/types.js';
+export type {
+  SveltedrawPlugin,
+  SveltedrawPluginContext,
+  ToolbarItemDef,
+  SidePanelDef,
+  CanvasOverlayDef,
+  MainMenuItemDef,
+} from './plugins/types.js';
+export { examplePlugin } from './plugins/example/index.js';
 export { COLLAB_STORE_KEY } from './collab/store.svelte.js';
 export { createCollabStore } from './collab/store.svelte.js';
 export type { CollabStore, CollabRole, CollabUser } from './collab/store.svelte.js';

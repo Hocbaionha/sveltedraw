@@ -2,17 +2,44 @@
   import './app.scss';
   import Showcase from './showcase/Showcase.svelte';
   // @ts-ignore — resolved via Vite alias
-  import { App as SveltedrawApp } from '@sveltedraw/editor';
+  import { App as SveltedrawApp, examplePlugin } from '@sveltedraw/editor';
 
   let hash = $state(window.location.hash);
   window.addEventListener('hashchange', () => { hash = window.location.hash; });
+
+  // Strip query-string from the hash for route matching. The editor
+  // needs query params (e.g. `?collab=ws://...`, `?demo=plugin`) to
+  // live inside the hash fragment because GitHub Pages and other
+  // static hosts don't pass top-level query strings to SPAs reliably.
+  const route = $derived.by(() => {
+    const qIdx = hash.indexOf('?');
+    return qIdx === -1 ? hash : hash.slice(0, qIdx);
+  });
+
+  // Demo: pass `?demo=plugin` (or `#app?demo=plugin`) to mount the
+  // example plugin. Lets us smoke-test the OCP wiring without
+  // shipping the demo to every embedder by default.
+  const demoFlag = $derived.by(() => {
+    try {
+      const url = new URL(window.location.href);
+      const top = url.searchParams.get('demo');
+      if (top) return top;
+      const hashFrag = url.hash || '';
+      const qIdx = hashFrag.indexOf('?');
+      if (qIdx === -1) return null;
+      return new URLSearchParams(hashFrag.slice(qIdx + 1)).get('demo');
+    } catch { return null; }
+  });
+  const editorPlugins = $derived(
+    demoFlag === 'plugin' ? [examplePlugin] : [],
+  );
 </script>
 
-{#if hash === '#showcase' || hash.startsWith('#showcase/')}
+{#if route === '#showcase' || route.startsWith('#showcase/')}
   <Showcase />
-{:else if hash === '#app' || hash.startsWith('#app/')}
+{:else if route === '#app' || route.startsWith('#app/')}
   <div class="editor-root">
-    <SveltedrawApp />
+    <SveltedrawApp plugins={editorPlugins} />
   </div>
 {:else}
   <div class="app-container">
