@@ -92,9 +92,9 @@ export function createLayerHandlers(deps: LayerDeps): LayerHandlers {
         newLayers.push({
           id: el.id,
           name: (el as AnyEl).customLayerName || getLayerName(el),
-          visible: !el.isDeleted,
+          visible: el.opacity !== 0,
           locked: el.locked || false,
-          opacity: el.opacity ?? 1,
+          opacity: (el as AnyEl).__hiddenOpacity ?? el.opacity ?? 100,
           type: "element" as const,
           order: idx,
         });
@@ -110,9 +110,9 @@ export function createLayerHandlers(deps: LayerDeps): LayerHandlers {
             newLayers.push({
               id: el.id,
               name: (el as AnyEl).customLayerName || getLayerName(el),
-              visible: !el.isDeleted,
+              visible: el.opacity !== 0,
               locked: el.locked || false,
-              opacity: el.opacity ?? 1,
+              opacity: (el as AnyEl).__hiddenOpacity ?? el.opacity ?? 100,
               type: "element" as const,
               parentId: layer.id,
               order: newLayers.length,
@@ -179,9 +179,20 @@ export function createLayerHandlers(deps: LayerDeps): LayerHandlers {
   const handleLayerVisibilityChange = (layerId: string, visible: boolean) => {
     const scene = getScene();
     if (!scene) return;
+    // Use opacity=0 instead of isDeleted so the element is still exported,
+    // participates in selection, and is tracked by getNonDeletedElements().
     const element = scene.getNonDeletedElementsMap().get(layerId);
     if (!element) return;
-    element.isDeleted = !visible;
+    if (!visible) {
+      // Stash the real opacity so we can restore it on re-show.
+      if (element.__hiddenOpacity === undefined) {
+        element.__hiddenOpacity = element.opacity ?? 100;
+      }
+      element.opacity = 0;
+    } else {
+      element.opacity = element.__hiddenOpacity ?? 100;
+      delete element.__hiddenOpacity;
+    }
     pushHistory();
     bumpSceneRepaint();
     syncLayersFromScene();

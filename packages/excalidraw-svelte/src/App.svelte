@@ -165,6 +165,10 @@
     saveAsExcalidrawFile as saveExcalidrawFileImpl,
     openExcalidrawFilePicker as openExcalidrawFilePickerImpl,
   } from "./data/excalidrawFile.js";
+  import { createImperativeAPI, type ImperativeAPIWithNotify } from "./api/ImperativeAPI.svelte.js";
+  import { SVELTEDRAW_API_KEY, type SveltedrawAPI } from "./api/types.js";
+  import { PluginRegistry, PLUGIN_REGISTRY_KEY } from "./plugins/registry.svelte.js";
+  import type { SveltedrawPlugin } from "./plugins/types.js";
   import { installSveltedrawProbe } from "./dev/probe.js";
   import { handleExport as handleExportImpl } from "./export/handleExport.js";
   import { createLibraryHandlers } from "./library/handlers.js";
@@ -202,6 +206,8 @@
     objectsSnapModeEnabled = false,
     theme,
     name,
+    plugins = [],
+    onmount,
   }: {
     viewModeEnabled?: boolean;
     zenModeEnabled?: boolean;
@@ -209,6 +215,8 @@
     objectsSnapModeEnabled?: boolean;
     theme?: "light" | "dark";
     name?: string;
+    plugins?: SveltedrawPlugin[];
+    onmount?: (api: SveltedrawAPI) => void;
   } = $props();
 
   // ── AppState ───────────────────────────────────────────────────────────
@@ -290,6 +298,34 @@
   // Use upstream `randomId` (nanoid in prod, deterministic in test) for parity
   // with the React side — `App.tsx` does `this.id = nanoid()`.
   setContext(EXCAL_ID_KEY, randomId());
+
+  // ── ImperativeAPI + PluginRegistry ─────────────────────────────────────
+  // contextResolver lets plugins access any store by Symbol via api.getContext().
+  const contextSymbols = new Map<symbol, unknown>();
+  const contextResolver = (key: symbol): unknown => contextSymbols.get(key);
+
+  const imperativeAPI = createImperativeAPI(
+    {
+      getScene: () => scene,
+      getAppState: () => appState,
+      patchAppState: (patch) => {
+        for (const [k, v] of Object.entries(patch)) {
+          (appState as Record<string, unknown>)[k] = v;
+        }
+      },
+      pushHistory: () => historyStore?.pushHistory(),
+      bumpSceneRepaint: () => bumpSceneRepaint(),
+      toSceneCoords: (clientX, clientY) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return viewportCoordsToSceneCoords({ clientX, clientY }, appState as any);
+      },
+    },
+    contextResolver,
+  );
+  setContext(SVELTEDRAW_API_KEY, imperativeAPI);
+
+  const pluginRegistry = new PluginRegistry();
+  setContext(PLUGIN_REGISTRY_KEY, pluginRegistry);
 
   // ── Canvas refs ────────────────────────────────────────────────────────
   const staticCanvas =
@@ -864,6 +900,19 @@
     window.addEventListener("resize", measure);
     measure();
 
+    // Install plugins now that all stores are ready.
+    for (const plugin of plugins) {
+      const ctx = pluginRegistry.buildContext(
+        plugin.id,
+        imperativeAPI,
+        tunnels,
+        (key) => contextSymbols.get(key),
+      );
+      pluginRegistry.install(plugin, ctx);
+    }
+    // Notify host app that the API is ready.
+    onmount?.(imperativeAPI);
+
     // Flush any pending save on page unload so nothing is lost.
     const onBeforeUnload = () => {
       flushPendingSave();
@@ -894,6 +943,10 @@
       }
       if (ydoc) {
         ydoc.destroy();
+      }
+      // Uninstall all plugins.
+      for (const plugin of plugins) {
+        pluginRegistry.uninstall(plugin.id);
       }
       // Flush the pending save synchronously on unmount too.
       flushPendingSave();
@@ -1009,7 +1062,10 @@
     getScene: () => scene,
     appState,
     scheduleSave,
-    bumpSceneRepaint: () => bumpSceneRepaint(),
+    bumpSceneRepaint: () => {
+      bumpSceneRepaint();
+      (imperativeAPI as ImperativeAPIWithNotify).notifyChange();
+    },
     getYmap: () => ymap,
     setUI: (entries, idx) => {
       editorHistory = entries;
