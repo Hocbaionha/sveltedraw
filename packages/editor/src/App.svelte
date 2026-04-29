@@ -5858,6 +5858,17 @@
     <HelpPanel onClose={() => (showHelpPanel = false)} />
   {/if}
 
+  <!-- Plugin-contributed side panels. Each plugin owns its own open
+       state internally, so we always mount its component (the plugin
+       decides whether to render anything). Items are keyed by id so a
+       plugin re-registering keeps the same DOM subtree. -->
+  {#each pluginRegistry.sidePanels as panel (panel.id)}
+    {@const PanelComponent = panel.component}
+    <div class="sveltedraw-plugin-side-panel" data-panel-id={panel.id}>
+      <PanelComponent />
+    </div>
+  {/each}
+
   <!-- Style panel. Shown whenever the editor is mounted; changes apply
        to the current selection OR to currentItem* defaults if none. -->
   <div class="sveltedraw-style-panel">
@@ -6977,5 +6988,19 @@
   :global(.sveltedraw.theme--dark) .sveltedraw-shape-library-panel {
     background: #232329;
     border-color: #363636;
+  }
+
+  /* Plugin-contributed side panels. Container is a positioned slot so the
+     plugin's own component can use absolute/fixed positioning relative to
+     the editor root. The plugin controls all visual styling of its
+     content; this rule establishes the stacking context only. */
+  .sveltedraw-plugin-side-panel {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 40;
+  }
+  .sveltedraw-plugin-side-panel > :global(*) {
+    pointer-events: auto;
   }
 </style>
