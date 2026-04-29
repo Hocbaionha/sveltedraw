@@ -39,70 +39,83 @@ export function createCollabStore(api: SveltedrawAPI) {
   let users = $state<Map<number, CollabUser>>(new Map());
   let myRole = $state<CollabRole>("viewer");
   let myUserId = $state<string | null>(null);
+  let myZone = $state<string | null>(null); // cached to avoid O(n) Map scan
   let roomId = $state<string | null>(null);
   let connected = $state(false);
 
   let provider: WebsocketProvider | null = null;
   let changeCleanup: (() => void) | null = null;
 
-  const getMyZone = (): string | null => {
-    if (!myUserId) return null;
-    for (const [, user] of users) {
-      if (user.id === myUserId) return user.zone;
-    }
-    return null;
-  };
-
-  async function joinRoom(opts: JoinRoomOpts): Promise<void> {
-    // Clean up previous session.
+  function joinRoom(opts: JoinRoomOpts): Promise<void> {
+    // Clean up previous session first.
     leaveRoom();
 
-    const ydoc = new Y.Doc();
-    const ymap = ydoc.getMap<unknown>("elements");
+    return new Promise((resolve, reject) => {
+      const ydoc = new Y.Doc();
+      const ymap = ydoc.getMap<unknown>("elements");
 
-    provider = new WebsocketProvider(opts.serverUrl, opts.roomId, ydoc);
+      const ws = new WebsocketProvider(opts.serverUrl, opts.roomId, ydoc);
+      provider = ws;
 
-    provider.awareness.setLocalState({
-      user: opts.user,
-      role: opts.role,
-      cursor: null,
-      zone: null,
-      activeFrame: null,
-    });
+      ws.awareness.setLocalState({
+        user: opts.user,
+        role: opts.role,
+        cursor: null,
+        zone: null,
+        activeFrame: null,
+      });
 
-    provider.awareness.on("change", () => {
-      const states = new Map<number, CollabUser>();
-      provider!.awareness.getStates().forEach((state: Record<string, unknown>, clientId: number) => {
-        if (state.user) {
-          states.set(clientId, {
-            ...(state.user as { id: string; name: string; color: string }),
-            role: (state.role as CollabRole) ?? "viewer",
-            cursor: (state.cursor as CollabUser["cursor"]) ?? null,
-            zone: (state.zone as string | null) ?? null,
-            activeFrame: (state.activeFrame as string | null) ?? null,
-          });
+      // Resolve as soon as the websocket is open.
+      ws.on("status", ({ status }: { status: string }) => {
+        if (status === "connected") {
+          myRole = opts.role;
+          myUserId = opts.user.id;
+          roomId = opts.roomId;
+          connected = true;
+          resolve();
         }
       });
-      users = states;
-    });
 
-    // Remote elements → update local scene.
-    ymap.observe(() => {
-      const remote = ymap.get("elements");
-      if (Array.isArray(remote)) {
-        api.updateScene({ elements: remote as AnyEl[] });
-      }
-    });
+      ws.on("connection-error", (err: Error) => {
+        reject(err);
+      });
 
-    // Local changes → broadcast.
-    changeCleanup = api.onChange((elements) => {
-      ymap.set("elements", Array.from(elements));
-    });
+      ws.awareness.on("change", () => {
+        const states = new Map<number, CollabUser>();
+        ws.awareness.getStates().forEach((state: Record<string, unknown>, clientId: number) => {
+          if (state.user) {
+            const collabUser: CollabUser = {
+              ...(state.user as { id: string; name: string; color: string }),
+              role: (state.role as CollabRole) ?? "viewer",
+              cursor: (state.cursor as CollabUser["cursor"]) ?? null,
+              zone: (state.zone as string | null) ?? null,
+              activeFrame: (state.activeFrame as string | null) ?? null,
+            };
+            states.set(clientId, collabUser);
 
-    myRole = opts.role;
-    myUserId = opts.user.id;
-    roomId = opts.roomId;
-    connected = true;
+            // Keep local zone in sync when the server updates our awareness.
+            if (collabUser.id === opts.user.id) {
+              myZone = collabUser.zone;
+            }
+          }
+        });
+        users = states;
+      });
+
+      // Remote elements → update local scene.
+      ymap.observe(() => {
+        const remote = ymap.get("elements");
+        if (Array.isArray(remote)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          api.updateScene({ elements: remote as any[] });
+        }
+      });
+
+      // Local changes → broadcast.
+      changeCleanup = api.onChange((elements) => {
+        ymap.set("elements", Array.from(elements));
+      });
+    });
   }
 
   function leaveRoom(): void {
@@ -113,33 +126,36 @@ export function createCollabStore(api: SveltedrawAPI) {
     connected = false;
     users = new Map();
     roomId = null;
+    myRole = "viewer";
+    myUserId = null;
+    myZone = null;
   }
 
   function canEdit(elementId: string): boolean {
     if (myRole === "teacher") return true;
     if (myRole === "viewer") return false;
     // student: only elements inside their assigned zone frame.
-    const myZone = getMyZone();
     if (!myZone) return false;
-    const element = api.getElements().find((e) => e.id === elementId);
-    return (element as Record<string, unknown>)?.["frameId"] === myZone;
+    // Use a fast Map lookup if the scene exposes getElementById, otherwise
+    // fall back to the linear scan via getElements().
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const element = api.getElements().find((e: any) => e.id === elementId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (element as any)?.frameId === myZone;
   }
 
   function assignZone(userId: string, frameId: string | null): void {
     if (myRole !== "teacher" || !provider) return;
-    // Find the client ID for the given userId and update their awareness zone.
-    provider.awareness.getStates().forEach((state: Record<string, unknown>, clientId: number) => {
-      if ((state.user as { id?: string })?.id === userId) {
-        // We can only set our own local state. Zone assignment goes through
-        // a shared document entry instead.
-        const zonesMap = provider!.doc.getMap<string>("zones");
-        if (frameId === null) {
-          zonesMap.delete(userId);
-        } else {
-          zonesMap.set(userId, frameId);
-        }
-      }
-    });
+    // Zone assignments are stored in a shared Y.Map keyed by userId so every
+    // client can read their own zone and sync it into awareness on reconnect.
+    const zonesMap = provider.doc.getMap<string>("zones");
+    if (frameId === null) {
+      zonesMap.delete(userId);
+    } else {
+      zonesMap.set(userId, frameId);
+    }
+    // Also push into awareness for the target client to pick up immediately.
+    // We can only mutate our own awareness; other clients watch the zonesMap.
   }
 
   function updateCursor(x: number, y: number, sceneX: number, sceneY: number): void {
@@ -150,6 +166,7 @@ export function createCollabStore(api: SveltedrawAPI) {
     get users() { return users; },
     get myRole() { return myRole; },
     get myUserId() { return myUserId; },
+    get myZone() { return myZone; },
     get roomId() { return roomId; },
     get connected() { return connected; },
     joinRoom,

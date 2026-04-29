@@ -15,15 +15,21 @@ type ChangeListener = (
 type SelectionListener = (selected: readonly AnyEl[]) => void;
 type ToolListener = (tool: string) => void;
 
+/** Internal extension of SveltedrawAPI — not part of the public surface. */
+export interface ImperativeAPIWithNotify extends SveltedrawAPI {
+  notifyChange(): void;
+  notifySelectionChange(selected: readonly AnyEl[]): void;
+  notifyToolChange(tool: string): void;
+}
+
 export function createImperativeAPI(
   engine: EngineDeps,
   contextResolver: (key: symbol) => unknown,
-): SveltedrawAPI {
+): ImperativeAPIWithNotify {
   const changeListeners = new Set<ChangeListener>();
   const selectionListeners = new Set<SelectionListener>();
   const toolListeners = new Set<ToolListener>();
 
-  // Called by App.svelte whenever scene/appState mutates.
   const notifyChange = () => {
     if (changeListeners.size === 0) return;
     const scene = engine.getScene();
@@ -40,7 +46,7 @@ export function createImperativeAPI(
     for (const cb of toolListeners) cb(tool);
   };
 
-  const api: SveltedrawAPI = {
+  const api: ImperativeAPIWithNotify = {
     getElements() {
       return engine.getScene()?.getNonDeletedElements() ?? [];
     },
@@ -74,7 +80,9 @@ export function createImperativeAPI(
     addElements(elements) {
       const scene = engine.getScene() as SceneLike | null;
       if (!scene) return;
-      const current = scene.getElementsIncludingDeleted();
+      // Build on non-deleted elements only — including deleted ones would
+      // resurrect soft-deleted history entries.
+      const current = scene.getNonDeletedElements();
       scene.replaceAllElements([...current, ...elements], { skipValidation: true });
       engine.pushHistory();
       engine.bumpSceneRepaint();
@@ -94,10 +102,12 @@ export function createImperativeAPI(
       const scene = engine.getScene() as SceneLike | null;
       if (!scene) return;
       const idSet = new Set(ids);
-      const remaining = scene
-        .getElementsIncludingDeleted()
-        .filter((el: AnyEl) => !idSet.has(el.id));
-      scene.replaceAllElements(remaining, { skipValidation: true });
+      // Soft-delete: mark isDeleted=true so undo/redo history stays intact.
+      for (const el of scene.getNonDeletedElements()) {
+        if (idSet.has(el.id)) {
+          el.isDeleted = true;
+        }
+      }
       engine.pushHistory();
       engine.bumpSceneRepaint();
     },
@@ -125,33 +135,34 @@ export function createImperativeAPI(
       return () => toolListeners.delete(cb);
     },
 
-    async exportToBlob(opts) {
-      // Delegated to export utilities — called with current scene snapshot.
-      throw new Error("exportToBlob: wire engine.exportFns in App.svelte");
+    async exportToBlob(_opts) {
+      throw new Error("exportToBlob: not yet wired — pass exportFns via EngineDeps");
     },
 
-    async exportToSvg(opts) {
-      throw new Error("exportToSvg: wire engine.exportFns in App.svelte");
+    async exportToSvg(_opts) {
+      throw new Error("exportToSvg: not yet wired — pass exportFns via EngineDeps");
     },
 
     setActiveTool(tool) {
       engine.patchAppState({ activeTool: { type: tool } });
     },
 
-    scrollToContent(opts) {
-      // Noop stub — requires canvas-scroll helpers wired from App.svelte.
+    scrollToContent(_opts) {
+      // Stub — requires canvas-scroll helpers to be wired from App.svelte.
     },
 
     zoomToFit() {
-      // Noop stub — requires renderer helpers wired from App.svelte.
+      // Stub — requires renderer helpers to be wired from App.svelte.
     },
 
     getContext<T>(key: symbol): T {
       return contextResolver(key) as T;
     },
+
+    notifyChange,
+    notifySelectionChange,
+    notifyToolChange,
   };
 
-  return Object.assign(api, { notifyChange, notifySelectionChange, notifyToolChange });
+  return api;
 }
-
-export type ImperativeAPIWithNotify = ReturnType<typeof createImperativeAPI>;

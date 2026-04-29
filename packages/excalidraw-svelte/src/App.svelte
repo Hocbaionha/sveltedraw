@@ -42,7 +42,6 @@
 <script lang="ts">
   import { setContext, untrack, onMount } from "svelte";
   import * as Y from "yjs";
-  import { WebsocketProvider } from "y-websocket";
   // @ts-ignore — upstream, resolved via Vite alias
   import { getDefaultAppState } from "@excalidraw/excalidraw/appState";
   // @ts-ignore — upstream
@@ -165,7 +164,7 @@
     saveAsExcalidrawFile as saveExcalidrawFileImpl,
     openExcalidrawFilePicker as openExcalidrawFilePickerImpl,
   } from "./data/excalidrawFile.js";
-  import { createImperativeAPI, type ImperativeAPIWithNotify } from "./api/ImperativeAPI.svelte.js";
+  import { createImperativeAPI } from "./api/ImperativeAPI.svelte.js";
   import { SVELTEDRAW_API_KEY, type SveltedrawAPI } from "./api/types.js";
   import { PluginRegistry, PLUGIN_REGISTRY_KEY } from "./plugins/registry.svelte.js";
   import type { SveltedrawPlugin } from "./plugins/types.js";
@@ -300,8 +299,17 @@
   setContext(EXCAL_ID_KEY, randomId());
 
   // ── ImperativeAPI + PluginRegistry ─────────────────────────────────────
-  // contextResolver lets plugins access any store by Symbol via api.getContext().
+  // contextSymbols mirrors setContext for Symbol-keyed stores so that
+  // plugins can reach any store via api.getContext(KEY) without depending
+  // on the Svelte component tree.
   const contextSymbols = new Map<symbol, unknown>();
+
+  // Helper: register in both Svelte context and the symbol map.
+  const registerCtx = <T>(key: symbol, value: T): T => {
+    setContext(key, value);
+    contextSymbols.set(key, value);
+    return value;
+  };
   const contextResolver = (key: symbol): unknown => contextSymbols.get(key);
 
   const imperativeAPI = createImperativeAPI(
@@ -322,10 +330,29 @@
     },
     contextResolver,
   );
-  setContext(SVELTEDRAW_API_KEY, imperativeAPI);
+  registerCtx(SVELTEDRAW_API_KEY, imperativeAPI);
 
   const pluginRegistry = new PluginRegistry();
-  setContext(PLUGIN_REGISTRY_KEY, pluginRegistry);
+  registerCtx(PLUGIN_REGISTRY_KEY, pluginRegistry);
+
+  // Reactively install/uninstall plugins when the `plugins` prop changes.
+  // Runs on mount (initial install) and on every subsequent prop update.
+  const buildCtx = (pluginId: string) =>
+    pluginRegistry.buildContext(pluginId, imperativeAPI, tunnels, contextResolver);
+
+  $effect(() => {
+    const currentIds = new Set(plugins.map((p) => p.id));
+
+    // Uninstall plugins that were removed from the prop array.
+    for (const id of pluginRegistry.installedIds) {
+      if (!currentIds.has(id)) pluginRegistry.uninstall(id);
+    }
+
+    // Install any plugins not yet registered.
+    for (const plugin of plugins) {
+      pluginRegistry.install(plugin, buildCtx(plugin.id));
+    }
+  });
 
   // ── Canvas refs ────────────────────────────────────────────────────────
   const staticCanvas =
@@ -832,85 +859,10 @@
       ro.observe(containerEl);
     }
 
-    // ── Phase 10: Real-time Collaboration with Yjs ──────────────────
-    // Initialize CRDT document for multi-user synchronization.
-    // Check for collaboration server URL (env var or query param).
-    const getCollabServerUrl = (): string | null => {
-      try {
-        const url = new URL(window.location.href);
-        const urlParam = url.searchParams.get("collab");
-        if (urlParam) return urlParam;
-      } catch {
-        // ignore
-      }
-      return import.meta.env.VITE_COLLAB_SERVER || null;
-    };
-
-    const collabServerUrl = getCollabServerUrl();
-    let provider: WebsocketProvider | null = null;
-    let ydoc: Y.Doc | null = null;
-
-    if (collabServerUrl) {
-      try {
-        // Create Yjs doc and map for elements
-        ydoc = new Y.Doc();
-        ymap = ydoc.getMap("excalidraw-elements");
-
-        // Connect to collaboration server
-        provider = new WebsocketProvider(collabServerUrl, "sveltedraw-room", ydoc);
-
-        // Set local awareness state (cursor, user info)
-        provider.awareness.setLocalState({
-          user: {
-            name: `User-${Math.random().toString(36).substr(2, 9)}`,
-            color: `#${Math.floor(Math.random() * 16777215).toString(16)}`,
-          },
-          cursor: null,
-        });
-
-        // Sync local elements to Yjs
-        const elements = scene?.getElementsIncludingDeleted() ?? [];
-        ymap!.set("elements", elements);
-
-        // Listen for remote changes
-        ymap!.observe((event: Y.YMapEvent<any>) => {
-          // Yjs YMapEvent.changes is `{added, deleted, keys, delta}`; the
-          // per-key change records live on `.keys` (Map<string, {action}>),
-          // not on `event.changes` itself.
-          for (const [key, change] of event.changes.keys.entries()) {
-            if (key === "elements" && change.action === "update") {
-              const remoteElements = ymap!.get("elements");
-              if (remoteElements && Array.isArray(remoteElements)) {
-                // Update scene with remote elements
-                scene?.replaceAllElements(
-                  remoteElements.map((el: any) => deepCopyElement(el)),
-                  { skipValidation: true }
-                );
-                bumpSceneRepaint();
-              }
-            }
-          }
-        });
-      } catch (err) {
-        console.warn("Collaboration setup failed:", err);
-        // Continue without collaboration if server unavailable
-      }
-    }
-
     window.addEventListener("resize", measure);
     measure();
 
-    // Install plugins now that all stores are ready.
-    for (const plugin of plugins) {
-      const ctx = pluginRegistry.buildContext(
-        plugin.id,
-        imperativeAPI,
-        tunnels,
-        (key) => contextSymbols.get(key),
-      );
-      pluginRegistry.install(plugin, ctx);
-    }
-    // Notify host app that the API is ready.
+    // Notify host app that the API is ready (one-time callback).
     onmount?.(imperativeAPI);
 
     // Flush any pending save on page unload so nothing is lost.
@@ -936,17 +888,6 @@
       if (laserRafId !== null) {
         cancelAnimationFrame(laserRafId);
         laserRafId = null;
-      }
-      // Cleanup collaboration provider
-      if (provider) {
-        provider.destroy();
-      }
-      if (ydoc) {
-        ydoc.destroy();
-      }
-      // Uninstall all plugins.
-      for (const plugin of plugins) {
-        pluginRegistry.uninstall(plugin.id);
       }
       // Flush the pending save synchronously on unmount too.
       flushPendingSave();
@@ -1062,10 +1003,7 @@
     getScene: () => scene,
     appState,
     scheduleSave,
-    bumpSceneRepaint: () => {
-      bumpSceneRepaint();
-      (imperativeAPI as ImperativeAPIWithNotify).notifyChange();
-    },
+    bumpSceneRepaint: () => bumpSceneRepaint(),
     getYmap: () => ymap,
     setUI: (entries, idx) => {
       editorHistory = entries;
@@ -3240,8 +3178,13 @@
   // when no appState field changed (e.g. after scene.replaceAllElements).
   // The $effect tracks sceneReady; we reuse it as a generic "something
   // scene-level happened" ticker.
+  // Also fires imperativeAPI.notifyChange() so ALL callers — pointer handlers,
+  // text editor, drag, etc. — automatically reach onChange subscribers without
+  // any per-call wiring. imperativeAPI is declared before bumpSceneRepaint so
+  // the closure safely captures the binding.
   const bumpSceneRepaint = () => {
     sceneReady++;
+    imperativeAPI.notifyChange();
   };
 
   // Build the AppState slice needed by `viewportCoordsToSceneCoords`.

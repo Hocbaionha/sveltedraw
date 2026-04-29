@@ -94,7 +94,7 @@ export function createLayerHandlers(deps: LayerDeps): LayerHandlers {
           name: (el as AnyEl).customLayerName || getLayerName(el),
           visible: el.opacity !== 0,
           locked: el.locked || false,
-          opacity: (el as AnyEl).__hiddenOpacity ?? el.opacity ?? 100,
+          opacity: ((el as AnyEl).customData?._hiddenOpacity as number) ?? el.opacity ?? 100,
           type: "element" as const,
           order: idx,
         });
@@ -181,17 +181,21 @@ export function createLayerHandlers(deps: LayerDeps): LayerHandlers {
     if (!scene) return;
     // Use opacity=0 instead of isDeleted so the element is still exported,
     // participates in selection, and is tracked by getNonDeletedElements().
+    // The real opacity is stashed in customData._hiddenOpacity so it survives
+    // file save/load (unlike a bare runtime property on the element object).
     const element = scene.getNonDeletedElementsMap().get(layerId);
     if (!element) return;
+    const customData = (element.customData as Record<string, unknown>) ?? {};
     if (!visible) {
-      // Stash the real opacity so we can restore it on re-show.
-      if (element.__hiddenOpacity === undefined) {
-        element.__hiddenOpacity = element.opacity ?? 100;
+      if (customData._hiddenOpacity === undefined) {
+        element.customData = { ...customData, _hiddenOpacity: element.opacity ?? 100 };
       }
       element.opacity = 0;
     } else {
-      element.opacity = element.__hiddenOpacity ?? 100;
-      delete element.__hiddenOpacity;
+      const restored = customData._hiddenOpacity as number ?? 100;
+      const { _hiddenOpacity: _removed, ...rest } = customData;
+      element.customData = Object.keys(rest).length ? rest : undefined;
+      element.opacity = restored;
     }
     pushHistory();
     bumpSceneRepaint();
