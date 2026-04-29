@@ -219,10 +219,10 @@ Service Worker:          4.7 KB
 - `vite`: 6.3.0 (build tool)
 - `typescript`: 5.9.3 (type safety)
 
-### Sveltedraw Workspace Packages (forked from Excalidraw)
+### Sveltedraw Workspace Packages
 - `@sveltedraw/element` (elements)
 - `@sveltedraw/engine` (headless drawing engine)
-- `@sveltedraw/excalidraw` (Svelte editor)
+- `@sveltedraw/editor` (Svelte editor)
 - `@sveltedraw/common` (utilities)
 - `@sveltedraw/math` (calculations)
 - `@sveltedraw/utils` (export)

@@ -22,11 +22,11 @@ jobs:
       - name: Create report file
         run: |
           yarn locales-coverage
-          FILE_CHANGED=$(git diff packages/excalidraw/locales/percentages.json)
+          FILE_CHANGED=$(git diff packages/engine/locales/percentages.json)
           if [ ! -z "${FILE_CHANGED}" ]; then
             git config --global user.name 'Sveltedraw Bot'
             git config --global user.email 'bot@sveltedraw.local'
-            git add packages/excalidraw/locales/percentages.json
+            git add packages/engine/locales/percentages.json
             git commit -am "Auto commit: Calculate translation coverage"
             git push
           fi

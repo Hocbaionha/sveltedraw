@@ -475,7 +475,6 @@ const recomputeOrigin = (
   return newOrigin;
 };
 
-// refer to https://link.excalidraw.com/l/6rfy1007QOo/6stx5PmRn0k
 export const getUncroppedImageElement = (
   element: SveltedrawImageElement,
   elementsMap: ElementsMap,

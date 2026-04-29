@@ -1,8 +1,7 @@
 <h1 align="center">Sveltedraw</h1>
 
 <p align="center">
-  An open-source virtual hand-drawn style whiteboard. Svelte 5 port of
-  the Excalidraw editor.
+  An open-source virtual hand-drawn whiteboard, built on Svelte 5.
 </p>
 
 <p align="center">
@@ -15,22 +14,12 @@
 
 ## What this is
 
-Sveltedraw is a fork of [Excalidraw](https://github.com/excalidraw/excalidraw)
-that replaces the React UI with a Svelte 5 application. The editor
-component, state stores, panels, dialogs, presentation mode, library, and
-collaboration layer are all native Svelte. The original React editor
-shell (`excalidraw-app/`) has been deleted; React is no longer a runtime
-dependency.
+Sveltedraw is a virtual whiteboard editor — an infinite canvas with
+hand-drawn-style shapes, text, freehand strokes, arrows, and frames.
+The editor UI is built natively in Svelte 5; a headless drawing engine
+handles canvas rendering, scene graph, and file format under the hood.
 
-The drawing engine itself — scene graph, renderer, element math, fonts,
-clipboard, file format — is preserved as a headless engine under
-`packages/excalidraw/` and consumed by the Svelte UI through subpath
-imports.
-
-## Status
-
-Past Phase 17 — collaborative editing over Y.js + WebSocket is in. See
-`MEMORY.md` for the running progress log.
+Collaborative editing over Y.js + WebSocket is supported.
 
 ## Getting started
 
@@ -44,13 +33,13 @@ yarn smoke       # puppeteer smoke test that the app mounts
 ## Layout
 
 - `sveltedraw-app/` — Vite + Svelte 5 application (the thing you run).
-- `packages/excalidraw-svelte/` — the editor component, panels, and all
-  feature modules (alignment, autolayout, connectors, export, history,
+- `packages/editor/` — the Svelte editor: panels, dialogs, and feature
+  modules (alignment, autolayout, connectors, collab, export, history,
   layers, library, presentation, snap, templates, texteditor, …).
-- `packages/excalidraw/` — headless engine (scene, renderer, data,
-  fonts). Subpath imports only; the bare entry point is gone.
-- `packages/{common,element,math,utils}/` — shared engine packages,
-  imported via `@excalidraw/<name>` aliases.
+- `packages/engine/` — headless drawing engine (scene, renderer, data,
+  fonts, clipboard). Subpath imports only.
+- `packages/{common, element, math, utils}/` — shared engine packages,
+  imported via `@sveltedraw/<name>` aliases.
 
 ## Testing
 
@@ -66,13 +55,6 @@ Honest-tests live under `sveltedraw-app/scripts/honest-tests/` and
 cover end-to-end paths the unit tests cannot (multi-tab collaboration,
 PNG metadata round-trip, presentation slicing, …).
 
-## Credits
-
-Sveltedraw is a fork of [Excalidraw](https://github.com/excalidraw/excalidraw).
-The drawing engine, file format, and rendering pipeline come from the
-upstream project. The Svelte UI, collaboration layer, and the
-re-architected packaging are this fork's contributions.
-
 ## License
 
-MIT — same as upstream.
+MIT.

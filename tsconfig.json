@@ -21,8 +21,8 @@
     "paths": {
       "@sveltedraw/common": ["./packages/common/src/index.ts"],
       "@sveltedraw/common/*": ["./packages/common/src/*"],
-      "@sveltedraw/engine": ["./packages/excalidraw/index.tsx"],
-      "@sveltedraw/engine/*": ["./packages/excalidraw/*"],
+      "@sveltedraw/engine": ["./packages/engine/index.tsx"],
+      "@sveltedraw/engine/*": ["./packages/engine/*"],
       "@sveltedraw/element": ["./packages/element/src/index.ts"],
       "@sveltedraw/element/*": ["./packages/element/src/*"],
       "@sveltedraw/math": ["./packages/math/src/index.ts"],
@@ -31,12 +31,12 @@
       "@sveltedraw/utils/*": ["./packages/utils/src/*"]
     }
   },
-  "include": ["packages", "excalidraw-app"],
+  "include": ["packages", "sveltedraw-app"],
   "exclude": [
     "examples",
     "dist",
     "types",
     "tests",
-    "packages/excalidraw-svelte"
+    "packages/editor"
   ]
 }

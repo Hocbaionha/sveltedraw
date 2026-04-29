@@ -19,15 +19,13 @@
   "files": [
     "dist/*"
   ],
-  "description": "Sveltedraw fork of Excalidraw utility functions",
+  "description": "Sveltedraw utility functions",
   "publishConfig": {
     "access": "public"
   },
   "license": "MIT",
   "keywords": [
-    "excalidraw",
-    "sveltedraw",
-    "excalidraw-utils"
+    "sveltedraw"
   ],
   "browserslist": {
     "production": [

@@ -79,7 +79,7 @@ type _ExcalidrawElementBase = Readonly<{
   link: string | null;
   locked: boolean;
   customData?: Record<string, any>;
-  /** C1: Drop shadow. Non-upstream; optional so legacy elements remain valid.
+  /** C1: Drop shadow. Non-original; optional so legacy elements remain valid.
       Canvas renderer reads this once at the top of renderElement() and applies
       ctx.shadow*. SVG exporter emits a per-element <filter> in <defs>. */
   shadow?: {
@@ -414,7 +414,7 @@ export type FileId = string & { _brand: "FileId" };
 export type SveltedrawElementType = SveltedrawElement["type"];
 
 /**
- * Map of excalidraw elements.
+ * Map of drawing elements.
  * Unspecified whether deleted or non-deleted.
  * Can be a subset of Scene elements.
  */
@@ -431,7 +431,7 @@ export type NonDeletedElementsMap = Map<
   MakeBrand<"NonDeletedElementsMap">;
 
 /**
- * Map of all excalidraw Scene elements, including deleted.
+ * Map of all Scene elements, including deleted.
  * Not a subset. Use this type when you need access to current Scene elements.
  */
 export type SceneElementsMap = Map<

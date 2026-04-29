@@ -1,5 +1,4 @@
 {
-  "extends": ["@excalidraw/eslint-config", "react-app"],
   "rules": {
     "import/order": [
       "warn",
@@ -7,7 +6,7 @@
         "groups": ["builtin", "external", "internal", "parent", "sibling", "index", "object", "type"],
         "pathGroups": [
           {
-            "pattern": "@excalidraw/**",
+            "pattern": "@sveltedraw/**",
             "group": "external",
             "position": "after"
           }
@@ -42,8 +41,8 @@
   },
   "overrides": [
     {
-      "files": ["packages/excalidraw/**/*.{ts,tsx}"],
-      "excludedFiles": ["packages/excalidraw/**/*.test.{ts,tsx}", "packages/excalidraw/**/*.test.*.{ts,tsx}"],
+      "files": ["packages/engine/**/*.{ts,tsx}"],
+      "excludedFiles": ["packages/engine/**/*.test.{ts,tsx}", "packages/engine/**/*.test.*.{ts,tsx}"],
       "rules": {
         "@typescript-eslint/no-restricted-imports": [
           "error",

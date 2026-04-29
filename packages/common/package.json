@@ -22,15 +22,13 @@
   "files": [
     "dist/*"
   ],
-  "description": "Sveltedraw fork of Excalidraw common functions, constants, etc.",
+  "description": "Sveltedraw common functions, constants, etc.",
   "publishConfig": {
     "access": "public"
   },
   "license": "MIT",
   "keywords": [
-    "excalidraw",
-    "sveltedraw",
-    "excalidraw-utils"
+    "sveltedraw"
   ],
   "browserslist": {
     "production": [

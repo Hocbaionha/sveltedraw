@@ -1,6 +1,7 @@
 # @sveltedraw/common
 
-Sveltedraw common functions, constants, and types.
+Sveltedraw common functions, constants, and shared types.
 
-Forked from the upstream Excalidraw `@excalidraw/common` package and adapted
-for the Svelte port. Workspace-internal — not published to npm.
+Workspace-internal package; not published to npm. Consumed by the
+editor (`@sveltedraw/editor`) and the headless engine
+(`@sveltedraw/engine`) through Vite path aliases.

@@ -61,10 +61,10 @@ Object.defineProperty(window, "SVELTEDRAW_ASSET_PATH", {
 
 // mock the font fetch only, so that everything else, as font subsetting, can run inside of the (snapshot) tests
 vi.mock(
-  "./packages/excalidraw/fonts/SveltedrawFontFace",
+  "./packages/engine/fonts/SveltedrawFontFace",
   async (importOriginal) => {
     const mod = await importOriginal<
-      typeof import("./packages/excalidraw/fonts/SveltedrawFontFace")
+      typeof import("./packages/engine/fonts/SveltedrawFontFace")
     >();
     const SveltedrawFontFaceImpl = mod.SveltedrawFontFace;
 

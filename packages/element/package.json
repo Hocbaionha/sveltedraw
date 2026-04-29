@@ -28,15 +28,13 @@
   "files": [
     "dist/*"
   ],
-  "description": "Sveltedraw fork of Excalidraw elements-related logic",
+  "description": "Sveltedraw elements-related logic",
   "publishConfig": {
     "access": "public"
   },
   "license": "MIT",
   "keywords": [
-    "excalidraw",
-    "sveltedraw",
-    "excalidraw-utils"
+    "sveltedraw"
   ],
   "browserslist": {
     "production": [

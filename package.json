@@ -7,7 +7,6 @@
     "packages/*"
   ],
   "devDependencies": {
-    "@excalidraw/prettier-config": "1.0.2",
     "@testing-library/jest-dom": "6.9.1",
     "@types/lodash.throttle": "4.1.9",
     "@types/react": "19.2.14",
@@ -28,14 +27,13 @@
     "node": ">=18.0.0"
   },
   "homepage": ".",
-  "prettier": "@excalidraw/prettier-config",
   "scripts": {
     "build-node": "node ./scripts/build-node.js",
     "build:common": "yarn --cwd ./packages/common build:esm",
     "build:element": "yarn --cwd ./packages/element build:esm",
-    "build:excalidraw": "yarn --cwd ./packages/excalidraw build:esm",
+    "build:engine": "yarn --cwd ./packages/engine build:esm",
     "build:math": "yarn --cwd ./packages/math build:esm",
-    "build:packages": "yarn build:common && yarn build:math && yarn build:element && yarn build:excalidraw",
+    "build:packages": "yarn build:common && yarn build:math && yarn build:element && yarn build:engine",
     "build": "yarn --cwd ./sveltedraw-app build",
     "start": "yarn --cwd ./sveltedraw-app dev",
     "preview": "yarn --cwd ./sveltedraw-app preview",

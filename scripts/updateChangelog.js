@@ -2,7 +2,7 @@ const fs = require("fs");
 const util = require("util");
 const exec = util.promisify(require("child_process").exec);
 
-const sveltedrawDir = `${__dirname}/../packages/excalidraw`;
+const sveltedrawDir = `${__dirname}/../packages/engine`;
 const sveltedrawPackage = `${sveltedrawDir}/package.json`;
 const pkg = require(sveltedrawPackage);
 const lastVersion = pkg.version;
@@ -63,7 +63,7 @@ const getLibraryCommitsSinceLastRelease = async () => {
       if (existingChangeLog.includes(prNumber)) {
         return;
       }
-      const prMarkdown = `[#${prNumber}](https://github.com/excalidraw/excalidraw/pull/${prNumber})`;
+      const prMarkdown = `[#${prNumber}](https://github.com/Hocbaionha/sveltedraw/pull/${prNumber})`;
       const messageWithPRLink = messageWithCapitalizeFirst.replace(
         /\(#[0-9]*\)/,
         prMarkdown,
@@ -81,7 +81,7 @@ const getLibraryCommitsSinceLastRelease = async () => {
 const updateChangelog = async (nextVersion) => {
   const commitList = await getLibraryCommitsSinceLastRelease();
   let changelogForLibrary =
-    "## Excalidraw Library\n\n**_This section lists the updates made to the excalidraw library and will not affect the integration._**\n\n";
+    "## Sveltedraw Library\n\n**_This section lists the updates made to the library and will not affect the integration._**\n\n";
   supportedTypes.forEach((type) => {
     if (commitList[type].length) {
       changelogForLibrary += `### ${headerForType[type]}\n\n`;

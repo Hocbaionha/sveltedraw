@@ -8,7 +8,7 @@
           {
             "patterns": [
               {
-                "group": ["../../excalidraw", "../../../packages/excalidraw", "@sveltedraw/engine"],
+                "group": ["../../engine", "../../../packages/engine", "@sveltedraw/engine"],
                 "message": "Do not import from '@sveltedraw/engine' package anything but types, as this package must be independent.",
                 "allowTypeImports": true
               }

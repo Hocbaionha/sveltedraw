@@ -1,6 +1,5 @@
 # @sveltedraw/math
 
-Sveltedraw math utilities (vectors, points, ranges, geometry).
+Sveltedraw math utilities — vectors, points, ranges, geometry primitives.
 
-Forked from the upstream Excalidraw `@excalidraw/math` package and adapted
-for the Svelte port. Workspace-internal — not published to npm.
+Workspace-internal package; not published to npm.

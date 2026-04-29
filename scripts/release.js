@@ -6,7 +6,7 @@ const { execSync } = require("child_process");
 const updateChangelog = require("./updateChangelog");
 
 // skipping utils for now, as it has independent release process
-const PACKAGES = ["common", "math", "element", "excalidraw"];
+const PACKAGES = ["common", "math", "element", "engine"];
 const PACKAGES_DIR = path.resolve(__dirname, "../packages");
 
 /**
@@ -70,7 +70,7 @@ const getArguments = () => {
   if (!version) {
     // set the next version based on the engine package version + commit hash
     const sveltedrawPackageVersion = require(getPackageJsonPath(
-      "excalidraw",
+      "engine",
     )).version;
 
     const hash = getShortCommitHash();

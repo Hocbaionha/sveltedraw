@@ -465,8 +465,7 @@ export const TOOL_TYPE = {
 
 export const EDITOR_LS_KEYS = {
   OAI_API_KEY: "sveltedraw-oai-api-key",
-  // legacy naming (non)scheme
-  MERMAID_TO_EXCALIDRAW: "mermaid-to-excalidraw",
+  MERMAID_TO_DIAGRAM: "mermaid-to-diagram",
   PUBLISH_LIBRARY: "publish-library-data",
 } as const;
 

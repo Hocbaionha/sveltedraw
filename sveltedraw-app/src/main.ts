@@ -1,4 +1,4 @@
-// Polyfill pointer events for Safari <13 and older browsers. Upstream's
+// Polyfill pointer events for Safari <13 and older browsers. Original's
 // main.tsx imports this too; without it, pointerdown/move/up on iOS
 // <13 fall back to touch events and our handlers stop firing.
 // eslint-disable-next-line import/no-unassigned-import
@@ -12,7 +12,7 @@ import AppRoot from './AppRoot.svelte';
 import { registerSW } from 'virtual:pwa-register';
 registerSW({ immediate: true });
 
-// Upstream Excalidraw's `SveltedrawFontFace.createUrls` treats raw asset
+// Original Sveltedraw's `SveltedrawFontFace.createUrls` treats raw asset
 // paths as relative and needs `window.SVELTEDRAW_ASSET_PATH` to build a
 // correct absolute URL. In our Vite dev setup, the font imports resolve
 // to `/@fs/C:/.../fonts/Excalifont/...woff2` — an absolute path on THIS

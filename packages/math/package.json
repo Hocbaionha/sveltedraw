@@ -22,15 +22,13 @@
   "files": [
     "dist/*"
   ],
-  "description": "Sveltedraw fork of Excalidraw math functions",
+  "description": "Sveltedraw math functions",
   "publishConfig": {
     "access": "public"
   },
   "license": "MIT",
   "keywords": [
-    "excalidraw",
     "sveltedraw",
-    "excalidraw-math",
     "math",
     "vector",
     "algebra",

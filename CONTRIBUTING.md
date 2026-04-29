@@ -1,9 +1,5 @@
 # Contributing
 
-Sveltedraw is a Svelte 5 port of Excalidraw. The drawing engine and
-file format come from upstream; the UI, collaboration layer, and
-Svelte-side architecture are this fork's contributions.
-
 ## Setup
 
 ```bash
@@ -29,17 +25,3 @@ yarn workspaces resolve in place via Vite aliases.
 - See `CLAUDE.md` for the working conventions (Svelte 5 runes, alias
   rules, manual-chunk boundaries, comment policy).
 - Prefer editing existing files over creating new ones.
-- Keep upstream-derived code (`packages/{excalidraw,common,element,math,utils}/`)
-  minimally diverged from Excalidraw to preserve future merge paths.
-
-## Upstream attribution
-
-When porting a React component to Svelte, retain a top-of-file comment
-identifying the upstream source path. Example:
-
-```svelte
-// Port of packages/excalidraw/components/Dialog.tsx
-```
-
-This makes upstream regressions traceable and keeps the merge-back path
-open if a feature changes upstream.

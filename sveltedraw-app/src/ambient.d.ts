@@ -1,12 +1,12 @@
 // Ambient shims for globals and cross-file types that show up when
-// svelte-check walks upstream packages/{common,element,excalidraw}.
+// svelte-check walks engine packages/{common,element,engine}.
 //
-// Why not use packages/excalidraw/global.d.ts directly: our tsconfig
+// Why not use packages/engine/global.d.ts directly: our tsconfig
 // excludes packages/** so its global.d.ts isn't auto-loaded. Mirroring
 // the same declarations here keeps the scope narrow to files our port
 // actually touches.
 
-// ─── Window globals upstream relies on ─────────────────────────────
+// ─── Window globals original relies on ─────────────────────────────
 interface Window {
   __SVELTEDRAW_SHA__: string | undefined;
   SVELTEDRAW_ASSET_PATH: string | string[] | undefined;
@@ -16,7 +16,7 @@ interface Window {
 }
 
 // ─── Node globals leaked into universal TS files ───────────────────
-// Upstream TS files reference `process.env`, `Buffer.from()`, etc. for
+// Original TS files reference `process.env`, `Buffer.from()`, etc. for
 // environment detection. They're guarded at runtime — these are just
 // type shims to silence svelte-check.
 declare const process: {
@@ -30,7 +30,7 @@ declare const Buffer: {
 };
 
 // ─── React namespace shim ─────────────────────────────────────────
-// A handful of upstream .ts files (linearElementEditor, clipboard)
+// A handful of original .ts files (linearElementEditor, clipboard)
 // still have `React.PointerEvent<HTMLElement>` / `React.Component<...>`
 // type annotations. We don't use React at runtime, but svelte-check
 // needs the namespace resolvable. Typing all inner members as `any`
@@ -45,8 +45,8 @@ declare namespace React {
   type ForwardRefRenderFunction<_T, _P = any> = any;
 }
 
-// ─── Untyped CommonJS libs upstream still imports ─────────────────
-// These are small pure-JS packages without @types/ packages. Upstream
+// ─── Untyped CommonJS libs original still imports ─────────────────
+// These are small pure-JS packages without @types/ packages. Original
 // uses them for image processing + png-chunk round-tripping.
 declare module "lodash.throttle";
 declare module "lodash.debounce";
@@ -55,7 +55,7 @@ declare module "png-chunks-encode";
 declare module "png-chunks-extract";
 declare module "image-blob-reduce";
 
-// Upstream `types.ts` does `import type { PointerEvent, ... }
+// Original `types.ts` does `import type { PointerEvent, ... }
 // from "react"`. Declare the module with the members as `any` —
 // real React isn't installed; these are erased types.
 declare module "react" {
@@ -72,8 +72,8 @@ declare module "react" {
   }
 }
 
-// ─── Misc Blob extensions used by upstream ────────────────────────
-// File (extends Blob) has `name`; upstream's Blob-typed params sometimes
+// ─── Misc Blob extensions used by original ────────────────────────
+// File (extends Blob) has `name`; original's Blob-typed params sometimes
 // read .name directly. Shim Blob to have optional name.
 interface Blob {
   name?: string;
@@ -83,6 +83,6 @@ interface File {
   handle?: any;
 }
 
-// browser-fs-access (which upstream's json/blob helpers use) adds a
+// browser-fs-access (which original's json/blob helpers use) adds a
 // `handle` property via augmentation but we don't pull that lib.
 

@@ -1070,7 +1070,7 @@ const generateElbowArrowShape = (
 };
 
 /**
- * get the pure geometric shape of an excalidraw elementw
+ * get the pure geometric shape of an drawing element
  * which is then used for hit detection
  */
 export const getElementShape = <Point extends GlobalPoint | LocalPoint>(

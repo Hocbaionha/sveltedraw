@@ -16,7 +16,7 @@ const getConfig = (outdir) => ({
   alias: {
     "@sveltedraw/common": path.resolve(__dirname, "../packages/common/src"),
     "@sveltedraw/element": path.resolve(__dirname, "../packages/element/src"),
-    "@sveltedraw/engine": path.resolve(__dirname, "../packages/excalidraw"),
+    "@sveltedraw/engine": path.resolve(__dirname, "../packages/engine"),
     "@sveltedraw/math": path.resolve(__dirname, "../packages/math/src"),
     "@sveltedraw/utils": path.resolve(__dirname, "../packages/utils/src"),
   },

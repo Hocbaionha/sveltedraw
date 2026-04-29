@@ -145,7 +145,7 @@ async function main() {
       (async () => {
         const p = window.__sveltedrawProbe;
         if (!p?.scene) return { err: 'no scene' };
-        // Factory tucked inside upstream element/src; reach via scene helpers.
+        // Factory tucked inside original element/src; reach via scene helpers.
         const rects = [];
         for (let i = 0; i < ${PER_CYCLE}; i++) {
           // eslint-disable-next-line

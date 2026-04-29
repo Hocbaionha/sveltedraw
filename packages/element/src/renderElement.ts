@@ -141,7 +141,7 @@ export interface SveltedrawElementWithCanvas {
   canvasOffsetX: number;
   canvasOffsetY: number;
   // Snapshot of element.version at the moment this bitmap was rendered.
-  // Upstream relied on `newElementWith` cloning the element (new identity =>
+  // Original relied on `newElementWith` cloning the element (new identity =>
   // WeakMap miss => regen). sveltedraw uses in-place `Scene.mutateElement`,
   // so identity stays the same and we need an explicit version guard.
   // Without this, text / freedraw style mutations (fontSize / fontFamily /
@@ -564,7 +564,7 @@ const drawElementOnCanvas = (
         context.save();
         context.font = getFontString(element);
         // sveltedraw: textColor overrides strokeColor when set; strokeColor
-        // remains the legacy path for upstream-style text.
+        // remains the legacy path for original-style text.
         const textFill = (element as any).textColor || element.strokeColor;
         context.fillStyle =
           renderConfig.theme === THEME.DARK
@@ -841,7 +841,7 @@ export const renderElement = (
     reduceAlphaForSelection ? DEFAULT_REDUCED_GLOBAL_ALPHA : 1,
   );
 
-  // C1: drop shadow. Sveltedraw non-upstream. Apply before the switch so
+  // C1: drop shadow. Sveltedraw non-original. Apply before the switch so
   // roughjs drawImage calls + path strokes inherit ctx.shadow*. Saved /
   // restored around the whole render so it doesn't leak into siblings.
   const shadow = (element as any).shadow as

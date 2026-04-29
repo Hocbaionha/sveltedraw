@@ -18,9 +18,8 @@ export default defineConfig({
   },
   plugins: [
     svelte(),
-    // Service-worker + install manifest. Lifted from upstream's
-    // excalidraw-app/vite.config.mts; the caching rules are tuned for
-    // Excalidraw's asset shape (fonts, locales, chunk names).
+    // Service-worker + install manifest. Caching rules tuned for the
+    // Sveltedraw asset shape (fonts, locales, chunk names).
     VitePWA({
       registerType: 'autoUpdate',
       devOptions: {
@@ -78,13 +77,13 @@ export default defineConfig({
           },
         ],
         maximumFileSizeToCacheInBytes: 3 * 1024 ** 2, // 3MB — our bundles
-        // are larger than upstream's React equivalents.
+        // are larger than original's React equivalents.
       },
       manifest: {
         short_name: 'Sveltedraw',
         name: 'Sveltedraw',
         description:
-          'Svelte port of Excalidraw — a whiteboard tool for sketching hand-drawn diagrams.',
+          'Svelte port of Sveltedraw — a whiteboard tool for sketching hand-drawn diagrams.',
         icons: [],
         start_url: '/',
         id: 'sveltedraw',
@@ -104,10 +103,9 @@ export default defineConfig({
     // condition without this hint.
     conditions: ['svelte', 'browser', 'module', 'import', 'default'],
     alias: [
-      // Bare `@sveltedraw/excalidraw` is no longer exported (index.tsx
-      // was the React entry, deleted in Phase 9). Only subpath imports
-      // like `/scene/Renderer` work.
-      { find: /^@sveltedraw\/engine\/(.*)/, replacement: resolve('../packages/excalidraw/$1') },
+      // Engine is consumed via subpath imports only (no bare entry);
+      // editor is consumed via the bare entry @sveltedraw/editor.
+      { find: /^@sveltedraw\/engine\/(.*)/, replacement: resolve('../packages/engine/$1') },
       { find: /^@sveltedraw\/common$/, replacement: resolve('../packages/common/src/index.ts') },
       { find: /^@sveltedraw\/common\/(.*)/, replacement: resolve('../packages/common/src/$1') },
       { find: /^@sveltedraw\/element$/, replacement: resolve('../packages/element/src/index.ts') },
@@ -116,13 +114,13 @@ export default defineConfig({
       { find: /^@sveltedraw\/math\/(.*)/, replacement: resolve('../packages/math/src/$1') },
       { find: /^@sveltedraw\/utils$/, replacement: resolve('../packages/utils/src/index.ts') },
       { find: /^@sveltedraw\/utils\/(.*)/, replacement: resolve('../packages/utils/src/$1') },
-      { find: /^@sveltedraw\/excalidraw$/, replacement: resolve('../packages/excalidraw-svelte/src/index.ts') },
+      { find: /^@sveltedraw\/editor$/, replacement: resolve('../packages/editor/src/index.ts') },
     ],
   },
   build: {
     target: 'esnext',
     // Chunk size budget: the warning limit at default 500 KB was
-    // designed for typical SPAs. Excalidraw has a ~900 KB main
+    // designed for typical SPAs. Sveltedraw has a ~900 KB main
     // bundle even after splitting because of the canvas rendering
     // stack (roughjs + perfect-freehand + element ops). Raising to
     // 800 KB suppresses the noise on chunks that are already as
@@ -131,8 +129,8 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          // Upstream-generated font subset worker — already its own
-          // chunk via Excalidraw's fonts pipeline, keep as-is.
+          // Source-generated font subset worker — already its own
+          // chunk via Sveltedraw's fonts pipeline, keep as-is.
           if (id.includes('subset-shared') || id.includes('subset-worker')) {
             return undefined;
           }
@@ -178,17 +176,17 @@ export default defineConfig({
             return 'vendor';
           }
 
-          // Split the Excalidraw engine (scene + renderer + data +
+          // Split the Sveltedraw engine (scene + renderer + data +
           // fonts) into its own chunk so the Svelte app code can be
           // updated without busting the engine cache.
           if (
-            id.includes('/packages/excalidraw/scene/') ||
-            id.includes('/packages/excalidraw/renderer/') ||
-            id.includes('/packages/excalidraw/data/') ||
-            id.includes('/packages/excalidraw/fonts/') ||
-            id.includes('/packages/excalidraw/clipboard.ts') ||
-            id.includes('/packages/excalidraw/appState.ts') ||
-            id.includes('/packages/excalidraw/types.ts') ||
+            id.includes('/packages/engine/scene/') ||
+            id.includes('/packages/engine/renderer/') ||
+            id.includes('/packages/engine/data/') ||
+            id.includes('/packages/engine/fonts/') ||
+            id.includes('/packages/engine/clipboard.ts') ||
+            id.includes('/packages/engine/appState.ts') ||
+            id.includes('/packages/engine/types.ts') ||
             id.includes('/packages/element/') ||
             id.includes('/packages/common/') ||
             id.includes('/packages/math/') ||

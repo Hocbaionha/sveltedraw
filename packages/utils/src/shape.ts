@@ -3,12 +3,12 @@
  *
  * for instance, a cubic bezier curve is specified by its four control points and
  * an ellipse is defined by its center, angle, semi major axis and semi minor axis
- * (but in semi-width and semi-height so it's more relevant to Excalidraw)
+ * (but in semi-width and semi-height so it's more relevant to Sveltedraw)
  *
  * the idea with pure shapes is so that we can provide collision and other geoemtric methods not depending on
- * the specifics of roughjs or elements in Excalidraw; instead, we can focus on the pure shapes themselves
+ * the specifics of roughjs or elements in Sveltedraw; instead, we can focus on the pure shapes themselves
  *
- * also included in this file are methods for converting an Excalidraw element or a Drawable from roughjs
+ * also included in this file are methods for converting an Sveltedraw element or a Drawable from roughjs
  * to pure shapes
  */
 import { pointsOnBezierCurves } from "points-on-curve";

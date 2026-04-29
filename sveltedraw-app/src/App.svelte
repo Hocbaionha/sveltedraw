@@ -2,7 +2,7 @@
   import './app.scss';
   import Showcase from './showcase/Showcase.svelte';
   // @ts-ignore — resolved via Vite alias
-  import { App as SveltedrawApp } from '@sveltedraw/excalidraw';
+  import { App as SveltedrawApp } from '@sveltedraw/editor';
 
   let hash = $state(window.location.hash);
   window.addEventListener('hashchange', () => { hash = window.location.hash; });
@@ -17,7 +17,7 @@
 {:else}
   <div class="app-container">
     <h1>Sveltedraw</h1>
-    <p>Svelte 5 port of Excalidraw — work in progress.</p>
+    <p>Svelte 5 port of Sveltedraw — work in progress.</p>
     <ul>
       <li><a href="#showcase">→ Component Showcase (bits-ui)</a></li>
       <li><a href="#app">→ Editor shell (Phase 6 batch 1 — no drawing yet)</a></li>

@@ -2036,7 +2036,7 @@ async function main() {
   console.log("=== DOM snapshot ===");
   console.log(JSON.stringify(domInfo.result?.value ?? domInfo, null, 2));
 
-  // Known-benign errors upstream logs: Excalidraw's Fonts class fetches
+  // Known-benign errors original logs: Sveltedraw's Fonts class fetches
   // woff2 files from a broken esm.sh URL that doesn't resolve in this
   // dev setup. Export succeeds (text renders with system-font fallback).
   // Filter them out so they don't mask real regressions.
@@ -2096,7 +2096,7 @@ async function main() {
   const probe = global.__probeResult;
   pass(
     // After drawing a rectangle, the tool auto-switches back to
-    // selection (mirrors upstream Excalidraw UX so the user can
+    // selection (mirrors original Sveltedraw UX so the user can
     // immediately click the element they just drew). Assertion
     // name kept for backwards compat; we verify the rectangle WAS
     // drawn via the element-count check below.

@@ -1,94 +1,94 @@
 // Global stylesheet for sveltedraw-app.
 //
-// Imports upstream Excalidraw SCSS so the ported Svelte components inherit
-// the same look. Excalidraw's own components import their .scss sidecars
+// Imports the engine SCSS so the ported Svelte components inherit
+// the same look. Sveltedraw's own components import their .scss sidecars
 // per-file; the Svelte ports do not, so we aggregate all of them here once.
 //
-// All upstream-derived SCSS rules are nested under `.sveltedraw` — wrap any
+// All original-derived SCSS rules are nested under `.sveltedraw` — wrap any
 // region that uses ported components in a `<div class="sveltedraw">` so the
 // rules apply.
 //
 // NOTE: Sass requires all `@use` rules to appear BEFORE any CSS rules, so the
-// upstream imports live first and the local reset is at the bottom.
+// original imports live first and the local reset is at the bottom.
 
-// ─── Upstream Excalidraw global styles + theme variables ─────────────────
-@use "../../packages/excalidraw/css/app";
-@use "../../packages/excalidraw/css/styles";
+// ─── Original Sveltedraw global styles + theme variables ─────────────────
+@use "../../packages/engine/css/app";
+@use "../../packages/engine/css/styles";
 
 // ─── Per-component SCSS sidecars (alphabetical) ─────────────────────────
-@use "../../packages/excalidraw/components/Actions";
-@use "../../packages/excalidraw/components/Avatar";
-@use "../../packages/excalidraw/components/Button";
-@use "../../packages/excalidraw/components/ButtonIcon";
-@use "../../packages/excalidraw/components/Card";
-@use "../../packages/excalidraw/components/CheckboxItem";
-@use "../../packages/excalidraw/components/ColorPicker/ColorPicker";
-@use "../../packages/excalidraw/components/CommandPalette/CommandPalette";
-@use "../../packages/excalidraw/components/ConfirmDialog";
-@use "../../packages/excalidraw/components/ContextMenu";
-@use "../../packages/excalidraw/components/ConvertElementTypePopup";
-@use "../../packages/excalidraw/components/Dialog";
-@use "../../packages/excalidraw/components/DialogActionButton";
-@use "../../packages/excalidraw/components/dropdownMenu/DropdownMenu";
-@use "../../packages/excalidraw/components/ElementCanvasButtons";
-@use "../../packages/excalidraw/components/ElementLinkDialog";
-@use "../../packages/excalidraw/components/SveltedrawLogo";
-@use "../../packages/excalidraw/components/ExportDialog";
-@use "../../packages/excalidraw/components/EyeDropper";
-@use "../../packages/excalidraw/components/FilledButton";
-@use "../../packages/excalidraw/components/FixedSideContainer";
-@use "../../packages/excalidraw/components/FollowMode/FollowMode";
-@use "../../packages/excalidraw/components/FontPicker/FontPicker";
-@use "../../packages/excalidraw/components/footer/FooterCenter";
-@use "../../packages/excalidraw/components/HelpDialog";
-@use "../../packages/excalidraw/components/HintViewer";
-@use "../../packages/excalidraw/components/hyperlink/Hyperlink";
-@use "../../packages/excalidraw/components/IconPicker";
-@use "../../packages/excalidraw/components/ImageExportDialog";
-@use "../../packages/excalidraw/components/Island";
-@use "../../packages/excalidraw/components/LayerUI";
-@use "../../packages/excalidraw/components/LibraryMenu";
-@use "../../packages/excalidraw/components/LibraryMenuItems";
-@use "../../packages/excalidraw/components/LibraryUnit";
-@use "../../packages/excalidraw/components/live-collaboration/LiveCollaborationTrigger";
-@use "../../packages/excalidraw/components/main-menu/DefaultItems";
-@use "../../packages/excalidraw/components/MobileToolBar";
-@use "../../packages/excalidraw/components/Modal";
-@use "../../packages/excalidraw/components/OverwriteConfirm/OverwriteConfirm";
-@use "../../packages/excalidraw/components/PasteChartDialog";
-@use "../../packages/excalidraw/components/Popover";
-@use "../../packages/excalidraw/components/ProjectName";
-@use "../../packages/excalidraw/components/PublishLibrary";
-@use "../../packages/excalidraw/components/QuickSearch";
-@use "../../packages/excalidraw/components/RadioGroup";
-@use "../../packages/excalidraw/components/Range";
-@use "../../packages/excalidraw/components/ScrollableList";
-@use "../../packages/excalidraw/components/SearchMenu";
-@use "../../packages/excalidraw/components/ShareableLinkDialog";
-@use "../../packages/excalidraw/components/Sidebar/Sidebar";
-@use "../../packages/excalidraw/components/Sidebar/SidebarTrigger";
-@use "../../packages/excalidraw/components/Spinner";
-@use "../../packages/excalidraw/components/Stack";
-@use "../../packages/excalidraw/components/Stats/DragInput";
-@use "../../packages/excalidraw/components/Stats/Stats";
-@use "../../packages/excalidraw/components/SVGLayer";
-@use "../../packages/excalidraw/components/Switch";
-@use "../../packages/excalidraw/components/TextField";
-@use "../../packages/excalidraw/components/TextInput";
-@use "../../packages/excalidraw/components/Toast";
-@use "../../packages/excalidraw/components/ToolIcon";
-@use "../../packages/excalidraw/components/Toolbar";
-@use "../../packages/excalidraw/components/ToolPopover";
-@use "../../packages/excalidraw/components/Tooltip";
-@use "../../packages/excalidraw/components/TTDDialog/Chat/Chat";
-@use "../../packages/excalidraw/components/TTDDialog/MermaidToExcalidraw";
-@use "../../packages/excalidraw/components/TTDDialog/TTDDialog";
-@use "../../packages/excalidraw/components/UnlockPopup";
-@use "../../packages/excalidraw/components/UserList";
-@use "../../packages/excalidraw/components/welcome-screen/WelcomeScreen";
+@use "../../packages/engine/components/Actions";
+@use "../../packages/engine/components/Avatar";
+@use "../../packages/engine/components/Button";
+@use "../../packages/engine/components/ButtonIcon";
+@use "../../packages/engine/components/Card";
+@use "../../packages/engine/components/CheckboxItem";
+@use "../../packages/engine/components/ColorPicker/ColorPicker";
+@use "../../packages/engine/components/CommandPalette/CommandPalette";
+@use "../../packages/engine/components/ConfirmDialog";
+@use "../../packages/engine/components/ContextMenu";
+@use "../../packages/engine/components/ConvertElementTypePopup";
+@use "../../packages/engine/components/Dialog";
+@use "../../packages/engine/components/DialogActionButton";
+@use "../../packages/engine/components/dropdownMenu/DropdownMenu";
+@use "../../packages/engine/components/ElementCanvasButtons";
+@use "../../packages/engine/components/ElementLinkDialog";
+@use "../../packages/engine/components/SveltedrawLogo";
+@use "../../packages/engine/components/ExportDialog";
+@use "../../packages/engine/components/EyeDropper";
+@use "../../packages/engine/components/FilledButton";
+@use "../../packages/engine/components/FixedSideContainer";
+@use "../../packages/engine/components/FollowMode/FollowMode";
+@use "../../packages/engine/components/FontPicker/FontPicker";
+@use "../../packages/engine/components/footer/FooterCenter";
+@use "../../packages/engine/components/HelpDialog";
+@use "../../packages/engine/components/HintViewer";
+@use "../../packages/engine/components/hyperlink/Hyperlink";
+@use "../../packages/engine/components/IconPicker";
+@use "../../packages/engine/components/ImageExportDialog";
+@use "../../packages/engine/components/Island";
+@use "../../packages/engine/components/LayerUI";
+@use "../../packages/engine/components/LibraryMenu";
+@use "../../packages/engine/components/LibraryMenuItems";
+@use "../../packages/engine/components/LibraryUnit";
+@use "../../packages/engine/components/live-collaboration/LiveCollaborationTrigger";
+@use "../../packages/engine/components/main-menu/DefaultItems";
+@use "../../packages/engine/components/MobileToolBar";
+@use "../../packages/engine/components/Modal";
+@use "../../packages/engine/components/OverwriteConfirm/OverwriteConfirm";
+@use "../../packages/engine/components/PasteChartDialog";
+@use "../../packages/engine/components/Popover";
+@use "../../packages/engine/components/ProjectName";
+@use "../../packages/engine/components/PublishLibrary";
+@use "../../packages/engine/components/QuickSearch";
+@use "../../packages/engine/components/RadioGroup";
+@use "../../packages/engine/components/Range";
+@use "../../packages/engine/components/ScrollableList";
+@use "../../packages/engine/components/SearchMenu";
+@use "../../packages/engine/components/ShareableLinkDialog";
+@use "../../packages/engine/components/Sidebar/Sidebar";
+@use "../../packages/engine/components/Sidebar/SidebarTrigger";
+@use "../../packages/engine/components/Spinner";
+@use "../../packages/engine/components/Stack";
+@use "../../packages/engine/components/Stats/DragInput";
+@use "../../packages/engine/components/Stats/Stats";
+@use "../../packages/engine/components/SVGLayer";
+@use "../../packages/engine/components/Switch";
+@use "../../packages/engine/components/TextField";
+@use "../../packages/engine/components/TextInput";
+@use "../../packages/engine/components/Toast";
+@use "../../packages/engine/components/ToolIcon";
+@use "../../packages/engine/components/Toolbar";
+@use "../../packages/engine/components/ToolPopover";
+@use "../../packages/engine/components/Tooltip";
+@use "../../packages/engine/components/TTDDialog/Chat/Chat";
+@use "../../packages/engine/components/TTDDialog/MermaidToExcalidraw";
+@use "../../packages/engine/components/TTDDialog/TTDDialog";
+@use "../../packages/engine/components/UnlockPopup";
+@use "../../packages/engine/components/UserList";
+@use "../../packages/engine/components/welcome-screen/WelcomeScreen";
 
 // ─── Vietnamese-capable hand-drawn fallback fonts ───────────────────────
-// Excalifont (upstream's hand-drawn default) doesn't cover Vietnamese tone
+// Excalifont (original's hand-drawn default) doesn't cover Vietnamese tone
 // marks (U+1EA0-1EF9 range — ả ẫ ặ ẻ ế ... etc). We bundle Patrick Hand
 // (Google Fonts, OFL) which has a dedicated Vietnamese subset + ships in
 // the same hand-drawn aesthetic family as Excalifont.
@@ -96,9 +96,9 @@
 // The trick: declare `@font-face family "Excalifont"` pointing to Patrick
 // Hand, scoped by `unicode-range` to Vietnamese + Latin Extended Additional.
 // Browser pseudo-merges font sources by unicode-range — Latin chars still
-// render via upstream's Excalifont, Vietnamese chars use Patrick Hand.
+// render via original's Excalifont, Vietnamese chars use Patrick Hand.
 //
-// This works for both DOM (textarea overlay) and canvas (upstream's font
+// This works for both DOM (textarea overlay) and canvas (original's font
 // loader registers via `document.fonts.add(new FontFace(…))` which coexists
 // with CSS-declared @font-face in the same FontFaceSet, chosen per-glyph by
 // unicode-range).
@@ -136,7 +136,7 @@
 
 // Alias Patrick Hand under "Excalifont" for the Vietnamese + Latin Ext A
 // ranges that Excalifont doesn't cover. Browser merges @font-face by
-// unicode-range, so Latin still loads from upstream's Excalifont woff2.
+// unicode-range, so Latin still loads from the engine's Excalifont woff2.
 @font-face {
   font-family: "Excalifont";
   src: url("/fonts/PatrickHand-Vietnamese.woff2") format("woff2");
@@ -155,7 +155,7 @@
   unicode-range: U+1E00-1E9F, U+1EF2-1EFF;
 }
 
-// ─── Local reset (after upstream @use) ──────────────────────────────────
+// ─── Local reset (after original @use) ──────────────────────────────────
 *,
 *::before,
 *::after {

@@ -61,7 +61,7 @@
     Collapsible,
     // Icons
     Icon,
-  } from "@sveltedraw/excalidraw";
+  } from "@sveltedraw/editor";
 
   // State
   let switchValue = $state(false);
@@ -371,8 +371,8 @@
       <div class="demo">
         <h2>LinkButton &amp; HelpButton</h2>
         <div class="row">
-          <LinkButton href="https://excalidraw.com">
-            {#snippet children()}Open excalidraw.com{/snippet}
+          <LinkButton href="https://github.com/Hocbaionha/sveltedraw">
+            {#snippet children()}Open repository{/snippet}
           </LinkButton>
           <HelpButton onclick={() => alert("help")} />
         </div>

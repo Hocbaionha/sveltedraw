@@ -49,3 +49,4 @@ meta*.json
 # Smoke + dev server scratch outputs (one-off captures)
 /smoke-results*.txt
 /dev-server.log
+/baseline-smoke.txt

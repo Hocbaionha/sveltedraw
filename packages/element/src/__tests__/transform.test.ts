@@ -328,7 +328,7 @@ describe("Test Transform", () => {
         backgroundColor: "#fff3bf",
         strokeWidth: 2,
         label: {
-          text: "HELLO EXCALIDRAW",
+          text: "HELLO SVELTEDRAW",
           strokeColor: "#099268",
           fontSize: 30,
         },

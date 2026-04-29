@@ -735,7 +735,7 @@ export const convertToSveltedrawElements = (
     }
   }
 
-  // Once all the excalidraw elements are created, we can add frames since we
+  // Once all the drawing elements are created, we can add frames since we
   // need to calculate coordinates and dimensions of frame which is possible after all
   // frame children are processed.
   for (const [id, element] of elementsWithIds) {
@@ -745,7 +745,7 @@ export const convertToSveltedrawElements = (
     const frame = elementStore.getElement(id);
 
     if (!frame) {
-      throw new Error(`Excalidraw element with id ${id} doesn't exist`);
+      throw new Error(`Sveltedraw element with id ${id} doesn't exist`);
     }
     const childrenElements: SveltedrawElement[] = [];
 

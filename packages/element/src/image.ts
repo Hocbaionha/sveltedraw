@@ -32,7 +32,7 @@ export const loadHTMLImageElement = (dataURL: DataURL) => {
 };
 
 /** NOTE: updates cache even if already populated with given image. Thus,
- * you should filter out the images upstream if you want to optimize this. */
+ * you should filter out the images original if you want to optimize this. */
 export const updateImageCache = async ({
   fileIds,
   files,
