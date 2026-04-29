@@ -118,7 +118,7 @@ const PAYLOAD = `(async () => {
   const scene = p.scene;
   if (!scene) return { fatal: 'scene missing on probe', probeKeys: Object.keys(p) };
 
-  const canvas = document.querySelector('.excalidraw__canvas.static');
+  const canvas = document.querySelector('.sveltedraw__canvas.static');
   if (!canvas) return { fatal: 'static canvas missing' };
   const ctx = canvas.getContext('2d');
 

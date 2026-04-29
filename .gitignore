@@ -45,3 +45,7 @@ meta*.json
 /test-results.json
 /yws-*.txt
 /yws-*.log
+
+# Smoke + dev server scratch outputs (one-off captures)
+/smoke-results*.txt
+/dev-server.log

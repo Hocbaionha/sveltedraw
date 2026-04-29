@@ -117,8 +117,8 @@ async function main() {
         localStorage.removeItem('sveltedraw:scene:v1');
         await new Promise(r => setTimeout(r, 50));
 
-        const container = document.querySelector('.excalidraw-container');
-        const iv = document.querySelector('.excalidraw__canvas.interactive') ||
+        const container = document.querySelector('.sveltedraw-container');
+        const iv = document.querySelector('.sveltedraw__canvas.interactive') ||
                    document.querySelectorAll('canvas')[1];
         container.focus();
 

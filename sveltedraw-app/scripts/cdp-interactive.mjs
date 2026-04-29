@@ -297,7 +297,7 @@ async function main() {
   await nav("dropdown");
   await wait(300);
   await evalJs(`(() => {
-    const trig = document.querySelector('[data-testid=dropdown-menu], .excalidraw-button');
+    const trig = document.querySelector('[data-testid=dropdown-menu], .sveltedraw-button');
     // actually the trigger is a button containing "File ▾"
     const btn = [...document.querySelectorAll('button')]
       .find(b => b.textContent?.includes('File'));
@@ -406,10 +406,10 @@ async function main() {
   await wait(1200);
   // Check multiple possible tooltip classes/attributes — bits-ui may use any
   const tooltipProbe = await evalJs(`(() => {
-    const visible = !!document.querySelector('.excalidraw-tooltip--visible');
+    const visible = !!document.querySelector('.sveltedraw-tooltip--visible');
     const byRole = !!document.querySelector('[role=tooltip]');
     const byDataState = !!document.querySelector('[data-tooltip-content][data-state=open]');
-    const anyTooltip = document.querySelectorAll('.excalidraw-tooltip, [role=tooltip]').length;
+    const anyTooltip = document.querySelectorAll('.sveltedraw-tooltip, [role=tooltip]').length;
     return { visible, byRole, byDataState, anyTooltip };
   })()`);
   const tooltipVisible =

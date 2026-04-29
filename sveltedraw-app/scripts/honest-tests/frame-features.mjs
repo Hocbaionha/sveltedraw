@@ -131,11 +131,11 @@ const PAYLOAD = `(async () => {
   p.bumpSceneRepaint();
   await new Promise(r => setTimeout(r, 100));
 
-  // Dispatch bare 'f' to the .excalidraw-container — that's the element the
+  // Dispatch bare 'f' to the .sveltedraw-container — that's the element the
   // onContainerKeyDown listener is attached to (App.svelte:799). Dispatching
   // to document does NOT trigger it.
-  const container = document.querySelector('.excalidraw-container');
-  if (!container) return { fatal: 'excalidraw-container missing' };
+  const container = document.querySelector('.sveltedraw-container');
+  if (!container) return { fatal: 'sveltedraw-container missing' };
   container.focus();
   await new Promise(r => setTimeout(r, 30));
 
@@ -189,8 +189,8 @@ const PAYLOAD = `(async () => {
   // by (dx, dy). We can't cheaply set up dragOrigins without a real
   // pointerdown, so simulate the real pointer gesture on the interactive
   // canvas: pointerdown on elOutside → pointermove into frame → pointerup.
-  const canvas = document.querySelector('.excalidraw__canvas.interactive')
-               || document.querySelector('.excalidraw__canvas.static');
+  const canvas = document.querySelector('.sveltedraw__canvas.interactive')
+               || document.querySelector('.sveltedraw__canvas.static');
   if (!canvas) return { fatal: 'interactive canvas missing' };
 
   // Move elOutside to a known position near the frame edge (but outside)

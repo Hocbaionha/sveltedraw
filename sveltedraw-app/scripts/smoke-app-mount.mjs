@@ -153,8 +153,8 @@ async function main() {
   // scene has one rectangle element.
   await send("Runtime.evaluate", {
     expression: `(async () => {
-      const container = document.querySelector('.excalidraw-container');
-      const iv = document.querySelector('.excalidraw__canvas.interactive');
+      const container = document.querySelector('.sveltedraw-container');
+      const iv = document.querySelector('.sveltedraw__canvas.interactive');
       if (!container || !iv) return { error: 'container or interactive canvas missing' };
 
       // 1) focus + press "r" to select rectangle tool
@@ -1038,11 +1038,11 @@ async function main() {
       try {
         const before = p.appState?.theme ?? 'light';
         const btn = document.querySelector('.sveltedraw-utility-bar button[aria-label="Toggle dark mode"]');
-        const beforeClass = document.querySelector('.excalidraw')?.classList?.contains('theme--dark') ?? false;
+        const beforeClass = document.querySelector('.sveltedraw')?.classList?.contains('theme--dark') ?? false;
         if (btn) btn.click();
         await new Promise(r => setTimeout(r, 40));
         const after = p.appState?.theme ?? 'light';
-        const afterClass = document.querySelector('.excalidraw')?.classList?.contains('theme--dark') ?? false;
+        const afterClass = document.querySelector('.sveltedraw')?.classList?.contains('theme--dark') ?? false;
         // Toggle back so later tests see the original theme.
         if (btn) btn.click();
         await new Promise(r => setTimeout(r, 40));
@@ -1980,11 +1980,11 @@ async function main() {
           return { w: canvas.width, h: canvas.height, nonBlank: false };
         } catch (e) { return { w: canvas.width, h: canvas.height, nonBlank: false, err: String(e) }; }
       };
-      const staticCanvas = pickBySel('.excalidraw__canvas.static');
-      const interactiveCanvas = pickBySel('.excalidraw__canvas.interactive');
+      const staticCanvas = pickBySel('.sveltedraw__canvas.static');
+      const interactiveCanvas = pickBySel('.sveltedraw__canvas.interactive');
       // NewElement canvas is third <canvas>, no class marker.
       const newElementCanvas = canvases.find(c => !c.classList.contains('static') && !c.classList.contains('interactive'));
-      const container = document.querySelector('.excalidraw-container');
+      const container = document.querySelector('.sveltedraw-container');
       return {
         title: document.title,
         hasContainer: !!container,

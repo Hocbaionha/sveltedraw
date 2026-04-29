@@ -224,7 +224,7 @@ async function main() {
       };
       p.scene.replaceAllElements([rect], { skipValidation: true });
       p.appState.selectedElementIds = { [rect.id]: true };
-      const container = document.querySelector('.excalidraw-container');
+      const container = document.querySelector('.sveltedraw-container');
       // 600 nudges to exceed MAX_HISTORY=500.
       for (let i = 0; i < 600; i++) {
         container.dispatchEvent(new KeyboardEvent('keydown', {
@@ -271,7 +271,7 @@ async function main() {
     expression: `
       (async () => {
         const p = window.__sveltedrawProbe;
-        const container = document.querySelector('.excalidraw-container');
+        const container = document.querySelector('.sveltedraw-container');
         const tools = ['1', '2', '3', '5', '6', '7', 'l', 'a', 't'];
         for (let i = 0; i < 500; i++) {
           container.dispatchEvent(new KeyboardEvent('keydown', {

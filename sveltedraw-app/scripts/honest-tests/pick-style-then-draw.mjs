@@ -125,8 +125,8 @@ const PAYLOAD = `(async () => {
   // INTERACTIVE canvas (that's the one the app's handlers attach to).
   // The rectangle factory reads appState.currentItem* at pointerdown time
   // (App.svelte ~line 4438), so this is the exact path the bug lives on.
-  const canvas = document.querySelector('.excalidraw__canvas.interactive')
-               || document.querySelector('.excalidraw__canvas.static');
+  const canvas = document.querySelector('.sveltedraw__canvas.interactive')
+               || document.querySelector('.sveltedraw__canvas.static');
   if (!canvas) return { fatal: 'canvas missing' };
   const rect = canvas.getBoundingClientRect();
   const startX = rect.left + 300;

@@ -64,7 +64,7 @@ async function main() {
         const p = window.__sveltedrawProbe;
         p.scene.replaceAllElements([], { skipValidation: true });
         p.appState.selectedElementIds = {};
-        const container = document.querySelector('.excalidraw-container');
+        const container = document.querySelector('.sveltedraw-container');
         const iv = document.querySelectorAll('canvas')[1];
         container.focus();
         container.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true, cancelable: true }));
