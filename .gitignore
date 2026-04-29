@@ -37,3 +37,11 @@ meta*.json
 /packages/excalidraw-svelte/*.pdf
 /sveltedraw-app/*.png
 /sveltedraw-app/*.pdf
+
+# Honest-test result dumps + ad-hoc subprocess captures. These are
+# non-reproducible byproducts of one-off runs; keep the runner and
+# the assertion logic, not the JSON output.
+/test-*-results.json
+/test-results.json
+/yws-*.txt
+/yws-*.log
