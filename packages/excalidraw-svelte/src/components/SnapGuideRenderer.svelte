@@ -69,7 +69,7 @@
     }
   }
 
-  :global(.excalidraw.theme--dark) .snap-guide {
+  :global(.sveltedraw.theme--dark) .snap-guide {
     stroke: #177ddc;
   }
 </style>

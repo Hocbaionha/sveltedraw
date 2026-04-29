@@ -108,7 +108,7 @@
     flex-direction: column;
   }
 
-  :global(.excalidraw.theme--dark) .recent-files-modal {
+  :global(.sveltedraw.theme--dark) .recent-files-modal {
     background: #232329;
     color: #e5e7ea;
   }
@@ -121,7 +121,7 @@
     border-bottom: 1px solid #e5e7ea;
   }
 
-  :global(.excalidraw.theme--dark) .rf-header {
+  :global(.sveltedraw.theme--dark) .rf-header {
     border-bottom-color: #363636;
   }
 
@@ -174,7 +174,7 @@
     background: #f5f5f5;
   }
 
-  :global(.excalidraw.theme--dark) .rf-item:hover {
+  :global(.sveltedraw.theme--dark) .rf-item:hover {
     background: #2e2e36;
   }
 
@@ -198,7 +198,7 @@
     color: #999;
   }
 
-  :global(.excalidraw.theme--dark) .rf-item-time {
+  :global(.sveltedraw.theme--dark) .rf-item-time {
     color: #666;
   }
 
@@ -219,7 +219,7 @@
     background: #fff5f5;
   }
 
-  :global(.excalidraw.theme--dark) .rf-item-delete:hover {
+  :global(.sveltedraw.theme--dark) .rf-item-delete:hover {
     background: #3d1515;
   }
 </style>

@@ -63,7 +63,7 @@
     margin-bottom: 12px;
     font-family: Excalifont, Xiaolai, sans-serif;
   }
-  :global(.excalidraw.theme--dark) .sw-title {
+  :global(.sveltedraw.theme--dark) .sw-title {
     color: #4a4a52;
   }
   .sw-hint {

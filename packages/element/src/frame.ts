@@ -36,7 +36,7 @@ import type {
   SveltedrawElement,
   SveltedrawFrameLikeElement,
   NonDeleted,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
 } from "./types";
 
 // --------------------------- Frame State ------------------------------------
@@ -167,7 +167,7 @@ export const isCursorInFrame = (
 };
 
 export const groupsAreAtLeastIntersectingTheFrame = (
-  elements: readonly NonDeletedExcalidrawElement[],
+  elements: readonly NonDeletedSveltedrawElement[],
   groupIds: readonly string[],
   frame: SveltedrawFrameLikeElement,
 ) => {
@@ -188,7 +188,7 @@ export const groupsAreAtLeastIntersectingTheFrame = (
 };
 
 export const groupsAreCompletelyOutOfFrame = (
-  elements: readonly NonDeletedExcalidrawElement[],
+  elements: readonly NonDeletedSveltedrawElement[],
   groupIds: readonly string[],
   frame: SveltedrawFrameLikeElement,
 ) => {
@@ -498,7 +498,7 @@ export const filterElementsEligibleAsFrameChildren = (
  */
 export const addElementsToFrame = <T extends ElementsMapOrArray>(
   allElements: T,
-  elementsToAdd: NonDeletedExcalidrawElement[],
+  elementsToAdd: NonDeletedSveltedrawElement[],
   frame: SveltedrawFrameLikeElement,
   appState: AppState,
 ): T => {
@@ -571,7 +571,7 @@ export const addElementsToFrame = <T extends ElementsMapOrArray>(
 };
 
 export const removeElementsFromFrame = (
-  elementsToRemove: ReadonlySetLike<NonDeletedExcalidrawElement>,
+  elementsToRemove: ReadonlySetLike<NonDeletedSveltedrawElement>,
   elementsMap: ElementsMap,
 ) => {
   const _elementsToRemove = new Map<

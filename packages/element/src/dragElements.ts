@@ -13,7 +13,7 @@ import type {
   PointerDownState,
 } from "@sveltedraw/engine/types";
 
-import type { NonDeletedExcalidrawElement } from "@sveltedraw/element/types";
+import type { NonDeletedSveltedrawElement } from "@sveltedraw/element/types";
 
 import { unbindBindingElement, updateBoundElements } from "./binding";
 import { getCommonBounds } from "./bounds";
@@ -34,7 +34,7 @@ import type { SveltedrawElement } from "./types";
 
 export const dragSelectedElements = (
   pointerDownState: PointerDownState,
-  _selectedElements: NonDeletedExcalidrawElement[],
+  _selectedElements: NonDeletedSveltedrawElement[],
   offset: { x: number; y: number },
   scene: Scene,
   snapOffset: {
@@ -69,7 +69,7 @@ export const dragSelectedElements = (
   // we do not want a frame and its elements to be selected at the same time
   // but when it happens (due to some bug), we want to avoid updating element
   // in the frame twice, hence the use of set
-  const elementsToUpdate = new Set<NonDeletedExcalidrawElement>(
+  const elementsToUpdate = new Set<NonDeletedSveltedrawElement>(
     selectedElements,
   );
   const frames = selectedElements
@@ -203,7 +203,7 @@ const calculateOffset = (
 
 const updateElementCoords = (
   pointerDownState: PointerDownState,
-  element: NonDeletedExcalidrawElement,
+  element: NonDeletedSveltedrawElement,
   scene: Scene,
   dragOffset: { x: number; y: number },
 ) => {
@@ -220,7 +220,7 @@ const updateElementCoords = (
 };
 
 export const getDragOffsetXY = (
-  selectedElements: NonDeletedExcalidrawElement[],
+  selectedElements: NonDeletedSveltedrawElement[],
   x: number,
   y: number,
 ): [number, number] => {
@@ -245,7 +245,7 @@ export const dragNewElement = ({
   originOffset = null,
   informMutation = true,
 }: {
-  newElement: NonDeletedExcalidrawElement;
+  newElement: NonDeletedSveltedrawElement;
   elementType: AppState["activeTool"]["type"];
   originX: number;
   originY: number;

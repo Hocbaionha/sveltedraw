@@ -304,7 +304,7 @@
     flex-direction: column;
   }
 
-  :global(.excalidraw.theme--dark) .help-modal {
+  :global(.sveltedraw.theme--dark) .help-modal {
     background: #232329;
     color: #e5e7ea;
   }
@@ -317,7 +317,7 @@
     border-bottom: 1px solid #e5e7ea;
   }
 
-  :global(.excalidraw.theme--dark) .help-header {
+  :global(.sveltedraw.theme--dark) .help-header {
     border-bottom-color: #363636;
   }
 
@@ -345,7 +345,7 @@
     background: #f5f5f5;
   }
 
-  :global(.excalidraw.theme--dark) .help-tabs {
+  :global(.sveltedraw.theme--dark) .help-tabs {
     background: #1a1a1f;
     border-bottom-color: #363636;
   }
@@ -366,7 +366,7 @@
     background: #e5e5e5;
   }
 
-  :global(.excalidraw.theme--dark) .help-tab:hover {
+  :global(.sveltedraw.theme--dark) .help-tab:hover {
     background: #2e2e36;
   }
 
@@ -375,7 +375,7 @@
     color: #6965db;
   }
 
-  :global(.excalidraw.theme--dark) .help-tab.active {
+  :global(.sveltedraw.theme--dark) .help-tab.active {
     background: #232329;
   }
 
@@ -404,7 +404,7 @@
     color: #666;
   }
 
-  :global(.excalidraw.theme--dark) .help-section p {
+  :global(.sveltedraw.theme--dark) .help-section p {
     color: #aaa;
   }
 
@@ -436,7 +436,7 @@
     font-size: 13px;
   }
 
-  :global(.excalidraw.theme--dark) .shortcut-row {
+  :global(.sveltedraw.theme--dark) .shortcut-row {
     background: #2e2e36;
   }
 
@@ -446,7 +446,7 @@
     min-width: 100px;
   }
 
-  :global(.excalidraw.theme--dark) .shortcut-key {
+  :global(.sveltedraw.theme--dark) .shortcut-key {
     color: #8b89ff;
   }
 </style>

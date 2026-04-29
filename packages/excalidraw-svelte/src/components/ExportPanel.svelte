@@ -253,7 +253,7 @@
     overflow: hidden;
   }
 
-  :global(.excalidraw.theme--dark) .export-panel {
+  :global(.sveltedraw.theme--dark) .export-panel {
     background: #232329;
     color: #e5e7ea;
   }
@@ -266,7 +266,7 @@
     border-bottom: 1px solid #e5e7ea;
   }
 
-  :global(.excalidraw.theme--dark) .ep-header {
+  :global(.sveltedraw.theme--dark) .ep-header {
     border-bottom-color: #363636;
   }
 
@@ -294,7 +294,7 @@
     background: rgba(0, 0, 0, 0.1);
   }
 
-  :global(.excalidraw.theme--dark) .ep-close-btn:hover {
+  :global(.sveltedraw.theme--dark) .ep-close-btn:hover {
     background: rgba(255, 255, 255, 0.1);
   }
 
@@ -321,7 +321,7 @@
     letter-spacing: 0.5px;
   }
 
-  :global(.excalidraw.theme--dark) .ep-label {
+  :global(.sveltedraw.theme--dark) .ep-label {
     color: #aaa;
   }
 
@@ -346,7 +346,7 @@
     color: #333;
   }
 
-  :global(.excalidraw.theme--dark) .ep-format-btn {
+  :global(.sveltedraw.theme--dark) .ep-format-btn {
     background: #2e2e36;
     border-color: #363636;
     color: #e5e7ea;
@@ -357,7 +357,7 @@
     background: #f8f8ff;
   }
 
-  :global(.excalidraw.theme--dark) .ep-format-btn:hover {
+  :global(.sveltedraw.theme--dark) .ep-format-btn:hover {
     border-color: #7c7cff;
     background: #3a3a44;
   }
@@ -368,7 +368,7 @@
     color: #6965db;
   }
 
-  :global(.excalidraw.theme--dark) .ep-format-btn.active {
+  :global(.sveltedraw.theme--dark) .ep-format-btn.active {
     border-color: #7c7cff;
     background: #2d3748;
     color: #7c7cff;
@@ -391,8 +391,8 @@
     color: #333;
   }
 
-  :global(.excalidraw.theme--dark) .ep-select,
-  :global(.excalidraw.theme--dark) .ep-input {
+  :global(.sveltedraw.theme--dark) .ep-select,
+  :global(.sveltedraw.theme--dark) .ep-input {
     background: #2e2e36;
     border-color: #363636;
     color: #e5e7ea;
@@ -420,7 +420,7 @@
     min-width: 40px;
   }
 
-  :global(.excalidraw.theme--dark) .ep-extension {
+  :global(.sveltedraw.theme--dark) .ep-extension {
     color: #666;
   }
 
@@ -450,7 +450,7 @@
     font-size: 12px;
   }
 
-  :global(.excalidraw.theme--dark) .ep-info {
+  :global(.sveltedraw.theme--dark) .ep-info {
     background: #2e2e36;
   }
 
@@ -469,7 +469,7 @@
     font-size: 12px;
   }
 
-  :global(.excalidraw.theme--dark) .ep-error {
+  :global(.sveltedraw.theme--dark) .ep-error {
     background: #3a2222;
     color: #ff9999;
   }
@@ -482,7 +482,7 @@
     background: #f8f8f8;
   }
 
-  :global(.excalidraw.theme--dark) .ep-footer {
+  :global(.sveltedraw.theme--dark) .ep-footer {
     background: #1a1a1e;
     border-top-color: #363636;
   }
@@ -517,7 +517,7 @@
     color: #333;
   }
 
-  :global(.excalidraw.theme--dark) .ep-btn-secondary {
+  :global(.sveltedraw.theme--dark) .ep-btn-secondary {
     background: #2e2e36;
     color: #e5e7ea;
   }
@@ -526,7 +526,7 @@
     background: #d1d4da;
   }
 
-  :global(.excalidraw.theme--dark) .ep-btn-secondary:hover {
+  :global(.sveltedraw.theme--dark) .ep-btn-secondary:hover {
     background: #363636;
   }
 </style>

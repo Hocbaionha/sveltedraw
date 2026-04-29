@@ -112,7 +112,7 @@ export const loadFromJSON = async (
   return loadFromBlob(file, localAppState, localElements, file.handle);
 };
 
-export const isValidExcalidrawData = (data?: {
+export const isValidSveltedrawData = (data?: {
   type?: any;
   elements?: any;
   appState?: any;

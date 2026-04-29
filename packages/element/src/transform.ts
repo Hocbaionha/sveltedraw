@@ -506,7 +506,7 @@ class ElementStore {
   };
 }
 
-export const convertToExcalidrawElements = (
+export const convertToSveltedrawElements = (
   elementsSkeleton: SveltedrawElementSkeleton[] | null,
   opts?: { regenerateIds: boolean },
 ) => {

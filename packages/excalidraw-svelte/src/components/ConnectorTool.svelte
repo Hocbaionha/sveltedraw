@@ -34,7 +34,7 @@
     font-size: 13px;
     color: #1e1e1e;
   }
-  :global(.excalidraw.theme--dark) .ct-panel {
+  :global(.sveltedraw.theme--dark) .ct-panel {
     color: #e5e7ea;
   }
   .ct-header {
@@ -45,7 +45,7 @@
     padding-bottom: 8px;
     border-bottom: 1px solid #e5e7ea;
   }
-  :global(.excalidraw.theme--dark) .ct-header {
+  :global(.sveltedraw.theme--dark) .ct-header {
     border-bottom-color: #363636;
   }
   .ct-cancel {
@@ -60,7 +60,7 @@
   .ct-cancel:hover {
     background: rgba(0, 0, 0, 0.08);
   }
-  :global(.excalidraw.theme--dark) .ct-cancel:hover {
+  :global(.sveltedraw.theme--dark) .ct-cancel:hover {
     background: rgba(255, 255, 255, 0.1);
   }
   .ct-step {
@@ -71,14 +71,14 @@
     color: #666;
     font-size: 12px;
   }
-  :global(.excalidraw.theme--dark) .ct-step {
+  :global(.sveltedraw.theme--dark) .ct-step {
     color: #aaa;
   }
   .ct-step-active {
     color: #1e1e1e;
     font-weight: 600;
   }
-  :global(.excalidraw.theme--dark) .ct-step-active {
+  :global(.sveltedraw.theme--dark) .ct-step-active {
     color: #e5e7ea;
   }
   .ct-num {
@@ -93,7 +93,7 @@
     font-weight: 600;
     font-size: 11px;
   }
-  :global(.excalidraw.theme--dark) .ct-num {
+  :global(.sveltedraw.theme--dark) .ct-num {
     background: #2e2e36;
     color: #aaa;
   }
@@ -109,7 +109,7 @@
     font-size: 11px;
     line-height: 1.5;
   }
-  :global(.excalidraw.theme--dark) .ct-hint {
+  :global(.sveltedraw.theme--dark) .ct-hint {
     border-top-color: #2e2e36;
     color: #888;
   }

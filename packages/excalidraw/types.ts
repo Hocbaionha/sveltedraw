@@ -13,7 +13,7 @@ import type { MaybeTransformHandleType } from "@sveltedraw/element";
 import type {
   PointerType,
   SveltedrawLinearElement,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
   NonDeleted,
   TextAlign,
   SveltedrawElement,
@@ -29,7 +29,7 @@ import type {
   SveltedrawFrameLikeElement,
   SveltedrawElementType,
   SveltedrawIframeLikeElement,
-  OrderedExcalidrawElement,
+  OrderedSveltedrawElement,
   SveltedrawNonSelectionElement,
   BindMode,
   SveltedrawTextElement,
@@ -305,7 +305,7 @@ export interface AppState {
   isLoading: boolean;
   errorMessage: React.ReactNode;
   activeEmbeddable: {
-    element: NonDeletedExcalidrawElement;
+    element: NonDeletedSveltedrawElement;
     state: "hover" | "active";
   } | null;
   /**
@@ -317,7 +317,7 @@ export interface AppState {
    * for a single element that's being resized
    * - set on pointer down when it's selected and the active tool is selection
    */
-  resizingElement: NonDeletedExcalidrawElement | null;
+  resizingElement: NonDeletedSveltedrawElement | null;
   /**
    * multiElement is for multi-point linear element that's created by clicking as opposed to dragging
    * - when set and present, the editor will handle linear element creation logic accordingly
@@ -327,7 +327,7 @@ export interface AppState {
    * decoupled from newElement, dragging selection only creates selectionElement
    * - set on pointer down, updated during pointer move
    */
-  selectionElement: NonDeletedExcalidrawElement | null;
+  selectionElement: NonDeletedSveltedrawElement | null;
   /**
    * tracking current arrow binding editor state (takes into account
    * `bindingPreference` and keyboard modifiers (ctrl/alt)
@@ -587,7 +587,7 @@ export type OnExportProgress = {
 
 export interface SveltedrawProps {
   onChange?: (
-    elements: readonly OrderedExcalidrawElement[],
+    elements: readonly OrderedSveltedrawElement[],
     appState: AppState,
     files: BinaryFiles,
   ) => void;
@@ -602,7 +602,7 @@ export interface SveltedrawProps {
    * Invoked as soon as the Excalidraw API is available
    * NOTE editor is not yet mounted, and state is not yet initialized
    */
-  onExcalidrawAPI?: (api: SveltedrawImperativeAPI | null) => void;
+  onSveltedrawAPI?: (api: SveltedrawImperativeAPI | null) => void;
   /**
    * Invoked once the editor root is mounted.
    */
@@ -659,7 +659,7 @@ export interface SveltedrawProps {
   // @TODO come with better API before v0.18.0
   name?: string;
   renderCustomStats?: (
-    elements: readonly NonDeletedExcalidrawElement[],
+    elements: readonly NonDeletedSveltedrawElement[],
     appState: UIAppState,
   ) => JSX.Element;
   UIOptions?: Partial<UIOptions>;
@@ -670,7 +670,7 @@ export interface SveltedrawProps {
   generateIdForFile?: (file: File) => string | Promise<string>;
   generateLinkForSelection?: (id: string, type: "element" | "group") => string;
   onLinkOpen?: (
-    element: NonDeletedExcalidrawElement,
+    element: NonDeletedSveltedrawElement,
     event: CustomEvent<{
       nativeEvent: MouseEvent | React.PointerEvent<HTMLCanvasElement>;
     }>,
@@ -737,12 +737,12 @@ export type SceneData = {
 export type ExportOpts = {
   saveFileToDisk?: boolean;
   onExportToBackend?: (
-    exportedElements: readonly NonDeletedExcalidrawElement[],
+    exportedElements: readonly NonDeletedSveltedrawElement[],
     appState: UIAppState,
     files: BinaryFiles,
   ) => void;
   renderCustomUI?: (
-    exportedElements: readonly NonDeletedExcalidrawElement[],
+    exportedElements: readonly NonDeletedSveltedrawElement[],
     appState: UIAppState,
     files: BinaryFiles,
     canvas: HTMLCanvasElement,
@@ -1060,7 +1060,7 @@ export type EmbedsValidationStatus = Map<
 
 export type ElementsPendingErasure = Set<SveltedrawElement["id"]>;
 
-export type PendingExcalidrawElements = SveltedrawElement[];
+export type PendingSveltedrawElements = SveltedrawElement[];
 
 /** Runtime gridSize value. Null indicates disabled grid. */
 export type NullableGridSize =

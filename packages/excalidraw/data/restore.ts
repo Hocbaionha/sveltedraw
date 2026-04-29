@@ -69,7 +69,7 @@ import type {
   FixedPointBinding,
   FontFamilyValues,
   NonDeletedSceneElementsMap,
-  OrderedExcalidrawElement,
+  OrderedSveltedrawElement,
   StrokeRoundness,
 } from "@sveltedraw/element/types";
 
@@ -96,7 +96,7 @@ type RestoredAppState = Omit<
   "offsetTop" | "offsetLeft" | "width" | "height"
 >;
 
-export const AllowedExcalidrawActiveTools: Record<
+export const AllowedSveltedrawActiveTools: Record<
   AppState["activeTool"]["type"],
   boolean
 > = {
@@ -120,7 +120,7 @@ export const AllowedExcalidrawActiveTools: Record<
 };
 
 export type RestoredDataState = {
-  elements: OrderedExcalidrawElement[];
+  elements: OrderedSveltedrawElement[];
   appState: RestoredAppState;
   files: BinaryFiles;
 };
@@ -659,7 +659,7 @@ export const restoreElements = <T extends SveltedrawElement>(
         deleteInvisibleElements?: boolean;
       }
     | undefined,
-): CombineBrandsIfNeeded<T, OrderedExcalidrawElement> => {
+): CombineBrandsIfNeeded<T, OrderedSveltedrawElement> => {
   // used to detect duplicate top-level element ids
   const existingIds = new Set<string>();
   const targetElementsMap = arrayToMap(targetElements || []);
@@ -716,7 +716,7 @@ export const restoreElements = <T extends SveltedrawElement>(
   if (!opts?.repairBindings) {
     return restoredElements as CombineBrandsIfNeeded<
       T,
-      OrderedExcalidrawElement
+      OrderedSveltedrawElement
     >;
   }
 
@@ -827,7 +827,7 @@ export const restoreElements = <T extends SveltedrawElement>(
     }
 
     return element;
-  }) as CombineBrandsIfNeeded<T, OrderedExcalidrawElement>;
+  }) as CombineBrandsIfNeeded<T, OrderedSveltedrawElement>;
 };
 
 /**
@@ -953,7 +953,7 @@ export const restoreAppState = (
       ...updateActiveTool(
         defaultAppState,
         nextAppState.activeTool.type &&
-          AllowedExcalidrawActiveTools[nextAppState.activeTool.type]
+          AllowedSveltedrawActiveTools[nextAppState.activeTool.type]
           ? nextAppState.activeTool
           : { type: "selection" },
       ),

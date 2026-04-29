@@ -81,7 +81,7 @@ import type {
   FixedSegment,
   SveltedrawElbowArrowElement,
   PointsPositionUpdates,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
   Ordered,
   SveltedrawBindableElement,
 } from "./types";
@@ -2128,7 +2128,7 @@ const pointDraggingUpdates = (
   scenePointerY: number,
   elementsMap: NonDeletedSceneElementsMap,
   element: NonDeleted<SveltedrawLinearElement>,
-  elements: readonly Ordered<NonDeletedExcalidrawElement>[],
+  elements: readonly Ordered<NonDeletedSveltedrawElement>[],
   app: AppClassProperties,
   angleLocked: boolean,
   altKey: boolean,

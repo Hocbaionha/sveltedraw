@@ -62,7 +62,7 @@ import type {
   SveltedrawBindableElement,
   FixedPointBinding,
   FixedSegment,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
   Ordered,
 } from "./types";
 
@@ -2281,7 +2281,7 @@ const getBindPointHeading = (
 const getHoveredElement = (
   origPoint: GlobalPoint,
   elementsMap: NonDeletedSceneElementsMap,
-  elements: readonly Ordered<NonDeletedExcalidrawElement>[],
+  elements: readonly Ordered<NonDeletedSveltedrawElement>[],
   zoom?: AppState["zoom"],
 ) => {
   return getHoveredElementForBinding(

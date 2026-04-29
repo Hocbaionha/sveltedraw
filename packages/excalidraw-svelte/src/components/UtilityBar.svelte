@@ -295,12 +295,12 @@
   .sveltedraw-util-btn:hover {
     background: #f1f3f5;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-util-btn {
+  :global(.sveltedraw.theme--dark) .sveltedraw-util-btn {
     background: #232329;
     border-color: #363636;
     color: #e5e7ea;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-util-btn:hover {
+  :global(.sveltedraw.theme--dark) .sveltedraw-util-btn:hover {
     background: #2e2e36;
   }
   .sveltedraw-lang-select {

@@ -4,7 +4,7 @@ import { type GlobalPoint, pointFrom, type LocalPoint } from "@sveltedraw/math";
 
 import type {
   AppState,
-  PendingExcalidrawElements,
+  PendingSveltedrawElements,
 } from "@sveltedraw/engine/types";
 
 import { bindBindingElement } from "./binding";
@@ -36,7 +36,7 @@ import {
   type SveltedrawFlowchartNodeElement,
   type NonDeletedSceneElementsMap,
   type Ordered,
-  type OrderedExcalidrawElement,
+  type OrderedSveltedrawElement,
 } from "./types";
 
 import type { Scene } from "./Scene";
@@ -455,18 +455,18 @@ const createBindingArrow = (
   );
   bindBindingElement(bindingArrow, endBindingElement, "orbit", "end", scene);
 
-  const changedElements = new Map<string, OrderedExcalidrawElement>();
+  const changedElements = new Map<string, OrderedSveltedrawElement>();
   changedElements.set(
     startBindingElement.id,
-    startBindingElement as OrderedExcalidrawElement,
+    startBindingElement as OrderedSveltedrawElement,
   );
   changedElements.set(
     endBindingElement.id,
-    endBindingElement as OrderedExcalidrawElement,
+    endBindingElement as OrderedSveltedrawElement,
   );
   changedElements.set(
     bindingArrow.id,
-    bindingArrow as OrderedExcalidrawElement,
+    bindingArrow as OrderedSveltedrawElement,
   );
 
   LinearElementEditor.movePoints(
@@ -636,7 +636,7 @@ export class FlowChartCreator {
   isCreatingChart: boolean = false;
   private numberOfNodes: number = 0;
   private direction: LinkDirection | null = "right";
-  pendingNodes: PendingExcalidrawElements | null = null;
+  pendingNodes: PendingSveltedrawElements | null = null;
 
   createNodes(
     startNode: SveltedrawFlowchartNodeElement,

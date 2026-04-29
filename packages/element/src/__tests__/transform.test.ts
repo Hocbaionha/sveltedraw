@@ -2,7 +2,7 @@ import { pointFrom } from "@sveltedraw/math";
 import { vi } from "vitest";
 
 import {
-  convertToExcalidrawElements,
+  convertToSveltedrawElements,
   type SveltedrawElementSkeleton,
 } from "../transform";
 
@@ -20,13 +20,13 @@ describe("Test Transform", () => {
         id: "rect-1",
       },
     ];
-    let data = convertToExcalidrawElements(
+    let data = convertToSveltedrawElements(
       elements as SveltedrawElementSkeleton[],
     );
     expect(data.length).toBe(1);
     expect(data[0].id).toBe("id0");
 
-    data = convertToExcalidrawElements(
+    data = convertToSveltedrawElements(
       elements as SveltedrawElementSkeleton[],
       opts,
     );
@@ -84,7 +84,7 @@ describe("Test Transform", () => {
       },
     ];
 
-    convertToExcalidrawElements(
+    convertToSveltedrawElements(
       elements as SveltedrawElementSkeleton[],
       opts,
     ).forEach((ele) => {
@@ -113,7 +113,7 @@ describe("Test Transform", () => {
         strokeColor: "#5f3dc4",
       },
     ];
-    convertToExcalidrawElements(
+    convertToSveltedrawElements(
       elements as SveltedrawElementSkeleton[],
       opts,
     ).forEach((ele) => {
@@ -155,7 +155,7 @@ describe("Test Transform", () => {
         strokeStyle: "dotted",
       },
     ];
-    const sveltedrawElements = convertToExcalidrawElements(
+    const sveltedrawElements = convertToSveltedrawElements(
       elements as SveltedrawElementSkeleton[],
       opts,
     );
@@ -238,7 +238,7 @@ describe("Test Transform", () => {
         },
       },
     ];
-    const sveltedrawElements = convertToExcalidrawElements(
+    const sveltedrawElements = convertToSveltedrawElements(
       elements as SveltedrawElementSkeleton[],
       opts,
     );
@@ -296,7 +296,7 @@ describe("Test Transform", () => {
         },
       },
     ];
-    const sveltedrawElements = convertToExcalidrawElements(
+    const sveltedrawElements = convertToSveltedrawElements(
       elements as SveltedrawElementSkeleton[],
       opts,
     );
@@ -345,7 +345,7 @@ describe("Test Transform", () => {
           name: "My frame",
         },
       ];
-      const sveltedrawElements = convertToExcalidrawElements(
+      const sveltedrawElements = convertToSveltedrawElements(
         elementsSkeleton,
         opts,
       );
@@ -371,7 +371,7 @@ describe("Test Transform", () => {
           height: 100,
         },
       ];
-      const sveltedrawElements = convertToExcalidrawElements(
+      const sveltedrawElements = convertToSveltedrawElements(
         elementsSkeleton,
         opts,
       );
@@ -391,7 +391,7 @@ describe("Test Transform", () => {
           y: 300,
         },
       ];
-      const sveltedrawElements = convertToExcalidrawElements(
+      const sveltedrawElements = convertToSveltedrawElements(
         elementsSkeleton,
         opts,
       );
@@ -419,7 +419,7 @@ describe("Test Transform", () => {
           },
         },
       ];
-      const sveltedrawElements = convertToExcalidrawElements(
+      const sveltedrawElements = convertToSveltedrawElements(
         elements as SveltedrawElementSkeleton[],
         opts,
       );
@@ -500,7 +500,7 @@ describe("Test Transform", () => {
         },
       ];
 
-      const sveltedrawElements = convertToExcalidrawElements(
+      const sveltedrawElements = convertToSveltedrawElements(
         elements as SveltedrawElementSkeleton[],
         opts,
       );
@@ -613,7 +613,7 @@ describe("Test Transform", () => {
         },
       ];
 
-      const sveltedrawElements = convertToExcalidrawElements(
+      const sveltedrawElements = convertToSveltedrawElements(
         elements as SveltedrawElementSkeleton[],
         opts,
       );
@@ -662,7 +662,7 @@ describe("Test Transform", () => {
         },
       ];
 
-      const sveltedrawElements = convertToExcalidrawElements(
+      const sveltedrawElements = convertToSveltedrawElements(
         elements as SveltedrawElementSkeleton[],
         opts,
       );
@@ -716,7 +716,7 @@ describe("Test Transform", () => {
         },
       ];
 
-      const sveltedrawElements = convertToExcalidrawElements(
+      const sveltedrawElements = convertToSveltedrawElements(
         elements as SveltedrawElementSkeleton[],
         opts,
       );
@@ -767,7 +767,7 @@ describe("Test Transform", () => {
           backgroundColor: "#bac8ff",
         },
       ];
-      const sveltedrawElements = convertToExcalidrawElements(
+      const sveltedrawElements = convertToSveltedrawElements(
         elements as SveltedrawElementSkeleton[],
         opts,
       );
@@ -810,7 +810,7 @@ describe("Test Transform", () => {
         height: 200,
       },
     ];
-    const sveltedrawElements = convertToExcalidrawElements(
+    const sveltedrawElements = convertToSveltedrawElements(
       elements as SveltedrawElementSkeleton[],
       opts,
     );
@@ -834,7 +834,7 @@ describe("Test Transform", () => {
         customData: { createdBy: "user01" },
       },
     ];
-    const convertedElements = convertToExcalidrawElements(
+    const convertedElements = convertToSveltedrawElements(
       rawData as SveltedrawElementSkeleton[],
       opts,
     );
@@ -955,7 +955,7 @@ describe("Test Transform", () => {
       },
     ];
 
-    const sveltedrawElements = convertToExcalidrawElements(elements, opts);
+    const sveltedrawElements = convertToSveltedrawElements(elements, opts);
     expect(sveltedrawElements.length).toBe(12);
     sveltedrawElements.forEach((ele) => {
       expect(ele).toMatchSnapshot({

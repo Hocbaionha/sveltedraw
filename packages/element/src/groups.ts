@@ -15,7 +15,7 @@ import type {
   GroupId,
   SveltedrawElement,
   NonDeleted,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
   ElementsMapOrArray,
   ElementsMap,
 } from "./types";
@@ -163,7 +163,7 @@ export const selectGroupsForSelectedElements = (function () {
    */
   const selectGroupsForSelectedElements = (
     appState: Pick<AppState, "selectedElementIds" | "editingGroupId">,
-    elements: readonly NonDeletedExcalidrawElement[],
+    elements: readonly NonDeletedSveltedrawElement[],
     prevAppState: InteractiveCanvasAppState,
     /**
      * supply null in cases where you don't have access to App instance and
@@ -383,7 +383,7 @@ export const elementsAreInSameGroup = (
   return maxGroup === elements.length;
 };
 
-export const isInGroup = (element: NonDeletedExcalidrawElement) => {
+export const isInGroup = (element: NonDeletedSveltedrawElement) => {
   return element.groupIds.length > 0;
 };
 

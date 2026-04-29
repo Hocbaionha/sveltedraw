@@ -72,11 +72,11 @@
     z-index: 1;
   }
 
-  :global(.excalidraw.theme--dark) .grid-line {
+  :global(.sveltedraw.theme--dark) .grid-line {
     stroke: #444;
   }
 
-  :global(.excalidraw.theme--dark) .grid-point {
+  :global(.sveltedraw.theme--dark) .grid-point {
     fill: #555;
   }
 </style>

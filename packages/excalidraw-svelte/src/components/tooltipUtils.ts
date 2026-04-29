@@ -8,11 +8,11 @@
  */
 
 export const getTooltipDiv = (): HTMLDivElement => {
-  const existing = document.querySelector<HTMLDivElement>(".excalidraw-tooltip");
+  const existing = document.querySelector<HTMLDivElement>(".sveltedraw-tooltip");
   if (existing) return existing;
   const div = document.createElement("div");
   document.body.appendChild(div);
-  div.classList.add("excalidraw-tooltip");
+  div.classList.add("sveltedraw-tooltip");
   return div;
 };
 

@@ -24,7 +24,7 @@ import {
 import type {
   ElementsMap,
   SveltedrawElement,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
   PointerType,
 } from "./types";
 
@@ -326,7 +326,7 @@ export const getTransformHandles = (
 };
 
 export const hasBoundingBox = (
-  elements: readonly NonDeletedExcalidrawElement[],
+  elements: readonly NonDeletedSveltedrawElement[],
   appState: InteractiveCanvasAppState,
   editorInterface: EditorInterface,
 ) => {

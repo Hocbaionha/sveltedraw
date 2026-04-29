@@ -47,11 +47,11 @@ import type {
   SveltedrawElement,
   SveltedrawFrameLikeElement,
   NonDeleted,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
 } from "./types";
 
 const shouldIgnoreElementFromSelection = (
-  element: NonDeletedExcalidrawElement,
+  element: NonDeletedSveltedrawElement,
 ) => element.locked || isBoundToContainer(element);
 
 const excludeElementsFromFrames = <T extends SveltedrawElement>(
@@ -89,13 +89,13 @@ export const excludeElementsInFramesFromSelection = <
 };
 
 export const getElementsWithinSelection = (
-  elements: readonly NonDeletedExcalidrawElement[],
-  selection: NonDeletedExcalidrawElement,
+  elements: readonly NonDeletedSveltedrawElement[],
+  selection: NonDeletedSveltedrawElement,
   elementsMap: ElementsMap,
   // TODO remove (this flag is effectively unused AFAIK)
   excludeElementsInFrames: boolean = true,
   boxSelectionMode: BoxSelectionMode = "contain",
-): NonDeletedExcalidrawElement[] => {
+): NonDeletedSveltedrawElement[] => {
   const [selectionStartX, selectionStartY, selectionEndX, selectionEndY] =
     getElementAbsoluteCoords(selection, elementsMap);
   const selectionX1 = Math.min(selectionStartX, selectionEndX);
@@ -128,9 +128,9 @@ export const getElementsWithinSelection = (
   ];
 
   const framesInSelection = excludeElementsInFrames
-    ? new Set<NonDeletedExcalidrawElement["id"]>()
+    ? new Set<NonDeletedSveltedrawElement["id"]>()
     : null;
-  let elementsInSelection: NonDeletedExcalidrawElement[] = [];
+  let elementsInSelection: NonDeletedSveltedrawElement[] = [];
 
   for (const element of elements) {
     if (shouldIgnoreElementFromSelection(element)) {
@@ -338,8 +338,8 @@ export const getElementsWithinSelection = (
 };
 
 export const getVisibleAndNonSelectedElements = (
-  elements: readonly NonDeletedExcalidrawElement[],
-  selectedElements: readonly NonDeletedExcalidrawElement[],
+  elements: readonly NonDeletedSveltedrawElement[],
+  selectedElements: readonly NonDeletedSveltedrawElement[],
   appState: AppState,
   elementsMap: ElementsMap,
 ) => {
@@ -361,12 +361,12 @@ export const getVisibleAndNonSelectedElements = (
 
 // FIXME move this into the editor instance to keep utility methods stateless
 export const isSomeElementSelected = (function () {
-  let lastElements: readonly NonDeletedExcalidrawElement[] | null = null;
+  let lastElements: readonly NonDeletedSveltedrawElement[] | null = null;
   let lastSelectedElementIds: AppState["selectedElementIds"] | null = null;
   let isSelected: boolean | null = null;
 
   const ret = (
-    elements: readonly NonDeletedExcalidrawElement[],
+    elements: readonly NonDeletedSveltedrawElement[],
     appState: Pick<AppState, "selectedElementIds">,
   ): boolean => {
     if (
@@ -471,7 +471,7 @@ export const makeNextSelectedElementIds = (
 
 const _getLinearElementEditor = (
   targetElements: readonly SveltedrawElement[],
-  allElements: readonly NonDeletedExcalidrawElement[],
+  allElements: readonly NonDeletedSveltedrawElement[],
 ) => {
   const linears = targetElements.filter(isLinearElement);
   if (linears.length === 1) {
@@ -491,7 +491,7 @@ const _getLinearElementEditor = (
 
 export const getSelectionStateForElements = (
   targetElements: readonly SveltedrawElement[],
-  allElements: readonly NonDeletedExcalidrawElement[],
+  allElements: readonly NonDeletedSveltedrawElement[],
   appState: AppState,
 ) => {
   return {

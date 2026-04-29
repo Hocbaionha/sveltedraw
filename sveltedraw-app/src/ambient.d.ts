@@ -8,11 +8,11 @@
 
 // ─── Window globals upstream relies on ─────────────────────────────
 interface Window {
-  __EXCALIDRAW_SHA__: string | undefined;
-  EXCALIDRAW_ASSET_PATH: string | string[] | undefined;
-  EXCALIDRAW_THROTTLE_RENDER: boolean | undefined;
+  __SVELTEDRAW_SHA__: string | undefined;
+  SVELTEDRAW_ASSET_PATH: string | string[] | undefined;
+  SVELTEDRAW_THROTTLE_RENDER: boolean | undefined;
   DEBUG_FRACTIONAL_INDICES: boolean | undefined;
-  EXCALIDRAW_EXPORT_SOURCE: string;
+  SVELTEDRAW_EXPORT_SOURCE: string;
 }
 
 // ─── Node globals leaked into universal TS files ───────────────────

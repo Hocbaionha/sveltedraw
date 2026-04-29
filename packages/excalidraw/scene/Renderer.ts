@@ -5,7 +5,7 @@ import { memoize, toBrandedType } from "@sveltedraw/common";
 import type {
   SveltedrawElement,
   NonDeletedElementsMap,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
 } from "@sveltedraw/element/types";
 
 import type { Scene } from "@sveltedraw/element";
@@ -42,8 +42,8 @@ export class Renderer {
       scrollY: AppState["scrollY"];
       height: AppState["height"];
       width: AppState["width"];
-    }): readonly NonDeletedExcalidrawElement[] => {
-      const visibleElements: NonDeletedExcalidrawElement[] = [];
+    }): readonly NonDeletedSveltedrawElement[] => {
+      const visibleElements: NonDeletedSveltedrawElement[] = [];
       for (const element of elementsMap.values()) {
         if (
           isElementInViewport(
@@ -71,7 +71,7 @@ export class Renderer {
       editingTextElement,
       newElementId,
     }: {
-      elements: readonly NonDeletedExcalidrawElement[];
+      elements: readonly NonDeletedSveltedrawElement[];
       editingTextElement: AppState["editingTextElement"];
       newElementId: SveltedrawElement["id"] | undefined;
     }) => {

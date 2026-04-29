@@ -2,11 +2,11 @@ import type { UIAppState } from "@sveltedraw/engine/types";
 
 import { getSelectedElements } from "./selection";
 
-import type { NonDeletedExcalidrawElement } from "./types";
+import type { NonDeletedSveltedrawElement } from "./types";
 
 export const showSelectedShapeActions = (
   appState: UIAppState,
-  elements: readonly NonDeletedExcalidrawElement[],
+  elements: readonly NonDeletedSveltedrawElement[],
 ) =>
   Boolean(
     !appState.viewModeEnabled &&

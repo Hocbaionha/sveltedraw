@@ -85,7 +85,7 @@
     overflow-y: auto;
   }
 
-  :global(.excalidraw.theme--dark) .alignment-panel {
+  :global(.sveltedraw.theme--dark) .alignment-panel {
     background: #232329;
     border-left-color: #363636;
     color: #e5e7ea;
@@ -100,7 +100,7 @@
     border-bottom: 1px solid #e5e7ea;
   }
 
-  :global(.excalidraw.theme--dark) .ap-header {
+  :global(.sveltedraw.theme--dark) .ap-header {
     border-bottom-color: #363636;
   }
 
@@ -111,7 +111,7 @@
     color: #333;
   }
 
-  :global(.excalidraw.theme--dark) .ap-title {
+  :global(.sveltedraw.theme--dark) .ap-title {
     color: #e5e7ea;
   }
 
@@ -130,7 +130,7 @@
     text-align: center;
   }
 
-  :global(.excalidraw.theme--dark) .ap-message {
+  :global(.sveltedraw.theme--dark) .ap-message {
     background: #2e2e36;
   }
 
@@ -140,7 +140,7 @@
     color: #666;
   }
 
-  :global(.excalidraw.theme--dark) .ap-message p {
+  :global(.sveltedraw.theme--dark) .ap-message p {
     color: #aaa;
   }
 
@@ -157,7 +157,7 @@
     letter-spacing: 0.5px;
   }
 
-  :global(.excalidraw.theme--dark) .ap-section-label {
+  :global(.sveltedraw.theme--dark) .ap-section-label {
     color: #999;
   }
 
@@ -179,7 +179,7 @@
     transition: all 0.15s ease;
   }
 
-  :global(.excalidraw.theme--dark) .ap-btn {
+  :global(.sveltedraw.theme--dark) .ap-btn {
     background: #2e2e36;
     border-color: #363636;
     color: #e5e7ea;
@@ -190,7 +190,7 @@
     border-color: #6965db;
   }
 
-  :global(.excalidraw.theme--dark) .ap-btn:hover {
+  :global(.sveltedraw.theme--dark) .ap-btn:hover {
     background: #363636;
     border-color: #6965db;
   }
@@ -216,7 +216,7 @@
     border-left: 3px solid #6965db;
   }
 
-  :global(.excalidraw.theme--dark) .ap-guides {
+  :global(.sveltedraw.theme--dark) .ap-guides {
     background: #2e2e36;
   }
 
@@ -234,7 +234,7 @@
     line-height: 1.4;
   }
 
-  :global(.excalidraw.theme--dark) .ap-guides-info {
+  :global(.sveltedraw.theme--dark) .ap-guides-info {
     color: #aaa;
   }
 </style>

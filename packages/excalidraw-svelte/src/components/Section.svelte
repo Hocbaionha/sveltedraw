@@ -1,6 +1,6 @@
 <script lang="ts">
   // Port of packages/excalidraw/components/Section.tsx
-  // The original reads `id` from useExcalidrawContainer(); here we use
+  // The original reads `id` from useSveltedrawContainer(); here we use
   // EXCAL_ID_KEY (optional context). Falls back to "" if not provided.
   // i18n heading text taken as a prop with the heading key as fallback.
 

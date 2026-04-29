@@ -76,7 +76,7 @@
     z-index: 40;
     font-size: 13px;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-library-panel {
+  :global(.sveltedraw.theme--dark) .sveltedraw-library-panel {
     background: #232329;
     border-color: #363636;
     color: #e5e7ea;
@@ -88,7 +88,7 @@
     padding: 8px 12px;
     border-bottom: 1px solid #e5e7ea;
   }
-  :global(.excalidraw.theme--dark) .lib-header {
+  :global(.sveltedraw.theme--dark) .lib-header {
     border-bottom-color: #363636;
   }
   .lib-close {
@@ -131,7 +131,7 @@
   .lib-item-insert:hover {
     background: #f1f3f5;
   }
-  :global(.excalidraw.theme--dark) .lib-item-insert:hover {
+  :global(.sveltedraw.theme--dark) .lib-item-insert:hover {
     background: #2e2e36;
   }
   .lib-item-name {

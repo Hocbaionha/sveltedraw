@@ -13,7 +13,7 @@ import type {
   SveltedrawLinearElement,
   SveltedrawBindableElement,
   SveltedrawFreeDrawElement,
-  InitializedExcalidrawImageElement,
+  InitializedSveltedrawImageElement,
   SveltedrawImageElement,
   SveltedrawTextElementWithContainer,
   SveltedrawTextContainer,
@@ -33,7 +33,7 @@ import type {
 
 export const isInitializedImageElement = (
   element: SveltedrawElement | null,
-): element is InitializedExcalidrawImageElement => {
+): element is InitializedSveltedrawImageElement => {
   return !!element && element.type === "image" && !!element.fileId;
 };
 
@@ -241,7 +241,7 @@ export const isTextBindableContainer = (
   );
 };
 
-export const isExcalidrawElement = (
+export const isSveltedrawElement = (
   element: any,
 ): element is SveltedrawElement => {
   const type: SveltedrawElementType | undefined = element?.type;

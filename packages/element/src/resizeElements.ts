@@ -72,7 +72,7 @@ import type {
 import type {
   SveltedrawLinearElement,
   SveltedrawTextElement,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
   NonDeleted,
   SveltedrawElement,
   SveltedrawTextElementWithContainer,
@@ -87,7 +87,7 @@ import type { ElementUpdate } from "./mutateElement";
 export const transformElements = (
   originalElements: PointerDownState["originalElements"],
   transformHandleType: MaybeTransformHandleType,
-  selectedElements: readonly NonDeletedExcalidrawElement[],
+  selectedElements: readonly NonDeletedSveltedrawElement[],
   scene: Scene,
   shouldRotateWithDiscreteAngle: boolean,
   shouldResizeFromCenter: boolean,
@@ -201,7 +201,7 @@ export const transformElements = (
 };
 
 const rotateSingleElement = (
-  element: NonDeletedExcalidrawElement,
+  element: NonDeletedSveltedrawElement,
   scene: Scene,
   pointerX: number,
   pointerY: number,
@@ -227,7 +227,7 @@ const rotateSingleElement = (
   }
   const boundTextElementId = getBoundTextElementId(element);
 
-  let update: ElementUpdate<NonDeletedExcalidrawElement> = {
+  let update: ElementUpdate<NonDeletedSveltedrawElement> = {
     angle,
   };
 
@@ -266,7 +266,7 @@ const rotateSingleElement = (
 };
 
 export const rescalePointsInElement = (
-  element: NonDeletedExcalidrawElement,
+  element: NonDeletedSveltedrawElement,
   width: number,
   height: number,
   normalizePoints: boolean,
@@ -403,7 +403,7 @@ export const resizeSingleTextElement = (
 
 const rotateMultipleElements = (
   originalElements: PointerDownState["originalElements"],
-  elements: readonly NonDeletedExcalidrawElement[],
+  elements: readonly NonDeletedSveltedrawElement[],
   scene: Scene,
   pointerX: number,
   pointerY: number,
@@ -421,7 +421,7 @@ const rotateMultipleElements = (
 
   const rotatedElementsMap = new Map<
     SveltedrawElement["id"],
-    NonDeletedExcalidrawElement
+    NonDeletedSveltedrawElement
   >(elements.map((element) => [element.id, element]));
 
   for (const element of elements) {
@@ -489,7 +489,7 @@ const rotateMultipleElements = (
 
 export const getResizeOffsetXY = (
   transformHandleType: MaybeTransformHandleType,
-  selectedElements: NonDeletedExcalidrawElement[],
+  selectedElements: NonDeletedSveltedrawElement[],
   elementsMap: ElementsMap,
   x: number,
   y: number,
@@ -1020,7 +1020,7 @@ const getNextSingleWidthAndHeightFromPointer = (
 };
 
 const getNextMultipleWidthAndHeightFromPointer = (
-  selectedElements: readonly NonDeletedExcalidrawElement[],
+  selectedElements: readonly NonDeletedSveltedrawElement[],
   originalElementsMap: ElementsMap,
   elementsMap: ElementsMap,
   handleDirection: TransformHandleDirection,
@@ -1147,7 +1147,7 @@ const getNextMultipleWidthAndHeightFromPointer = (
 };
 
 export const resizeMultipleElements = (
-  selectedElements: readonly NonDeletedExcalidrawElement[],
+  selectedElements: readonly NonDeletedSveltedrawElement[],
   elementsMap: ElementsMap,
   handleDirection: TransformHandleDirection,
   scene: Scene,
@@ -1194,9 +1194,9 @@ export const resizeMultipleElements = (
     (
       acc: {
         /** element at resize start */
-        orig: NonDeletedExcalidrawElement;
+        orig: NonDeletedSveltedrawElement;
         /** latest element */
-        latest: NonDeletedExcalidrawElement;
+        latest: NonDeletedSveltedrawElement;
       }[],
       element,
     ) => {
@@ -1328,7 +1328,7 @@ export const resizeMultipleElements = (
     const [flipFactorX, flipFactorY] = [flipByX ? -1 : 1, flipByY ? -1 : 1];
 
     const elementsAndUpdates: {
-      element: NonDeletedExcalidrawElement;
+      element: NonDeletedSveltedrawElement;
       update: Mutable<
         Pick<SveltedrawElement, "x" | "y" | "width" | "height" | "angle">
       > & {
@@ -1457,7 +1457,7 @@ export const resizeMultipleElements = (
     const elementsToUpdate = elementsAndUpdates.map(({ element }) => element);
     const resizedElementsMap = new Map<
       SveltedrawElement["id"],
-      NonDeletedExcalidrawElement
+      NonDeletedSveltedrawElement
     >(elementsAndUpdates.map(({ element }) => [element.id, element]));
 
     for (const {

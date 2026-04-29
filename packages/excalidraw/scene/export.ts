@@ -45,7 +45,7 @@ import type {
   SveltedrawElement,
   SveltedrawFrameLikeElement,
   SveltedrawTextElement,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
   NonDeletedSceneElementsMap,
 } from "@sveltedraw/element/types";
 
@@ -100,10 +100,10 @@ const truncateText = (element: SveltedrawTextElement, maxWidth: number) => {
  * proper canvas rendering, even within editor (instead of DOM).
  */
 const addFrameLabelsAsTextElements = (
-  elements: readonly NonDeletedExcalidrawElement[],
+  elements: readonly NonDeletedSveltedrawElement[],
   opts: Pick<AppState, "exportWithDarkMode">,
 ) => {
-  const nextElements: NonDeletedExcalidrawElement[] = [];
+  const nextElements: NonDeletedSveltedrawElement[] = [];
   for (const element of elements) {
     if (isFrameLikeElement(element)) {
       let textElement: Mutable<SveltedrawTextElement> = newTextElement({
@@ -174,7 +174,7 @@ const prepareElementsForRender = ({
 };
 
 export const exportToCanvas = async (
-  elements: readonly NonDeletedExcalidrawElement[],
+  elements: readonly NonDeletedSveltedrawElement[],
   appState: AppState,
   files: BinaryFiles,
   {
@@ -287,7 +287,7 @@ const createHTMLComment = (text: string) => {
 };
 
 export const exportToSvg = async (
-  elements: readonly NonDeletedExcalidrawElement[],
+  elements: readonly NonDeletedSveltedrawElement[],
   appState: {
     exportBackground: boolean;
     exportPadding?: number;
@@ -361,7 +361,7 @@ export const exportToSvg = async (
     "metadata",
   );
 
-  svgRoot.appendChild(createHTMLComment("svg-source:excalidraw"));
+  svgRoot.appendChild(createHTMLComment("svg-source:sveltedraw"));
   svgRoot.appendChild(metadataElement);
   svgRoot.appendChild(defsElement);
 
@@ -562,7 +562,7 @@ export const decodeSvgBase64Payload = ({ svg }: { svg: string }) => {
 
 // calculate smallest area to fit the contents in
 const getCanvasSize = (
-  elements: readonly NonDeletedExcalidrawElement[],
+  elements: readonly NonDeletedSveltedrawElement[],
   exportPadding: number,
 ): Bounds => {
   const [minX, minY, maxX, maxY] = getCommonBounds(elements);
@@ -573,7 +573,7 @@ const getCanvasSize = (
 };
 
 export const getExportSize = (
-  elements: readonly NonDeletedExcalidrawElement[],
+  elements: readonly NonDeletedSveltedrawElement[],
   exportPadding: number,
   scale: number,
 ): [number, number] => {

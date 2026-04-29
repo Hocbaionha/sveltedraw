@@ -219,12 +219,13 @@ Service Worker:          4.7 KB
 - `vite`: 6.3.0 (build tool)
 - `typescript`: 5.9.3 (type safety)
 
-### Excalidraw Packages
-- `@excalidraw/element` (elements)
-- `@excalidraw/excalidraw` (core editor)
-- `@excalidraw/common` (utilities)
-- `@excalidraw/math` (calculations)
-- `@excalidraw/utils` (export)
+### Sveltedraw Workspace Packages (forked from Excalidraw)
+- `@sveltedraw/element` (elements)
+- `@sveltedraw/engine` (headless drawing engine)
+- `@sveltedraw/excalidraw` (Svelte editor)
+- `@sveltedraw/common` (utilities)
+- `@sveltedraw/math` (calculations)
+- `@sveltedraw/utils` (export)
 
 ### Drawing
 - `roughjs` (sketch-like rendering)

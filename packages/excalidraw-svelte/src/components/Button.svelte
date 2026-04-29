@@ -33,7 +33,7 @@
 
 <button
   {type}
-  class={clsx('excalidraw-button', className, { selected })}
+  class={clsx('sveltedraw-button', className, { selected })}
   onclick={handleClick}
   {...rest}
 >

@@ -35,7 +35,7 @@
         {#snippet child({ props })}
           <div
             {...props}
-            class="sveltedraw-tooltip excalidraw-tooltip--visible"
+            class="sveltedraw-tooltip sveltedraw-tooltip--visible"
             style:min-width={long ? '50ch' : '10ch'}
             style:max-width={long ? '50ch' : '15ch'}
           >

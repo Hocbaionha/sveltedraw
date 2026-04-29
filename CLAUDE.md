@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-**Sveltedraw** is a Svelte 5 port of Excalidraw. It is a fork: the upstream React `excalidraw-app/` was deleted in Phase 9 and replaced by `sveltedraw-app/` + `packages/excalidraw-svelte/`. The original `packages/excalidraw/` still exists but is now a **headless engine** (scene, renderer, data, fonts, clipboard, appState, types) consumed via subpath imports — there is no longer a bare `@excalidraw/excalidraw` entry. React is not a runtime dependency.
+**Sveltedraw** is a Svelte 5 port of Excalidraw. It is a fork: the upstream React `excalidraw-app/` was deleted in Phase 9 and replaced by `sveltedraw-app/` + `packages/excalidraw-svelte/`. The original `packages/excalidraw/` still exists but is now a **headless engine** (scene, renderer, data, fonts, clipboard, appState, types) consumed via subpath imports — there is no longer a bare `@sveltedraw/excalidraw` entry. React is not a runtime dependency.
 
 The port runs in phases (currently past Phase 16 — see `MEMORY.md` and the various `*-PLAN.md` / `PHASE-*.md` notes at the repo root for status).
 
@@ -12,8 +12,8 @@ The port runs in phases (currently past Phase 16 — see `MEMORY.md` and the var
 
 - **`sveltedraw-app/`** — Vite + Svelte 5 application (the thing you run). Entry `src/App.svelte` routes by URL hash to `Showcase` or `SveltedrawApp`.
 - **`packages/excalidraw-svelte/`** — Svelte port of the editor UI. Published surface in `src/index.ts`; subdirs `engine/`, `state/`, `components/`, `icons/`, plus feature dirs (`alignment/`, `autolayout/`, `connectors/`, `export/`, `history/`, `layers/`, `library/`, `measurements/`, `presentation/`, `snap/`, `templates/`, `texteditor/`).
-- **`packages/excalidraw/`** — headless engine (was the React package). Only subpath imports work — e.g. `@excalidraw/excalidraw/scene/Renderer`. Do not add a barrel re-export.
-- **`packages/{common,element,math,utils}/`** — shared engine packages, imported via `@excalidraw/<name>` aliases (see `vite.config.ts` and `vitest.config.mts`).
+- **`packages/excalidraw/`** — headless engine (was the React package). Only subpath imports work — e.g. `@sveltedraw/engine/scene/Renderer`. Do not add a barrel re-export.
+- **`packages/{common,element,math,utils}/`** — shared engine packages, imported via `@sveltedraw/<name>` aliases (see `vite.config.ts` and `vitest.config.mts`).
 
 ## Commands
 
@@ -45,7 +45,7 @@ Engine packages have their own ESM builds (`yarn build:packages`), but the app c
 
 - **Aliases are the source of truth for imports.** `vite.config.ts` and `vitest.config.mts` declare matching alias sets. If you add a new top-level path, mirror it in both.
 - **Two `App.svelte` files exist** and they are different: `sveltedraw-app/src/App.svelte` is the app shell (hash router); `packages/excalidraw-svelte/src/App.svelte` is the editor itself. Don't confuse them.
-- **Manual chunking** in `vite.config.ts` splits `excalidraw-engine` (scene/renderer/data/fonts + element/common/math/utils) from app code so the engine cache survives app changes. When moving files between those boundaries, recheck the `manualChunks` predicate.
+- **Manual chunking** in `vite.config.ts` splits `sveltedraw-engine` (scene/renderer/data/fonts + element/common/math/utils) from app code so the engine cache survives app changes. When moving files between those boundaries, recheck the `manualChunks` predicate.
 - **Svelte 5 runes** (`$state`, `$derived`, `$effect`) are in use throughout. See `feedback_svelte5_derived_tracking.md` in memory: `$derived` tracking can drop across function-call boundaries — access reactive proxies inline, not via helper functions.
 - **bits-ui** is the UI primitive library. Vite needs explicit `conditions: ['svelte', 'browser', 'module', 'import', 'default']` because bits-ui's `exports` field omits `default`/`import`.
 

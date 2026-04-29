@@ -224,7 +224,7 @@
     background: var(--button-gray-1, #f1f3f5);
   }
 
-  :global(.excalidraw.theme--dark) .CollabIdentityDialog__label {
+  :global(.sveltedraw.theme--dark) .CollabIdentityDialog__label {
     color: var(--text-primary-color);
   }
 </style>

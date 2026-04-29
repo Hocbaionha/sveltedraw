@@ -29,7 +29,7 @@ import type { MaybeTransformHandleType } from "@sveltedraw/element";
 import type {
   ElementsMap,
   SveltedrawElement,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
 } from "@sveltedraw/element/types";
 
 import type {
@@ -166,7 +166,7 @@ export const isSnappingEnabled = ({
 }: {
   app: AppClassProperties;
   event: KeyboardModifiersObject;
-  selectedElements: NonDeletedExcalidrawElement[];
+  selectedElements: NonDeletedSveltedrawElement[];
 }) => {
   if (event) {
     // Allow snapping for lasso tool when dragging selected elements
@@ -313,8 +313,8 @@ export const getElementsCorners = (
 };
 
 const getReferenceElements = (
-  elements: readonly NonDeletedExcalidrawElement[],
-  selectedElements: NonDeletedExcalidrawElement[],
+  elements: readonly NonDeletedSveltedrawElement[],
+  selectedElements: NonDeletedSveltedrawElement[],
   appState: AppState,
   elementsMap: ElementsMap,
 ) =>
@@ -326,7 +326,7 @@ const getReferenceElements = (
   );
 
 export const getVisibleGaps = (
-  elements: readonly NonDeletedExcalidrawElement[],
+  elements: readonly NonDeletedSveltedrawElement[],
   selectedElements: SveltedrawElement[],
   appState: AppState,
   elementsMap: ElementsMap,
@@ -614,7 +614,7 @@ const getGapSnaps = (
 };
 
 export const getReferenceSnapPoints = (
-  elements: readonly NonDeletedExcalidrawElement[],
+  elements: readonly NonDeletedSveltedrawElement[],
   selectedElements: SveltedrawElement[],
   appState: AppState,
   elementsMap: ElementsMap,

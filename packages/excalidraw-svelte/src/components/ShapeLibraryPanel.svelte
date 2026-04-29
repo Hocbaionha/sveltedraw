@@ -189,7 +189,7 @@
     flex-direction: column;
   }
 
-  :global(.excalidraw.theme--dark) .library-panel {
+  :global(.sveltedraw.theme--dark) .library-panel {
     background: #232329;
     border-right-color: #363636;
     color: #e5e7ea;
@@ -204,7 +204,7 @@
     border-bottom: 1px solid #e5e7ea;
   }
 
-  :global(.excalidraw.theme--dark) .lp-header {
+  :global(.sveltedraw.theme--dark) .lp-header {
     border-bottom-color: #363636;
   }
 
@@ -215,7 +215,7 @@
     color: #333;
   }
 
-  :global(.excalidraw.theme--dark) .lp-title {
+  :global(.sveltedraw.theme--dark) .lp-title {
     color: #e5e7ea;
   }
 
@@ -227,7 +227,7 @@
     border-radius: 3px;
   }
 
-  :global(.excalidraw.theme--dark) .lp-count {
+  :global(.sveltedraw.theme--dark) .lp-count {
     background: #2e2e36;
     color: #999;
   }
@@ -245,7 +245,7 @@
     box-sizing: border-box;
   }
 
-  :global(.excalidraw.theme--dark) .lp-search-input {
+  :global(.sveltedraw.theme--dark) .lp-search-input {
     background: #2e2e36;
     border-color: #363636;
     color: #e5e7ea;
@@ -255,7 +255,7 @@
     color: #999;
   }
 
-  :global(.excalidraw.theme--dark) .lp-search-input::placeholder {
+  :global(.sveltedraw.theme--dark) .lp-search-input::placeholder {
     color: #666;
   }
 
@@ -283,7 +283,7 @@
     white-space: nowrap;
   }
 
-  :global(.excalidraw.theme--dark) .lp-cat-btn {
+  :global(.sveltedraw.theme--dark) .lp-cat-btn {
     background: #2e2e36;
     border-color: #363636;
     color: #999;
@@ -293,7 +293,7 @@
     background: #e5e7ea;
   }
 
-  :global(.excalidraw.theme--dark) .lp-cat-btn:hover {
+  :global(.sveltedraw.theme--dark) .lp-cat-btn:hover {
     background: #363636;
   }
 
@@ -303,7 +303,7 @@
     border-color: #6965db;
   }
 
-  :global(.excalidraw.theme--dark) .lp-cat-btn.active {
+  :global(.sveltedraw.theme--dark) .lp-cat-btn.active {
     background: #7c7cff;
     border-color: #7c7cff;
   }
@@ -348,7 +348,7 @@
     cursor: grabbing;
   }
 
-  :global(.excalidraw.theme--dark) .lp-component {
+  :global(.sveltedraw.theme--dark) .lp-component {
     background: #2e2e36;
   }
 
@@ -357,7 +357,7 @@
     border-color: #d1d4da;
   }
 
-  :global(.excalidraw.theme--dark) .lp-component:hover {
+  :global(.sveltedraw.theme--dark) .lp-component:hover {
     background: #363636;
     border-color: #4a4a52;
   }
@@ -375,8 +375,8 @@
     overflow: hidden;
   }
 
-  :global(.excalidraw.theme--dark) .lp-comp-thumb,
-  :global(.excalidraw.theme--dark) .lp-comp-placeholder {
+  :global(.sveltedraw.theme--dark) .lp-comp-thumb,
+  :global(.sveltedraw.theme--dark) .lp-comp-placeholder {
     background: #1a1a1a;
   }
 
@@ -407,7 +407,7 @@
     white-space: nowrap;
   }
 
-  :global(.excalidraw.theme--dark) .lp-comp-name {
+  :global(.sveltedraw.theme--dark) .lp-comp-name {
     color: #e5e7ea;
   }
 
@@ -416,7 +416,7 @@
     color: #999;
   }
 
-  :global(.excalidraw.theme--dark) .lp-comp-meta {
+  :global(.sveltedraw.theme--dark) .lp-comp-meta {
     color: #666;
   }
 
@@ -435,7 +435,7 @@
     border-radius: 2px;
   }
 
-  :global(.excalidraw.theme--dark) .lp-tag {
+  :global(.sveltedraw.theme--dark) .lp-tag {
     background: #3a3a4a;
     color: #7c7cff;
   }
@@ -466,7 +466,7 @@
     border-color: #d1d4da;
   }
 
-  :global(.excalidraw.theme--dark) .lp-action-btn:hover {
+  :global(.sveltedraw.theme--dark) .lp-action-btn:hover {
     background: rgba(255, 255, 255, 0.1);
     border-color: #4a4a52;
   }
@@ -483,7 +483,7 @@
     border-top: 1px solid #e5e7ea;
   }
 
-  :global(.excalidraw.theme--dark) .lp-footer {
+  :global(.sveltedraw.theme--dark) .lp-footer {
     border-top-color: #363636;
   }
 
@@ -499,7 +499,7 @@
     transition: all 0.15s;
   }
 
-  :global(.excalidraw.theme--dark) .lp-footer-btn {
+  :global(.sveltedraw.theme--dark) .lp-footer-btn {
     background: #2e2e36;
     border-color: #363636;
     color: #e5e7ea;
@@ -509,7 +509,7 @@
     background: #e5e7ea;
   }
 
-  :global(.excalidraw.theme--dark) .lp-footer-btn:hover {
+  :global(.sveltedraw.theme--dark) .lp-footer-btn:hover {
     background: #363636;
   }
 </style>

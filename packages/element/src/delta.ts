@@ -15,7 +15,7 @@ import type {
   SveltedrawTextElement,
   NonDeleted,
   Ordered,
-  OrderedExcalidrawElement,
+  OrderedSveltedrawElement,
   SceneElementsMap,
 } from "@sveltedraw/element/types";
 
@@ -1160,7 +1160,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
    *
    * @returns `ElementsDelta` instance representing the `Delta` changes between the two sets of elements.
    */
-  public static calculate<T extends OrderedExcalidrawElement>(
+  public static calculate<T extends OrderedSveltedrawElement>(
     prevElements: Map<string, T>,
     nextElements: Map<string, T>,
   ): ElementsDelta {
@@ -1305,11 +1305,11 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
   ): ElementsDelta {
     const modifier =
       (
-        prevElement: OrderedExcalidrawElement | undefined,
-        nextElement: OrderedExcalidrawElement | undefined,
+        prevElement: OrderedSveltedrawElement | undefined,
+        nextElement: OrderedSveltedrawElement | undefined,
       ) =>
       (partial: ElementPartial, partialType: "deleted" | "inserted") => {
-        let element: OrderedExcalidrawElement | undefined;
+        let element: OrderedSveltedrawElement | undefined;
 
         switch (partialType) {
           case "deleted":
@@ -1391,7 +1391,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
     options?: ApplyToOptions,
   ): [SceneElementsMap, boolean] {
     let nextElements = new Map(elements) as SceneElementsMap;
-    let changedElements: Map<string, OrderedExcalidrawElement>;
+    let changedElements: Map<string, OrderedSveltedrawElement>;
 
     const flags: ApplyToFlags = {
       containsVisibleDifference: false,
@@ -1606,7 +1606,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
         }
 
         return acc;
-      }, new Map<string, OrderedExcalidrawElement>());
+      }, new Map<string, OrderedSveltedrawElement>());
     };
 
   private static createGetter =
@@ -1633,7 +1633,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
         } else {
           // not in elements, not in snapshot? element might have been added remotely!
           element = newElementWith(
-            { id, version: 1 } as OrderedExcalidrawElement,
+            { id, version: 1 } as OrderedSveltedrawElement,
             {
               ...partial,
             },
@@ -1645,7 +1645,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
     };
 
   private static applyDelta(
-    element: OrderedExcalidrawElement,
+    element: OrderedSveltedrawElement,
     delta: Delta<ElementPartial>,
     flags: ApplyToFlags,
     options?: ApplyToOptions,
@@ -1709,7 +1709,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
    * Check for visible changes regardless of whether they were removed, added or updated.
    */
   private static checkForVisibleDifference(
-    element: OrderedExcalidrawElement,
+    element: OrderedSveltedrawElement,
     partial: ElementPartial,
   ) {
     if (element.isDeleted && partial.isDeleted !== false) {
@@ -1744,7 +1744,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
     nextElements: SceneElementsMap,
     applyDirection: "forward" | "backward" = "forward",
   ) {
-    const nextAffectedElements = new Map<string, OrderedExcalidrawElement>();
+    const nextAffectedElements = new Map<string, OrderedSveltedrawElement>();
     const updater = (
       element: SveltedrawElement,
       updates: ElementUpdate<SveltedrawElement>,
@@ -1760,9 +1760,9 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
           ? nextElement.version + 1
           : nextElement.version - 1;
 
-      const elementUpdates = updates as ElementUpdate<OrderedExcalidrawElement>;
+      const elementUpdates = updates as ElementUpdate<OrderedSveltedrawElement>;
 
-      let affectedElement: OrderedExcalidrawElement;
+      let affectedElement: OrderedSveltedrawElement;
 
       if (prevElement === nextElement) {
         // create the new element instance in case we didn't modify the element yet
@@ -1890,7 +1890,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
 
   public static redrawElements(
     nextElements: SceneElementsMap,
-    changedElements: Map<string, OrderedExcalidrawElement>,
+    changedElements: Map<string, OrderedSveltedrawElement>,
   ) {
     try {
       // we don't have an up-to-date scene, as we can be just in the middle of applying history entry
@@ -1915,12 +1915,12 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
 
   private static redrawTextBoundingBoxes(
     scene: Scene,
-    changed: Map<string, OrderedExcalidrawElement>,
+    changed: Map<string, OrderedSveltedrawElement>,
   ) {
     const elements = scene.getNonDeletedElementsMap();
     const boxesToRedraw = new Map<
       string,
-      { container: OrderedExcalidrawElement; boundText: SveltedrawTextElement }
+      { container: OrderedSveltedrawElement; boundText: SveltedrawTextElement }
     >();
 
     for (const element of changed.values()) {
@@ -1963,7 +1963,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
 
   private static redrawBoundArrows(
     scene: Scene,
-    changed: Map<string, OrderedExcalidrawElement>,
+    changed: Map<string, OrderedSveltedrawElement>,
   ) {
     for (const element of changed.values()) {
       if (!element.isDeleted && isBindableElement(element)) {
@@ -1977,7 +1977,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
 
   private static reorderElements(
     elements: SceneElementsMap,
-    changed: Map<string, OrderedExcalidrawElement>,
+    changed: Map<string, OrderedSveltedrawElement>,
     flags: {
       containsVisibleDifference: boolean;
       containsZindexDifference: boolean;
@@ -2057,7 +2057,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
   }
 
   private static stripIrrelevantProps(
-    partial: Partial<OrderedExcalidrawElement>,
+    partial: Partial<OrderedSveltedrawElement>,
   ): ElementPartial {
     const { id, updated, ...strippedPartial } = partial;
 

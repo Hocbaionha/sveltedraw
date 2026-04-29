@@ -150,14 +150,14 @@ export class SveltedrawFontFace {
     const assetUrl: string = uri.replace(/^\/+/, "");
     const urls: URL[] = [];
 
-    if (typeof window.EXCALIDRAW_ASSET_PATH === "string") {
+    if (typeof window.SVELTEDRAW_ASSET_PATH === "string") {
       const normalizedBaseUrl = this.normalizeBaseUrl(
-        window.EXCALIDRAW_ASSET_PATH,
+        window.SVELTEDRAW_ASSET_PATH,
       );
 
       urls.push(new URL(assetUrl, normalizedBaseUrl));
-    } else if (Array.isArray(window.EXCALIDRAW_ASSET_PATH)) {
-      window.EXCALIDRAW_ASSET_PATH.forEach((path) => {
+    } else if (Array.isArray(window.SVELTEDRAW_ASSET_PATH)) {
+      window.SVELTEDRAW_ASSET_PATH.forEach((path) => {
         const normalizedBaseUrl = this.normalizeBaseUrl(path);
         urls.push(new URL(assetUrl, normalizedBaseUrl));
       });

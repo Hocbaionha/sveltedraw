@@ -10,7 +10,7 @@ import type {
   ElementsMap,
   SveltedrawElement,
   FractionalIndex,
-  OrderedExcalidrawElement,
+  OrderedSveltedrawElement,
   SceneElementsMap,
 } from "./types";
 
@@ -128,7 +128,7 @@ export const validateFractionalIndices = (
  * - when there is no fractional index in one of the elements, respect the order of the array
  */
 export const orderByFractionalIndex = (
-  elements: OrderedExcalidrawElement[],
+  elements: OrderedSveltedrawElement[],
 ) => {
   return elements.sort((a, b) => {
     // in case the indices are not the defined at runtime
@@ -155,7 +155,7 @@ export const orderByFractionalIndex = (
 export const syncMovedIndices = (
   elements: readonly SveltedrawElement[],
   movedElements: ElementsMap,
-): OrderedExcalidrawElement[] => {
+): OrderedSveltedrawElement[] => {
   try {
     const elementsMap = arrayToMap(elements);
     const indicesGroups = getMovedIndicesGroups(elements, movedElements);
@@ -192,7 +192,7 @@ export const syncMovedIndices = (
     syncInvalidIndices(elements);
   }
 
-  return elements as OrderedExcalidrawElement[];
+  return elements as OrderedSveltedrawElement[];
 };
 
 /**
@@ -202,7 +202,7 @@ export const syncMovedIndices = (
  */
 export const syncInvalidIndices = (
   elements: readonly SveltedrawElement[],
-): OrderedExcalidrawElement[] => {
+): OrderedSveltedrawElement[] => {
   const elementsMap = arrayToMap(elements);
   const indicesGroups = getInvalidIndicesGroups(elements);
   const elementsUpdates = generateIndices(elements, indicesGroups);
@@ -211,7 +211,7 @@ export const syncInvalidIndices = (
     mutateElement(element, elementsMap, { index });
   }
 
-  return elements as OrderedExcalidrawElement[];
+  return elements as OrderedSveltedrawElement[];
 };
 
 /**
@@ -433,7 +433,7 @@ const generateIndices = (
 
 const isOrderedElement = (
   element: SveltedrawElement,
-): element is OrderedExcalidrawElement => {
+): element is OrderedSveltedrawElement => {
   // for now it's sufficient whether the index is there
   // meaning, the element was already ordered in the past
   // meaning, it is not a newly inserted element, not an unrestored element, etc.

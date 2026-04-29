@@ -2,7 +2,7 @@ import type { UserIdleState, EditorInterface } from "@sveltedraw/common";
 import type {
   SveltedrawElement,
   NonDeletedElementsMap,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
   NonDeletedSceneElementsMap,
 } from "@sveltedraw/element/types";
 
@@ -16,7 +16,7 @@ import type {
   InteractiveCanvasAppState,
   StaticCanvasAppState,
   SocketId,
-  PendingExcalidrawElements,
+  PendingSveltedrawElements,
 } from "../types";
 import type { RoughCanvas } from "roughjs/bin/canvas";
 import type { Drawable } from "roughjs/bin/core";
@@ -35,7 +35,7 @@ export type StaticCanvasRenderConfig = {
   isExporting: boolean;
   embedsValidationStatus: EmbedsValidationStatus;
   elementsPendingErasure: ElementsPendingErasure;
-  pendingFlowchartNodes: PendingExcalidrawElements | null;
+  pendingFlowchartNodes: PendingSveltedrawElements | null;
   theme: AppState["theme"];
 };
 
@@ -84,7 +84,7 @@ export type StaticSceneRenderConfig = {
   rc: RoughCanvas;
   elementsMap: RenderableElementsMap;
   allElementsMap: NonDeletedSceneElementsMap;
-  visibleElements: readonly NonDeletedExcalidrawElement[];
+  visibleElements: readonly NonDeletedSveltedrawElement[];
   scale: number;
   appState: StaticCanvasAppState;
   renderConfig: StaticCanvasRenderConfig;
@@ -98,8 +98,8 @@ export type InteractiveSceneRenderConfig = {
   app: AppClassProperties;
   canvas: HTMLCanvasElement | null;
   elementsMap: RenderableElementsMap;
-  visibleElements: readonly NonDeletedExcalidrawElement[];
-  selectedElements: readonly NonDeletedExcalidrawElement[];
+  visibleElements: readonly NonDeletedSveltedrawElement[];
+  selectedElements: readonly NonDeletedSveltedrawElement[];
   allElementsMap: NonDeletedSceneElementsMap;
   scale: number;
   appState: InteractiveCanvasAppState;

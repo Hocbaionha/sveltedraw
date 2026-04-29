@@ -164,7 +164,7 @@ export type SveltedrawImageElement = _ExcalidrawElementBase &
     crop: ImageCrop | null;
   }>;
 
-export type InitializedExcalidrawImageElement = MarkNonNullable<
+export type InitializedSveltedrawImageElement = MarkNonNullable<
   SveltedrawImageElement,
   "fileId"
 >;
@@ -233,13 +233,13 @@ export type Ordered<TElement extends SveltedrawElement> = TElement & {
   index: FractionalIndex;
 };
 
-export type OrderedExcalidrawElement = Ordered<SveltedrawElement>;
+export type OrderedSveltedrawElement = Ordered<SveltedrawElement>;
 
 export type NonDeleted<TElement extends SveltedrawElement> = TElement & {
   isDeleted: boolean;
 };
 
-export type NonDeletedExcalidrawElement = NonDeleted<SveltedrawElement>;
+export type NonDeletedSveltedrawElement = NonDeleted<SveltedrawElement>;
 
 export type SveltedrawTextElement = _ExcalidrawElementBase &
   Readonly<{
@@ -426,7 +426,7 @@ export type ElementsMap = Map<SveltedrawElement["id"], SveltedrawElement>;
  */
 export type NonDeletedElementsMap = Map<
   SveltedrawElement["id"],
-  NonDeletedExcalidrawElement
+  NonDeletedSveltedrawElement
 > &
   MakeBrand<"NonDeletedElementsMap">;
 
@@ -446,7 +446,7 @@ export type SceneElementsMap = Map<
  */
 export type NonDeletedSceneElementsMap = Map<
   SveltedrawElement["id"],
-  Ordered<NonDeletedExcalidrawElement>
+  Ordered<NonDeletedSveltedrawElement>
 > &
   MakeBrand<"NonDeletedSceneElementsMap">;
 

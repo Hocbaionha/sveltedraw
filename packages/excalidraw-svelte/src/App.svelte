@@ -17,7 +17,7 @@
   //  - Scene-mutation nonce wiring (Renderer repaints via appState deps only
   //    so far; batch 4 adds a sceneNonce $state bumped on every mutation).
   //  - syncActionResult / actionManager / history integration → batch 5.
-  //  - SveltedrawImperativeAPI (`onExcalidrawAPI` callback) → batch 6.
+  //  - SveltedrawImperativeAPI (`onSveltedrawAPI` callback) → batch 6.
   //  - textWysiwyg.ts port → batch 7.
 
   // @ts-ignore — upstream, resolved via Vite alias; tsconfig path mapping
@@ -171,8 +171,8 @@
   import { createHistoryStore } from "./history/store.js";
   import { triggerDownload } from "./data/download.js";
   import {
-    saveAsExcalidrawFile as saveExcalidrawFileImpl,
-    openExcalidrawFilePicker as openExcalidrawFilePickerImpl,
+    saveAsSveltedrawFile as saveSveltedrawFileImpl,
+    openSveltedrawFilePicker as openSveltedrawFilePickerImpl,
   } from "./data/sveltedrawFile.js";
   import { createImperativeAPI } from "./api/ImperativeAPI.svelte.js";
   import { SVELTEDRAW_API_KEY, type SveltedrawAPI } from "./api/types.js";
@@ -2322,10 +2322,10 @@
 
   // ── .excalidraw JSON file open/save ────────────────────────────
   // Implementation in ./data/sveltedrawFile.ts.
-  const saveAsExcalidrawFile = () =>
-    saveExcalidrawFileImpl({ scene, appState, binaryFiles });
-  const loadFromExcalidrawFile = () =>
-    openExcalidrawFilePickerImpl({
+  const saveAsSveltedrawFile = () =>
+    saveSveltedrawFileImpl({ scene, appState, binaryFiles });
+  const loadFromSveltedrawFile = () =>
+    openSveltedrawFilePickerImpl({
       scene,
       appState,
       clearSelection,
@@ -2376,7 +2376,7 @@
   const exportAsSvg = async (): Promise<SVGSVGElement | null> => {
     const opts = buildExportOpts();
     if (!opts) return null;
-    // Font inlining enabled — with `EXCALIDRAW_ASSET_PATH = location.origin`
+    // Font inlining enabled — with `SVELTEDRAW_ASSET_PATH = location.origin`
     // (set in main.ts), Excalifont woff2 loads from the Vite dev server
     // and the Patrick Hand fallback is bundled in /public/fonts/. Exported
     // SVG embeds the font bytes as base64 so VN text renders correctly
@@ -5456,8 +5456,8 @@
     bind:open={mainMenuOpen}
     theme={(appState as any).theme}
     gridEnabled={!!(appState as any).gridModeEnabled}
-    onLoad={loadFromExcalidrawFile}
-    onSave={saveAsExcalidrawFile}
+    onLoad={loadFromSveltedrawFile}
+    onSave={saveAsSveltedrawFile}
     onExportPng={downloadPng}
     onExportSvg={downloadSvg}
     onToggleGrid={toggleGrid}

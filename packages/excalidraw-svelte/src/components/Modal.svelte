@@ -34,11 +34,11 @@
 
   const animationsDisabled =
     typeof document !== 'undefined' &&
-    document.body.classList.contains('excalidraw-animations-disabled');
+    document.body.classList.contains('sveltedraw-animations-disabled');
 
   const containerClass = $derived(
-    clsx('excalidraw', 'excalidraw-modal-container', {
-      'excalidraw--mobile': formFactor === 'phone',
+    clsx('sveltedraw', 'sveltedraw-modal-container', {
+      'sveltedraw--mobile': formFactor === 'phone',
       'theme--dark': theme === 'dark',
     }),
   );

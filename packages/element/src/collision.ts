@@ -72,7 +72,7 @@ import type {
   SveltedrawLinearElement,
   SveltedrawRectanguloidElement,
   NonDeleted,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
   NonDeletedSceneElementsMap,
   Ordered,
 } from "./types";
@@ -302,7 +302,7 @@ const bindingBorderTest = (
 
 export const getAllHoveredElementAtPoint = (
   point: Readonly<GlobalPoint>,
-  elements: readonly Ordered<NonDeletedExcalidrawElement>[],
+  elements: readonly Ordered<NonDeletedSveltedrawElement>[],
   elementsMap: NonDeletedSceneElementsMap,
   tolerance?: number,
 ): NonDeleted<SveltedrawBindableElement>[] => {
@@ -335,7 +335,7 @@ export const getAllHoveredElementAtPoint = (
 
 export const getHoveredElementForBinding = (
   point: Readonly<GlobalPoint>,
-  elements: readonly Ordered<NonDeletedExcalidrawElement>[],
+  elements: readonly Ordered<NonDeletedSveltedrawElement>[],
   elementsMap: NonDeletedSceneElementsMap,
   tolerance?: number,
 ): NonDeleted<SveltedrawBindableElement> | null => {
@@ -365,7 +365,7 @@ export const getHoveredElementForBinding = (
 export const getHoveredElementForFocusPoint = (
   point: GlobalPoint,
   arrow: SveltedrawArrowElement,
-  elements: readonly Ordered<NonDeletedExcalidrawElement>[],
+  elements: readonly Ordered<NonDeletedSveltedrawElement>[],
   elementsMap: NonDeletedSceneElementsMap,
   tolerance?: number,
 ): SveltedrawBindableElement | null => {

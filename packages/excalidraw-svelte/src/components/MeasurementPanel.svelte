@@ -143,7 +143,7 @@
     overflow-y: auto;
   }
 
-  :global(.excalidraw.theme--dark) .measurement-panel {
+  :global(.sveltedraw.theme--dark) .measurement-panel {
     background: #232329;
     border-left-color: #363636;
     color: #e5e7ea;
@@ -158,7 +158,7 @@
     border-bottom: 1px solid #e5e7ea;
   }
 
-  :global(.excalidraw.theme--dark) .mp-header {
+  :global(.sveltedraw.theme--dark) .mp-header {
     border-bottom-color: #363636;
   }
 
@@ -169,7 +169,7 @@
     color: #333;
   }
 
-  :global(.excalidraw.theme--dark) .mp-title {
+  :global(.sveltedraw.theme--dark) .mp-title {
     color: #e5e7ea;
   }
 
@@ -187,7 +187,7 @@
     border-bottom: 1px solid #f0f0f0;
   }
 
-  :global(.excalidraw.theme--dark) .mp-section {
+  :global(.sveltedraw.theme--dark) .mp-section {
     border-bottom-color: #2e2e36;
   }
 
@@ -205,7 +205,7 @@
     gap: 6px;
   }
 
-  :global(.excalidraw.theme--dark) .mp-label {
+  :global(.sveltedraw.theme--dark) .mp-label {
     color: #e5e7ea;
   }
 
@@ -223,7 +223,7 @@
     font-size: 12px;
   }
 
-  :global(.excalidraw.theme--dark) .mp-select {
+  :global(.sveltedraw.theme--dark) .mp-select {
     background: #2e2e36;
     border-color: #363636;
   }
@@ -235,7 +235,7 @@
     text-align: center;
   }
 
-  :global(.excalidraw.theme--dark) .mp-message {
+  :global(.sveltedraw.theme--dark) .mp-message {
     background: #2e2e36;
   }
 
@@ -245,7 +245,7 @@
     color: #666;
   }
 
-  :global(.excalidraw.theme--dark) .mp-message p {
+  :global(.sveltedraw.theme--dark) .mp-message p {
     color: #aaa;
   }
 
@@ -256,7 +256,7 @@
     border-radius: 4px;
   }
 
-  :global(.excalidraw.theme--dark) .mp-measurements {
+  :global(.sveltedraw.theme--dark) .mp-measurements {
     background: #2e2e36;
   }
 
@@ -269,7 +269,7 @@
     letter-spacing: 0.5px;
   }
 
-  :global(.excalidraw.theme--dark) .mp-section-label {
+  :global(.sveltedraw.theme--dark) .mp-section-label {
     color: #999;
   }
 
@@ -282,7 +282,7 @@
     font-size: 12px;
   }
 
-  :global(.excalidraw.theme--dark) .mp-item {
+  :global(.sveltedraw.theme--dark) .mp-item {
     border-bottom-color: #363636;
   }
 
@@ -295,7 +295,7 @@
     font-weight: 500;
   }
 
-  :global(.excalidraw.theme--dark) .mp-item-label {
+  :global(.sveltedraw.theme--dark) .mp-item-label {
     color: #999;
   }
 

@@ -1,7 +1,7 @@
-// Save/load the scene as a .excalidraw JSON file (the canonical Excalidraw
-// interchange format). Wraps the upstream-shaped envelope but does not call
-// `restoreElements` defensively — the loader bails on missing/invalid arrays
-// rather than migrating older shapes.
+// Save/load the scene as a .sveltedraw JSON file (forked from Excalidraw's
+// canonical interchange format). Wraps the upstream-shaped envelope but
+// does not call `restoreElements` defensively — the loader bails on
+// missing/invalid arrays rather than migrating older shapes.
 
 import { triggerDownload } from "./download.js";
 
@@ -12,7 +12,7 @@ type SceneLike = {
   replaceAllElements: (els: AnyEl[], opts?: { skipValidation?: boolean }) => void;
 };
 
-export const saveAsExcalidrawFile = async (opts: {
+export const saveAsSveltedrawFile = async (opts: {
   scene: SceneLike | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   appState: any;
@@ -42,10 +42,10 @@ export const saveAsExcalidrawFile = async (opts: {
   );
   const blob = new Blob([json], { type: "application/vnd.sveltedraw+json" });
   const name = appState.name || "sveltedraw";
-  triggerDownload(blob, `${name}.excalidraw`);
+  triggerDownload(blob, `${name}.sveltedraw`);
 };
 
-export const openExcalidrawFilePicker = (opts: {
+export const openSveltedrawFilePicker = (opts: {
   scene: SceneLike | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   appState: any;
@@ -55,7 +55,7 @@ export const openExcalidrawFilePicker = (opts: {
 }): void => {
   const input = document.createElement("input");
   input.type = "file";
-  input.accept = ".excalidraw,application/json,application/vnd.sveltedraw+json";
+  input.accept = ".sveltedraw,application/json,application/vnd.sveltedraw+json";
   input.onchange = async () => {
     const file = input.files?.[0];
     const { scene, appState, clearSelection, pushHistory, bumpSceneRepaint } = opts;
@@ -64,7 +64,7 @@ export const openExcalidrawFilePicker = (opts: {
       const text = await file.text();
       const parsed = JSON.parse(text);
       if (!parsed || !Array.isArray(parsed.elements)) {
-        throw new Error("Invalid .excalidraw file");
+        throw new Error("Invalid .sveltedraw file");
       }
       scene.replaceAllElements(parsed.elements, { skipValidation: true });
       if (parsed.appState) {
@@ -80,7 +80,7 @@ export const openExcalidrawFilePicker = (opts: {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error("sveltedraw: failed to load file", err);
-      window.alert("Failed to load .excalidraw file");
+      window.alert("Failed to load .sveltedraw file");
     }
   };
   input.click();

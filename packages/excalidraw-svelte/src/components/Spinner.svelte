@@ -40,7 +40,7 @@
 <style>
   /*
    * Minimal Spinner styles inlined (originals in packages/excalidraw/components/Spinner.scss).
-   * These are scoped to :global(.excalidraw) by the global stylesheet;
+   * These are scoped to :global(.sveltedraw) by the global stylesheet;
    * here we scope to the component's own class so it works standalone.
    */
   :global(.Spinner) {

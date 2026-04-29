@@ -32,7 +32,7 @@ import type {
 import type {
   SveltedrawElement,
   PointerType,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
   ElementsMap,
 } from "./types";
 
@@ -47,7 +47,7 @@ const isInsideTransformHandle = (
   y <= transformHandle[1] + transformHandle[3];
 
 export const resizeTest = <Point extends GlobalPoint | LocalPoint>(
-  element: NonDeletedExcalidrawElement,
+  element: NonDeletedSveltedrawElement,
   elementsMap: ElementsMap,
   appState: AppState,
   x: number,
@@ -128,7 +128,7 @@ export const resizeTest = <Point extends GlobalPoint | LocalPoint>(
 };
 
 export const getElementWithTransformHandleType = (
-  elements: readonly NonDeletedExcalidrawElement[],
+  elements: readonly NonDeletedSveltedrawElement[],
   appState: AppState,
   scenePointerX: number,
   scenePointerY: number,
@@ -152,7 +152,7 @@ export const getElementWithTransformHandleType = (
       editorInterface,
     );
     return transformHandleType ? { element, transformHandleType } : null;
-  }, null as { element: NonDeletedExcalidrawElement; transformHandleType: MaybeTransformHandleType } | null);
+  }, null as { element: NonDeletedSveltedrawElement; transformHandleType: MaybeTransformHandleType } | null);
 };
 
 export const getTransformHandleTypeFromCoords = <

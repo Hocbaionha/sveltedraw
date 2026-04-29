@@ -50,7 +50,7 @@
     z-index: 50;
     overflow: hidden;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-zoom-ctrls {
+  :global(.sveltedraw.theme--dark) .sveltedraw-zoom-ctrls {
     background: #232329;
     border-color: #363636;
   }
@@ -79,11 +79,11 @@
     min-width: 52px;
     font-size: 12px;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-zoom-btn {
+  :global(.sveltedraw.theme--dark) .sveltedraw-zoom-btn {
     color: #e5e7ea;
     border-left-color: #363636;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-zoom-btn:hover {
+  :global(.sveltedraw.theme--dark) .sveltedraw-zoom-btn:hover {
     background: #2e2e36;
   }
 </style>

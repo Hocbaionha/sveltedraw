@@ -98,12 +98,12 @@
   .sveltedraw-main-menu-trigger:hover {
     background: #f1f3f5;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-main-menu-trigger {
+  :global(.sveltedraw.theme--dark) .sveltedraw-main-menu-trigger {
     background: #232329;
     border-color: #363636;
     color: #e5e7ea;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-main-menu-trigger:hover {
+  :global(.sveltedraw.theme--dark) .sveltedraw-main-menu-trigger:hover {
     background: #2e2e36;
   }
   :global(.sveltedraw-main-menu-trigger svg) {
@@ -124,7 +124,7 @@
     z-index: 60;
     font-size: 13px;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-main-menu {
+  :global(.sveltedraw.theme--dark) .sveltedraw-main-menu {
     background: #232329;
     border-color: #363636;
     color: #e5e7ea;
@@ -143,7 +143,7 @@
   .mm-item:hover {
     background: #eeedfa;
   }
-  :global(.excalidraw.theme--dark) .mm-item:hover {
+  :global(.sveltedraw.theme--dark) .mm-item:hover {
     background: #3b3a66;
   }
   .mm-item--danger {
@@ -154,7 +154,7 @@
     background: #e5e7ea;
     margin: 4px 0;
   }
-  :global(.excalidraw.theme--dark) .mm-sep {
+  :global(.sveltedraw.theme--dark) .mm-sep {
     background: #363636;
   }
 </style>

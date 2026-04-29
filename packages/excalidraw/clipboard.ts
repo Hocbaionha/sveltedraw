@@ -22,7 +22,7 @@ import type { ValueOf } from "@sveltedraw/common/utility-types";
 import type { IMAGE_MIME_TYPES, STRING_MIME_TYPES } from "@sveltedraw/common";
 import type {
   SveltedrawElement,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
 } from "@sveltedraw/element/types";
 
 import { SveltedrawError } from "./errors";
@@ -37,7 +37,7 @@ import type { BinaryFiles } from "./types";
 
 type ElementsClipboard = {
   type: typeof EXPORT_DATA_TYPES.sveltedrawClipboard;
-  elements: readonly NonDeletedExcalidrawElement[];
+  elements: readonly NonDeletedSveltedrawElement[];
   files: BinaryFiles | undefined;
 };
 
@@ -143,7 +143,7 @@ export const serializeAsClipboardJSON = ({
   elements,
   files,
 }: {
-  elements: readonly NonDeletedExcalidrawElement[];
+  elements: readonly NonDeletedSveltedrawElement[];
   files: BinaryFiles | null;
 }) => {
   const elementsMap = arrayToMap(elements);
@@ -192,7 +192,7 @@ export const serializeAsClipboardJSON = ({
 };
 
 export const copyToClipboard = async (
-  elements: readonly NonDeletedExcalidrawElement[],
+  elements: readonly NonDeletedSveltedrawElement[],
   files: BinaryFiles | null,
   /** supply if available to make the operation more certain to succeed */
   clipboardEvent?: ClipboardEvent | null,

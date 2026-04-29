@@ -1,19 +1,6 @@
-# @excalidraw/math
+# @sveltedraw/math
 
-## Install
+Sveltedraw math utilities (vectors, points, ranges, geometry).
 
-```bash
-npm install @excalidraw/math
-```
-
-If you prefer Yarn over npm, use this command to install the Excalidraw utils package:
-
-```bash
-yarn add @excalidraw/math
-```
-
-With PNPM, similarly install the package with this command:
-
-```bash
-pnpm add @excalidraw/math
-```
+Forked from the upstream Excalidraw `@excalidraw/math` package and adapted
+for the Svelte port. Workspace-internal — not published to npm.

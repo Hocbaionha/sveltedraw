@@ -124,7 +124,7 @@
     overflow: hidden;
     font-size: 13px;
   }
-  :global(.excalidraw.theme--dark) .sveltedraw-help-card {
+  :global(.sveltedraw.theme--dark) .sveltedraw-help-card {
     background: #232329;
     color: #e5e7ea;
   }
@@ -136,7 +136,7 @@
     border-bottom: 1px solid #e5e7ea;
     font-size: 16px;
   }
-  :global(.excalidraw.theme--dark) .hd-header {
+  :global(.sveltedraw.theme--dark) .hd-header {
     border-bottom-color: #363636;
   }
   .hd-close {
@@ -168,7 +168,7 @@
     padding: 3px 0;
     color: #1e1e1e;
   }
-  :global(.excalidraw.theme--dark) .hd-row {
+  :global(.sveltedraw.theme--dark) .hd-row {
     color: #e5e7ea;
   }
   .hd-row span {

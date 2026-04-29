@@ -216,7 +216,7 @@
     overflow-y: auto;
   }
 
-  :global(.excalidraw.theme--dark) .text-editor-panel {
+  :global(.sveltedraw.theme--dark) .text-editor-panel {
     background: #232329;
     border-left-color: #363636;
     color: #e5e7ea;
@@ -231,7 +231,7 @@
     border-bottom: 1px solid #e5e7ea;
   }
 
-  :global(.excalidraw.theme--dark) .te-header {
+  :global(.sveltedraw.theme--dark) .te-header {
     border-bottom-color: #363636;
   }
 
@@ -242,7 +242,7 @@
     color: #333;
   }
 
-  :global(.excalidraw.theme--dark) .te-title {
+  :global(.sveltedraw.theme--dark) .te-title {
     color: #e5e7ea;
   }
 
@@ -261,7 +261,7 @@
     text-align: center;
   }
 
-  :global(.excalidraw.theme--dark) .te-message {
+  :global(.sveltedraw.theme--dark) .te-message {
     background: #2e2e36;
   }
 
@@ -271,7 +271,7 @@
     color: #666;
   }
 
-  :global(.excalidraw.theme--dark) .te-message p {
+  :global(.sveltedraw.theme--dark) .te-message p {
     color: #aaa;
   }
 
@@ -281,7 +281,7 @@
     border-bottom: 1px solid #f0f0f0;
   }
 
-  :global(.excalidraw.theme--dark) .te-section {
+  :global(.sveltedraw.theme--dark) .te-section {
     border-bottom-color: #2e2e36;
   }
 
@@ -295,7 +295,7 @@
     gap: 6px;
   }
 
-  :global(.excalidraw.theme--dark) .te-label {
+  :global(.sveltedraw.theme--dark) .te-label {
     color: #e5e7ea;
   }
 
@@ -321,7 +321,7 @@
     font-size: 12px;
   }
 
-  :global(.excalidraw.theme--dark) .te-select {
+  :global(.sveltedraw.theme--dark) .te-select {
     background: #2e2e36;
     border-color: #363636;
   }
@@ -334,7 +334,7 @@
     cursor: pointer;
   }
 
-  :global(.excalidraw.theme--dark) .te-color {
+  :global(.sveltedraw.theme--dark) .te-color {
     border-color: #363636;
   }
 
@@ -356,7 +356,7 @@
     transition: all 0.15s ease;
   }
 
-  :global(.excalidraw.theme--dark) .te-format-btn {
+  :global(.sveltedraw.theme--dark) .te-format-btn {
     background: #2e2e36;
     border-color: #363636;
     color: #e5e7ea;
@@ -367,7 +367,7 @@
     border-color: #6965db;
   }
 
-  :global(.excalidraw.theme--dark) .te-format-btn:hover {
+  :global(.sveltedraw.theme--dark) .te-format-btn:hover {
     background: #363636;
     border-color: #6965db;
   }
@@ -395,7 +395,7 @@
     cursor: pointer;
   }
 
-  :global(.excalidraw.theme--dark) .te-align-btn {
+  :global(.sveltedraw.theme--dark) .te-align-btn {
     background: #2e2e36;
     border-color: #363636;
     color: #e5e7ea;
@@ -406,7 +406,7 @@
     border-color: #6965db;
   }
 
-  :global(.excalidraw.theme--dark) .te-align-btn:hover {
+  :global(.sveltedraw.theme--dark) .te-align-btn:hover {
     background: #363636;
     border-color: #6965db;
   }

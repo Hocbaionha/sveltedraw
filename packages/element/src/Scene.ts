@@ -24,13 +24,13 @@ import { mutateElement, type ElementUpdate } from "@sveltedraw/element";
 
 import type {
   SveltedrawElement,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
   NonDeleted,
   SveltedrawFrameLikeElement,
   ElementsMapOrArray,
   SceneElementsMap,
   NonDeletedSceneElementsMap,
-  OrderedExcalidrawElement,
+  OrderedSveltedrawElement,
   Ordered,
 } from "@sveltedraw/element/types";
 
@@ -57,7 +57,7 @@ const getNonDeletedElements = <T extends SveltedrawElement>(
       elements.push(element as NonDeleted<T>);
       elementsMap.set(
         element.id,
-        element as Ordered<NonDeletedExcalidrawElement>,
+        element as Ordered<NonDeletedSveltedrawElement>,
       );
     }
   }
@@ -112,21 +112,21 @@ export class Scene {
 
   private callbacks: Set<SceneStateCallback> = new Set();
 
-  private nonDeletedElements: readonly Ordered<NonDeletedExcalidrawElement>[] =
+  private nonDeletedElements: readonly Ordered<NonDeletedSveltedrawElement>[] =
     [];
   private nonDeletedElementsMap = toBrandedType<NonDeletedSceneElementsMap>(
     new Map(),
   );
   // ideally all elements within the scene should be wrapped around with `Ordered` type, but right now there is no real benefit doing so
-  private elements: readonly OrderedExcalidrawElement[] = [];
+  private elements: readonly OrderedSveltedrawElement[] = [];
   private nonDeletedFramesLikes: readonly NonDeleted<SveltedrawFrameLikeElement>[] =
     [];
   private frames: readonly SveltedrawFrameLikeElement[] = [];
   private elementsMap = toBrandedType<SceneElementsMap>(new Map());
   private selectedElementsCache: {
     selectedElementIds: AppState["selectedElementIds"] | null;
-    elements: readonly NonDeletedExcalidrawElement[] | null;
-    cache: Map<SelectionHash, NonDeletedExcalidrawElement[]>;
+    elements: readonly NonDeletedSveltedrawElement[] | null;
+    cache: Map<SelectionHash, NonDeletedSveltedrawElement[]>;
   } = {
     selectedElementIds: null,
     elements: null,

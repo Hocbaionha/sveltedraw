@@ -25,7 +25,7 @@ import { getElementAbsoluteCoords } from "@sveltedraw/element";
 import type {
   ElementsMap,
   SveltedrawFrameLikeElement,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
 } from "@sveltedraw/element/types";
 
 import {
@@ -166,7 +166,7 @@ const linkIconCanvasCache: {
 };
 
 const renderLinkIcon = (
-  element: NonDeletedExcalidrawElement,
+  element: NonDeletedSveltedrawElement,
   context: CanvasRenderingContext2D,
   appState: StaticCanvasAppState,
   elementsMap: ElementsMap,

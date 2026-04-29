@@ -31,8 +31,8 @@ export const withBatchedUpdatesThrottled = <
 /**
  * Whether render throttling is enabled. The Svelte port delegates
  * throttling to the AnimationController's rAF loop, so this can be
- * off unless the dev explicitly opts in via window.EXCALIDRAW_THROTTLE_RENDER.
+ * off unless the dev explicitly opts in via window.SVELTEDRAW_THROTTLE_RENDER.
  */
 export const isRenderThrottlingEnabled = () => {
-  return (window as any).EXCALIDRAW_THROTTLE_RENDER === true;
+  return (window as any).SVELTEDRAW_THROTTLE_RENDER === true;
 };

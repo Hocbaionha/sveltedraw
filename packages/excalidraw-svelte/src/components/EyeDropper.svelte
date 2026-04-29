@@ -53,7 +53,7 @@
   } = $props();
 
   // Backdrop container — mounts a div inside
-  // `.excalidraw-eye-dropper-container` (if present) or body.
+  // `.sveltedraw-eye-dropper-container` (if present) or body.
   let backdropEl: HTMLDivElement | null = $state(null);
   let previewEl: HTMLDivElement | null = $state(null);
 
@@ -169,7 +169,7 @@
       const target = event.target as Element | null;
       if (
         target?.closest(
-          ".excalidraw-eye-dropper-trigger, .excalidraw-eye-dropper-backdrop",
+          ".sveltedraw-eye-dropper-trigger, .sveltedraw-eye-dropper-backdrop",
         )
       ) {
         return;
@@ -183,7 +183,7 @@
   });
 </script>
 
-<Portal to=".excalidraw-eye-dropper-container, body">
+<Portal to=".sveltedraw-eye-dropper-container, body">
   <div
     bind:this={backdropEl}
     class="sveltedraw-eye-dropper-backdrop"

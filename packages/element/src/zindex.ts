@@ -15,10 +15,10 @@ import type {
   SveltedrawArrowElement,
   SveltedrawElement,
   SveltedrawFrameLikeElement,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
   NonDeletedSceneElementsMap,
   Ordered,
-  OrderedExcalidrawElement,
+  OrderedSveltedrawElement,
 } from "./types";
 
 const isOfTargetFrame = (element: SveltedrawElement, frameId: string) => {
@@ -153,11 +153,11 @@ const getContiguousFrameRangeElements = (
 export const moveArrowAboveBindable = (
   point: GlobalPoint,
   arrow: SveltedrawArrowElement,
-  elements: readonly Ordered<NonDeletedExcalidrawElement>[],
+  elements: readonly Ordered<NonDeletedSveltedrawElement>[],
   elementsMap: NonDeletedSceneElementsMap,
   scene: Scene,
-  hit?: NonDeletedExcalidrawElement,
-): readonly OrderedExcalidrawElement[] => {
+  hit?: NonDeletedSveltedrawElement,
+): readonly OrderedSveltedrawElement[] => {
   const hoveredElement = hit
     ? hit
     : getHoveredElementForBinding(point, elements, elementsMap);
@@ -175,7 +175,7 @@ export const moveArrowAboveBindable = (
     hoveredElement.id,
     boundTextElement?.id,
     containerElement?.id,
-  ].filter((id): id is NonDeletedExcalidrawElement["id"] => !!id);
+  ].filter((id): id is NonDeletedSveltedrawElement["id"] => !!id);
   const bindableIdx = elements.findIndex((el) => bindableIds.includes(el.id));
   const arrowIdx = elements.findIndex((el) => el.id === arrow.id);
 

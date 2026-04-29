@@ -186,7 +186,7 @@
     flex-direction: column;
   }
 
-  :global(.excalidraw.theme--dark) .settings-modal {
+  :global(.sveltedraw.theme--dark) .settings-modal {
     background: #232329;
     color: #e5e7ea;
   }
@@ -199,7 +199,7 @@
     border-bottom: 1px solid #e5e7ea;
   }
 
-  :global(.excalidraw.theme--dark) .settings-header {
+  :global(.sveltedraw.theme--dark) .settings-header {
     border-bottom-color: #363636;
   }
 
@@ -241,7 +241,7 @@
     color: #999;
   }
 
-  :global(.excalidraw.theme--dark) .settings-section h3 {
+  :global(.sveltedraw.theme--dark) .settings-section h3 {
     color: #666;
   }
 
@@ -271,7 +271,7 @@
     font-size: 13px;
   }
 
-  :global(.excalidraw.theme--dark) .settings-input {
+  :global(.sveltedraw.theme--dark) .settings-input {
     background: #2e2e36;
     border-color: #363636;
   }
@@ -288,7 +288,7 @@
     text-align: right;
   }
 
-  :global(.excalidraw.theme--dark) .settings-value {
+  :global(.sveltedraw.theme--dark) .settings-value {
     color: #999;
   }
 
@@ -300,7 +300,7 @@
     justify-content: flex-end;
   }
 
-  :global(.excalidraw.theme--dark) .settings-footer {
+  :global(.sveltedraw.theme--dark) .settings-footer {
     border-top-color: #363636;
   }
 
@@ -333,7 +333,7 @@
     color: inherit;
   }
 
-  :global(.excalidraw.theme--dark) .settings-btn--secondary {
+  :global(.sveltedraw.theme--dark) .settings-btn--secondary {
     border-color: #363636;
   }
 
@@ -341,7 +341,7 @@
     background: #f5f5f5;
   }
 
-  :global(.excalidraw.theme--dark) .settings-btn--secondary:hover {
+  :global(.sveltedraw.theme--dark) .settings-btn--secondary:hover {
     background: #2e2e36;
   }
 </style>

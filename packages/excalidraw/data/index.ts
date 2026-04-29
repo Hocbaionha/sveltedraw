@@ -18,7 +18,7 @@ import { getElementsOverlappingFrame } from "@sveltedraw/element";
 import type {
   SveltedrawElement,
   SveltedrawFrameLikeElement,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
 } from "@sveltedraw/element/types";
 
 import {
@@ -40,7 +40,7 @@ import type { AppState, BinaryFiles } from "../types";
 export { loadFromBlob } from "./blob";
 export { loadFromJSON, saveAsJSON } from "./json";
 
-export type ExportedElements = readonly NonDeletedExcalidrawElement[] & {
+export type ExportedElements = readonly NonDeletedSveltedrawElement[] & {
   _brand: "exportedElements";
 };
 

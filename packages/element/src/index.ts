@@ -4,7 +4,7 @@ import { isInvisiblySmallElement } from "./sizeHelpers";
 
 import type {
   SveltedrawElement,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
   NonDeleted,
   ElementsMapOrArray,
 } from "./types";
@@ -43,7 +43,7 @@ export const hashString = (s: string): number => {
 export const getVisibleElements = (elements: readonly SveltedrawElement[]) =>
   elements.filter(
     (el) => !el.isDeleted && !isInvisiblySmallElement(el),
-  ) as readonly NonDeletedExcalidrawElement[];
+  ) as readonly NonDeletedSveltedrawElement[];
 
 export const getNonDeletedElements = <T extends SveltedrawElement>(
   elements: readonly T[],

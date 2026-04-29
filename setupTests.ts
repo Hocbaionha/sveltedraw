@@ -55,7 +55,7 @@ Object.defineProperty(document, "fonts", {
   },
 });
 
-Object.defineProperty(window, "EXCALIDRAW_ASSET_PATH", {
+Object.defineProperty(window, "SVELTEDRAW_ASSET_PATH", {
   value: `file://${__dirname}/`,
 });
 

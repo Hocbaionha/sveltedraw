@@ -78,7 +78,7 @@ import type {
   FixedPoint,
   FixedPointBinding,
   NonDeleted,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
   NonDeletedSceneElementsMap,
   Ordered,
   PointsPositionUpdates,
@@ -248,7 +248,7 @@ const bindingStrategyForElbowArrowEndpointDragging = (
   arrow: NonDeleted<SveltedrawArrowElement>,
   draggingPoints: PointsPositionUpdates,
   elementsMap: NonDeletedSceneElementsMap,
-  elements: readonly Ordered<NonDeletedExcalidrawElement>[],
+  elements: readonly Ordered<NonDeletedSveltedrawElement>[],
   zoom?: AppState["zoom"],
 ): {
   start: BindingStrategy;
@@ -300,7 +300,7 @@ const bindingStrategyForNewSimpleArrowEndpointDragging = (
   arrow: NonDeleted<SveltedrawArrowElement>,
   draggingPoints: PointsPositionUpdates,
   elementsMap: NonDeletedSceneElementsMap,
-  elements: readonly Ordered<NonDeletedExcalidrawElement>[],
+  elements: readonly Ordered<NonDeletedSveltedrawElement>[],
   startDragged: boolean,
   endDragged: boolean,
   startIdx: number,
@@ -459,7 +459,7 @@ const bindingStrategyForSimpleArrowEndpointDragging_complex = (
   currentBinding: FixedPointBinding | null,
   oppositeBinding: FixedPointBinding | null,
   elementsMap: NonDeletedSceneElementsMap,
-  elements: readonly Ordered<NonDeletedExcalidrawElement>[],
+  elements: readonly Ordered<NonDeletedSveltedrawElement>[],
   globalBindMode: AppState["bindMode"],
   arrow: NonDeleted<SveltedrawArrowElement>,
   finalize?: boolean,
@@ -584,7 +584,7 @@ export const getBindingStrategyForDraggingBindingElementEndpoints = (
   screenPointerX: number,
   screenPointerY: number,
   elementsMap: NonDeletedSceneElementsMap,
-  elements: readonly Ordered<NonDeletedExcalidrawElement>[],
+  elements: readonly Ordered<NonDeletedSveltedrawElement>[],
   appState: AppState,
   opts?: {
     newArrow?: boolean;
@@ -624,7 +624,7 @@ const getBindingStrategyForDraggingBindingElementEndpoints_simple = (
   scenePointerX: number,
   scenePointerY: number,
   elementsMap: NonDeletedSceneElementsMap,
-  elements: readonly Ordered<NonDeletedExcalidrawElement>[],
+  elements: readonly Ordered<NonDeletedSveltedrawElement>[],
   appState: AppState,
   opts?: {
     newArrow?: boolean;
@@ -873,7 +873,7 @@ const getBindingStrategyForDraggingBindingElementEndpoints_complex = (
   arrow: NonDeleted<SveltedrawArrowElement>,
   draggingPoints: PointsPositionUpdates,
   elementsMap: NonDeletedSceneElementsMap,
-  elements: readonly Ordered<NonDeletedExcalidrawElement>[],
+  elements: readonly Ordered<NonDeletedSveltedrawElement>[],
   appState: AppState,
   opts?: {
     newArrow?: boolean;
@@ -1103,7 +1103,7 @@ export const unbindBindingElement = (
 // Supports translating, rotating and scaling `changedElement` with bound
 // linear elements.
 export const updateBoundElements = (
-  changedElement: NonDeletedExcalidrawElement,
+  changedElement: NonDeletedSveltedrawElement,
   scene: Scene,
   options?: {
     simultaneouslyUpdated?: readonly SveltedrawElement[];

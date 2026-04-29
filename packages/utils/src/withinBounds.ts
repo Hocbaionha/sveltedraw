@@ -2,7 +2,7 @@ import { arrayToMap, type Bounds } from "@sveltedraw/common";
 import { getElementBounds } from "@sveltedraw/element";
 import {
   isArrowElement,
-  isExcalidrawElement,
+  isSveltedrawElement,
   isFreeDrawElement,
   isLinearElement,
   isTextElement,
@@ -18,12 +18,12 @@ import type {
   SveltedrawElement,
   SveltedrawFreeDrawElement,
   SveltedrawLinearElement,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
 } from "@sveltedraw/element/types";
 import type { LocalPoint } from "@sveltedraw/math";
 
-type Element = NonDeletedExcalidrawElement;
-type Elements = readonly NonDeletedExcalidrawElement[];
+type Element = NonDeletedSveltedrawElement;
+type Elements = readonly NonDeletedSveltedrawElement[];
 
 type Points = readonly LocalPoint[];
 
@@ -175,7 +175,7 @@ export const elementsOverlappingBBox = ({
    **/
   type: "overlap" | "contain" | "inside";
 }) => {
-  if (isExcalidrawElement(bounds)) {
+  if (isSveltedrawElement(bounds)) {
     bounds = getElementBounds(bounds, arrayToMap(elements));
   }
   const adjustedBBox: Bounds = [

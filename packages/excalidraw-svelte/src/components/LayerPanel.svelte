@@ -346,7 +346,7 @@
     flex-shrink: 0;
   }
 
-  :global(.excalidraw.theme--dark) .layer-panel {
+  :global(.sveltedraw.theme--dark) .layer-panel {
     background: #232329;
     border-right-color: #363636;
     color: #e5e7ea;
@@ -361,7 +361,7 @@
     border-bottom: 1px solid #e5e7ea;
   }
 
-  :global(.excalidraw.theme--dark) .lp-header {
+  :global(.sveltedraw.theme--dark) .lp-header {
     border-bottom-color: #363636;
   }
 
@@ -372,7 +372,7 @@
     color: #333;
   }
 
-  :global(.excalidraw.theme--dark) .lp-title {
+  :global(.sveltedraw.theme--dark) .lp-title {
     color: #e5e7ea;
   }
 
@@ -384,7 +384,7 @@
     border-radius: 3px;
   }
 
-  :global(.excalidraw.theme--dark) .lp-count {
+  :global(.sveltedraw.theme--dark) .lp-count {
     background: #2e2e36;
     color: #999;
   }
@@ -403,7 +403,7 @@
     color: #666;
   }
 
-  :global(.excalidraw.theme--dark) .lp-action-btn {
+  :global(.sveltedraw.theme--dark) .lp-action-btn {
     color: #999;
   }
 
@@ -411,7 +411,7 @@
     background: rgba(0, 0, 0, 0.1);
   }
 
-  :global(.excalidraw.theme--dark) .lp-action-btn:hover {
+  :global(.sveltedraw.theme--dark) .lp-action-btn:hover {
     background: rgba(255, 255, 255, 0.1);
   }
 
@@ -440,7 +440,7 @@
     user-select: none;
   }
 
-  :global(.excalidraw.theme--dark) .lp-item {
+  :global(.sveltedraw.theme--dark) .lp-item {
     background: #2e2e36;
   }
 
@@ -448,7 +448,7 @@
     background: #f0f0f0;
   }
 
-  :global(.excalidraw.theme--dark) .lp-item:hover {
+  :global(.sveltedraw.theme--dark) .lp-item:hover {
     background: #363636;
   }
 
@@ -459,7 +459,7 @@
     box-shadow: inset 0 0 0 1px #6965db;
   }
 
-  :global(.excalidraw.theme--dark) .lp-item.selected {
+  :global(.sveltedraw.theme--dark) .lp-item.selected {
     background: #3d4658;
     border-left-color: #7c7cff;
     box-shadow: inset 0 0 0 1px #7c7cff;
@@ -470,7 +470,7 @@
     font-weight: 600;
   }
 
-  :global(.excalidraw.theme--dark) .lp-group-header.selected {
+  :global(.sveltedraw.theme--dark) .lp-group-header.selected {
     background: #3d4658;
   }
 
@@ -493,8 +493,8 @@
     border-radius: 3px;
   }
 
-  :global(.excalidraw.theme--dark) .lp-visibility:hover,
-  :global(.excalidraw.theme--dark) .lp-lock:hover {
+  :global(.sveltedraw.theme--dark) .lp-visibility:hover,
+  :global(.sveltedraw.theme--dark) .lp-lock:hover {
     background: rgba(255, 255, 255, 0.1);
   }
 
@@ -512,7 +512,7 @@
     font-size: 12px;
   }
 
-  :global(.excalidraw.theme--dark) .lp-name {
+  :global(.sveltedraw.theme--dark) .lp-name {
     color: #e5e7ea;
   }
 
@@ -552,7 +552,7 @@
     font-weight: 500;
   }
 
-  :global(.excalidraw.theme--dark) .lp-group-header {
+  :global(.sveltedraw.theme--dark) .lp-group-header {
     background: #363636;
   }
 
@@ -570,7 +570,7 @@
     color: #666;
   }
 
-  :global(.excalidraw.theme--dark) .lp-expand {
+  :global(.sveltedraw.theme--dark) .lp-expand {
     color: #999;
   }
 
@@ -579,7 +579,7 @@
     border-radius: 3px;
   }
 
-  :global(.excalidraw.theme--dark) .lp-expand:hover {
+  :global(.sveltedraw.theme--dark) .lp-expand:hover {
     background: rgba(255, 255, 255, 0.1);
   }
 
@@ -593,7 +593,7 @@
     border-left: 2px solid #e5e7ea;
   }
 
-  :global(.excalidraw.theme--dark) .lp-group-children {
+  :global(.sveltedraw.theme--dark) .lp-group-children {
     background: rgba(255, 255, 255, 0.02);
     border-left-color: #363636;
   }
@@ -607,7 +607,7 @@
     background: rgba(0, 0, 0, 0.03);
   }
 
-  :global(.excalidraw.theme--dark) .lp-child:hover {
+  :global(.sveltedraw.theme--dark) .lp-child:hover {
     background: rgba(255, 255, 255, 0.05);
   }
 
@@ -629,7 +629,7 @@
     background: #f0f0f0;
   }
 
-  :global(.excalidraw.theme--dark) .lp-item.dragging {
+  :global(.sveltedraw.theme--dark) .lp-item.dragging {
     background: #363636;
   }
 
@@ -638,7 +638,7 @@
     padding-top: 6px;
   }
 
-  :global(.excalidraw.theme--dark) .lp-item.drag-over {
+  :global(.sveltedraw.theme--dark) .lp-item.drag-over {
     border-top-color: #7c7cff;
   }
 
@@ -651,7 +651,7 @@
     padding-top: 6px;
   }
 
-  :global(.excalidraw.theme--dark) .lp-group-header.drag-over {
+  :global(.sveltedraw.theme--dark) .lp-group-header.drag-over {
     border-top-color: #7c7cff;
   }
 </style>

@@ -212,7 +212,7 @@
 
   function handleLabelPointerDown() {
     if (!inputEl || !editable) return;
-    document.body.classList.add("excalidraw-cursor-resize");
+    document.body.classList.add("sveltedraw-cursor-resize");
 
     let lastPointer: { x: number; y: number } | null = null;
 
@@ -286,7 +286,7 @@
       stepChange = 0;
       originalElements = null;
       originalElementsMap = null;
-      document.body.classList.remove("excalidraw-cursor-resize");
+      document.body.classList.remove("sveltedraw-cursor-resize");
       window.removeEventListener(EVENT.POINTER_UP, onPointerUp, false);
     };
 

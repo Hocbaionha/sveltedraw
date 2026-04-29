@@ -147,7 +147,7 @@
     overflow-y: auto;
   }
 
-  :global(.excalidraw.theme--dark) .autolayout-panel {
+  :global(.sveltedraw.theme--dark) .autolayout-panel {
     background: #232329;
     border-left-color: #363636;
     color: #e5e7ea;
@@ -162,7 +162,7 @@
     border-bottom: 1px solid #e5e7ea;
   }
 
-  :global(.excalidraw.theme--dark) .al-header {
+  :global(.sveltedraw.theme--dark) .al-header {
     border-bottom-color: #363636;
   }
 
@@ -173,7 +173,7 @@
     color: #333;
   }
 
-  :global(.excalidraw.theme--dark) .al-title {
+  :global(.sveltedraw.theme--dark) .al-title {
     color: #e5e7ea;
   }
 
@@ -192,7 +192,7 @@
     text-align: center;
   }
 
-  :global(.excalidraw.theme--dark) .al-message {
+  :global(.sveltedraw.theme--dark) .al-message {
     background: #2e2e36;
   }
 
@@ -202,7 +202,7 @@
     color: #666;
   }
 
-  :global(.excalidraw.theme--dark) .al-message p {
+  :global(.sveltedraw.theme--dark) .al-message p {
     color: #aaa;
   }
 
@@ -212,7 +212,7 @@
     border-bottom: 1px solid #f0f0f0;
   }
 
-  :global(.excalidraw.theme--dark) .al-section {
+  :global(.sveltedraw.theme--dark) .al-section {
     border-bottom-color: #2e2e36;
   }
 
@@ -226,7 +226,7 @@
     gap: 6px;
   }
 
-  :global(.excalidraw.theme--dark) .al-label {
+  :global(.sveltedraw.theme--dark) .al-label {
     color: #e5e7ea;
   }
 
@@ -252,7 +252,7 @@
     transition: all 0.15s ease;
   }
 
-  :global(.excalidraw.theme--dark) .al-type-btn {
+  :global(.sveltedraw.theme--dark) .al-type-btn {
     background: #2e2e36;
     border-color: #363636;
     color: #e5e7ea;
@@ -263,7 +263,7 @@
     border-color: #6965db;
   }
 
-  :global(.excalidraw.theme--dark) .al-type-btn:hover {
+  :global(.sveltedraw.theme--dark) .al-type-btn:hover {
     background: #363636;
     border-color: #6965db;
   }
@@ -291,7 +291,7 @@
     cursor: pointer;
   }
 
-  :global(.excalidraw.theme--dark) .al-align-btn {
+  :global(.sveltedraw.theme--dark) .al-align-btn {
     background: #2e2e36;
     border-color: #363636;
     color: #e5e7ea;
@@ -302,7 +302,7 @@
     border-color: #6965db;
   }
 
-  :global(.excalidraw.theme--dark) .al-align-btn:hover {
+  :global(.sveltedraw.theme--dark) .al-align-btn:hover {
     background: #363636;
     border-color: #6965db;
   }
@@ -331,7 +331,7 @@
     color: #666;
   }
 
-  :global(.excalidraw.theme--dark) .al-spacing-label span:first-child {
+  :global(.sveltedraw.theme--dark) .al-spacing-label span:first-child {
     color: #999;
   }
 

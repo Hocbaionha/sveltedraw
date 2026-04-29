@@ -194,7 +194,7 @@ export default defineConfig({
             id.includes('/packages/math/') ||
             id.includes('/packages/utils/')
           ) {
-            return 'excalidraw-engine';
+            return 'sveltedraw-engine';
           }
         },
       },

@@ -15,7 +15,7 @@ import { isInitializedImageElement } from "./typeChecks";
 import type {
   SveltedrawElement,
   FileId,
-  InitializedExcalidrawImageElement,
+  InitializedSveltedrawImageElement,
 } from "./types";
 
 export const loadHTMLImageElement = (dataURL: DataURL) => {
@@ -93,7 +93,7 @@ export const getInitializedImageElements = (
 ) =>
   elements.filter((element) =>
     isInitializedImageElement(element),
-  ) as InitializedExcalidrawImageElement[];
+  ) as InitializedSveltedrawImageElement[];
 
 export const isHTMLSVGElement = (node: Node | null): node is SVGElement => {
   // lower-casing due to XML/HTML convention differences

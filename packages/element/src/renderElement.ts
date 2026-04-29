@@ -32,7 +32,7 @@ import type {
   Zoom,
   InteractiveCanvasAppState,
   ElementsPendingErasure,
-  PendingExcalidrawElements,
+  PendingSveltedrawElements,
   NormalizedZoomValue,
 } from "@sveltedraw/engine/types";
 
@@ -71,7 +71,7 @@ import { ShapeCache } from "./shape";
 import type {
   SveltedrawElement,
   SveltedrawTextElement,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
   SveltedrawFreeDrawElement,
   SveltedrawImageElement,
   SveltedrawTextElementWithContainer,
@@ -109,7 +109,7 @@ export const getRenderOpacity = (
   element: SveltedrawElement,
   containingFrame: SveltedrawFrameLikeElement | null,
   elementsPendingErasure: ElementsPendingErasure,
-  pendingNodes: Readonly<PendingExcalidrawElements> | null,
+  pendingNodes: Readonly<PendingSveltedrawElements> | null,
   globalAlpha: number = 1,
 ) => {
   // multiplying frame opacity with element opacity to combine them
@@ -154,7 +154,7 @@ export interface SveltedrawElementWithCanvas {
 }
 
 const cappedElementCanvasSize = (
-  element: NonDeletedExcalidrawElement,
+  element: NonDeletedSveltedrawElement,
   elementsMap: ElementsMap,
   zoom: Zoom,
 ): {
@@ -209,7 +209,7 @@ const cappedElementCanvasSize = (
 };
 
 const generateElementCanvas = (
-  element: NonDeletedExcalidrawElement,
+  element: NonDeletedSveltedrawElement,
   elementsMap: NonDeletedSceneElementsMap,
   zoom: Zoom,
   renderConfig: StaticCanvasRenderConfig,
@@ -393,7 +393,7 @@ const drawImagePlaceholder = (
 };
 
 const drawElementOnCanvas = (
-  element: NonDeletedExcalidrawElement,
+  element: NonDeletedSveltedrawElement,
   rc: RoughCanvas,
   context: CanvasRenderingContext2D,
   renderConfig: StaticCanvasRenderConfig,
@@ -641,7 +641,7 @@ export const elementWithCanvasCache = new WeakMap<
 >();
 
 const generateElementWithCanvas = (
-  element: NonDeletedExcalidrawElement,
+  element: NonDeletedSveltedrawElement,
   elementsMap: NonDeletedSceneElementsMap,
   renderConfig: StaticCanvasRenderConfig,
   appState: StaticCanvasAppState | InteractiveCanvasAppState,
@@ -796,7 +796,7 @@ const drawElementFromCanvas = (
 };
 
 export const renderSelectionElement = (
-  element: NonDeletedExcalidrawElement,
+  element: NonDeletedSveltedrawElement,
   context: CanvasRenderingContext2D,
   appState: InteractiveCanvasAppState,
   selectionColor: InteractiveCanvasRenderConfig["selectionColor"],
@@ -820,7 +820,7 @@ export const renderSelectionElement = (
 };
 
 export const renderElement = (
-  element: NonDeletedExcalidrawElement,
+  element: NonDeletedSveltedrawElement,
   elementsMap: RenderableElementsMap,
   allElementsMap: NonDeletedSceneElementsMap,
   rc: RoughCanvas,
@@ -864,7 +864,7 @@ export const renderElement = (
 };
 
 const renderElementCore = (
-  element: NonDeletedExcalidrawElement,
+  element: NonDeletedSveltedrawElement,
   elementsMap: RenderableElementsMap,
   allElementsMap: NonDeletedSceneElementsMap,
   rc: RoughCanvas,

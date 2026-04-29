@@ -39,7 +39,7 @@ import { getElementAbsoluteCoords } from "@sveltedraw/element";
 import type {
   SveltedrawElement,
   SveltedrawTextElementWithContainer,
-  NonDeletedExcalidrawElement,
+  NonDeletedSveltedrawElement,
 } from "@sveltedraw/element/types";
 
 import type { RenderableElementsMap, SVGRenderConfig } from "../scene/types";
@@ -64,7 +64,7 @@ const roughSVGDrawWithPrecision = (
 };
 
 const maybeWrapNodesInFrameClipPath = (
-  element: NonDeletedExcalidrawElement,
+  element: NonDeletedSveltedrawElement,
   root: SVGElement,
   nodes: SVGElement[],
   frameRendering: AppState["frameRendering"],
@@ -85,7 +85,7 @@ const maybeWrapNodesInFrameClipPath = (
 };
 
 const renderElementToSvg = (
-  element: NonDeletedExcalidrawElement,
+  element: NonDeletedSveltedrawElement,
   elementsMap: RenderableElementsMap,
   rsvg: RoughSVG,
   svgRoot: SVGElement,
@@ -779,7 +779,7 @@ const renderElementToSvg = (
 };
 
 export const renderSceneToSvg = (
-  elements: readonly NonDeletedExcalidrawElement[],
+  elements: readonly NonDeletedSveltedrawElement[],
   elementsMap: RenderableElementsMap,
   rsvg: RoughSVG,
   svgRoot: SVGElement,

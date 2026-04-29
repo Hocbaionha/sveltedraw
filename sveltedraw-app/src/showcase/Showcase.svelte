@@ -152,7 +152,7 @@
   }
 </script>
 
-<div class="showcase excalidraw" class:theme--dark={theme === "dark"}>
+<div class="showcase sveltedraw" class:theme--dark={theme === "dark"}>
   <aside class="showcase__sidebar">
     <header>
       <strong>Sveltedraw</strong>
