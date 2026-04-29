@@ -389,6 +389,13 @@
   const pluginRegistry = new PluginRegistry();
   registerCtx(PLUGIN_REGISTRY_KEY, pluginRegistry);
 
+  // Stable-sorted view of canvas overlays. Re-derives only when the
+  // registry array mutates; the sort is by ascending zIndex so plugins
+  // registered later but with lower zIndex render below earlier ones.
+  const canvasOverlaysSorted = $derived(
+    [...pluginRegistry.canvasOverlays].sort((a, b) => a.zIndex - b.zIndex),
+  );
+
   // Reactively install/uninstall plugins when the `plugins` prop changes.
   // Runs on mount (initial install) and on every subsequent prop update.
   const buildCtx = (pluginId: string) =>
@@ -6250,6 +6257,24 @@
     render={newElementRender}
   />
 
+  <!-- Plugin-contributed canvas overlays. Stacked above the three canvas
+       layers; pointer-events default off so plugins explicitly opt in.
+       Sorted by zIndex so plugins can establish a deterministic order
+       independent of registration time. The sort happens inside a
+       $derived (canvasOverlaysSorted) so re-iteration only fires when
+       the registry array mutates, not per render tick. -->
+  {#each canvasOverlaysSorted as overlay (overlay.id)}
+    {@const OverlayComponent = overlay.component}
+    <div
+      class="sveltedraw-plugin-canvas-overlay"
+      data-overlay-id={overlay.id}
+      style:z-index={overlay.zIndex}
+      style:pointer-events={overlay.pointerEvents ? "auto" : "none"}
+    >
+      <OverlayComponent />
+    </div>
+  {/each}
+
   <!-- Text editor overlay. A plain <textarea> that grows with its content.
        On blur OR Escape → commitTextEditor(). Ctrl+Enter also commits
        (without inserting a newline). The textarea's own keydown handler
@@ -7002,5 +7027,13 @@
   }
   .sveltedraw-plugin-side-panel > :global(*) {
     pointer-events: auto;
+  }
+
+  /* Plugin-contributed canvas overlays. Sit between the canvas layers
+     and the panel layer. z-index is set inline per overlay (style:z-index)
+     so plugins control ordering without arbitrary CSS hacks. */
+  .sveltedraw-plugin-canvas-overlay {
+    position: absolute;
+    inset: 0;
   }
 </style>
