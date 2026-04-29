@@ -2,8 +2,12 @@
   // Top-left burger main menu — trigger + dropdown.
   // Outside-click and Escape handling stays in App.svelte (it owns the
   // `open` state and closes via `bind:open`).
+  // Plugin-contributed menu items appear in their own group below the
+  // built-in items — see PluginRegistry.menuItems.
+  import { getContext } from "svelte";
   import { t } from "../state/i18n.svelte.js";
   import Icon from "../icons/Icon.svelte";
+  import { PLUGIN_REGISTRY_KEY, type PluginRegistry } from "../plugins/registry.svelte.js";
 
   type Props = {
     open: boolean;
@@ -45,6 +49,13 @@
     }
     close();
   };
+
+  // Plugin items section — read at render time. The component is mounted
+  // unconditionally so re-registering a plugin between menu opens picks
+  // up the new items without remount.
+  const pluginRegistry =
+    getContext<PluginRegistry | undefined>(PLUGIN_REGISTRY_KEY);
+  const pluginMenuItems = $derived(pluginRegistry?.menuItems ?? []);
 </script>
 
 <button
@@ -74,6 +85,21 @@
     <div class="mm-sep"></div>
     <button type="button" class="mm-item" onclick={run(onOpenHelp)}>{t("helpDialog.title", undefined, "Keyboard shortcuts")}</button>
     <button type="button" class="mm-item mm-item--danger" onclick={onClearConfirm}>{t("buttons.clearReset", undefined, "Reset canvas")}</button>
+    {#if pluginMenuItems.length > 0}
+      <div class="mm-sep"></div>
+      {#each pluginMenuItems as item (item.id)}
+        <button
+          type="button"
+          class="mm-item"
+          onclick={run(item.onSelect)}
+        >
+          {item.label}
+          {#if item.shortcut}
+            <span class="mm-shortcut">{item.shortcut}</span>
+          {/if}
+        </button>
+      {/each}
+    {/if}
   </div>
 {/if}
 
@@ -156,5 +182,11 @@
   }
   :global(.sveltedraw.theme--dark) .mm-sep {
     background: #363636;
+  }
+  .mm-shortcut {
+    float: right;
+    color: #868e96;
+    font-size: 11px;
+    margin-left: 16px;
   }
 </style>
