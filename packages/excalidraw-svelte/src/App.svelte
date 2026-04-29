@@ -839,6 +839,15 @@
         createFrameAtCenter: () => createFrameAtCenter(),
         applyStyle: (patch) => applyStyle(patch as Record<string, unknown>),
         setActiveTool: (type) => setActiveTool(type),
+        // Phase 17 — collab session inspector for honest-tests. Returns a
+        // plain JSON-safe snapshot rather than the live store getters so
+        // the test can pass it across CDP without serialization issues.
+        getCollabState: () => ({
+          status: collabStore.status,
+          userCount: collabStore.users.size,
+          myUserId: collabStore.myUserId,
+          roomId: collabStore.roomId,
+        }),
         forcePresentationSlides: (n) => {
           presentationSlides = Array.from({ length: n }, (_, i) => ({
             id: `s${i}`,

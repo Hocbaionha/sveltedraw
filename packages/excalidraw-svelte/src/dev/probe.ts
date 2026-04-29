@@ -102,6 +102,16 @@ export type ProbeBindings = {
   // toolbar buttons use. Exposed for honest-tests that drive tool-switching
   // flows (style → tool → draw).
   setActiveTool: (type: string) => void;
+
+  // Phase 17 — collab session inspector. Returns a JSON-safe snapshot so
+  // CDP-driven tests can read connection state without tunneling live
+  // reactive proxies through Runtime.evaluate.
+  getCollabState: () => {
+    status: string;
+    userCount: number;
+    myUserId: string | null;
+    roomId: string | null;
+  };
 };
 
 export function installSveltedrawProbe(b: ProbeBindings): void {
@@ -190,6 +200,7 @@ export function installSveltedrawProbe(b: ProbeBindings): void {
     forcePresentationSlides: b.forcePresentationSlides,
     applyStyle: b.applyStyle,
     setActiveTool: b.setActiveTool,
+    getCollabState: b.getCollabState,
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).__sveltedrawHistoryLen = b.getHistoryLen;
