@@ -160,6 +160,7 @@
   import CollabIdentityDialog, {
     type IdentityResult,
   } from "./components/CollabIdentityDialog.svelte";
+  import CollabCursors from "./components/CollabCursors.svelte";
   import {
     createCollabStore,
     COLLAB_STORE_KEY,
@@ -1294,6 +1295,27 @@
     collabDialogOpen = false;
     pendingCollabServerUrl = null;
     pendingAnonId = null;
+  };
+
+  // ── Cursor broadcast (Phase 17 / A2) ────────────────────────────────
+  // Throttled to ~20fps. Native pointermove can fire at 60-1000Hz on
+  // high-rate input devices; awareness gossip every tick would melt
+  // both the socket and the peers' renderers. 50ms is smooth enough
+  // that motion looks continuous and cheap enough that a 4-peer room
+  // sends ~80 messages/sec total.
+  const CURSOR_BROADCAST_THROTTLE_MS = 50;
+  let lastCursorBroadcastAt = 0;
+  const broadcastCursor = (event: PointerEvent): void => {
+    if (collabStore.status !== "connected") return;
+    const now = performance.now();
+    if (now - lastCursorBroadcastAt < CURSOR_BROADCAST_THROTTLE_MS) return;
+    lastCursorBroadcastAt = now;
+    const { x: sceneX, y: sceneY } = toSceneCoords(event.clientX, event.clientY);
+    // x/y are kept as raw clientX/clientY in case future on-screen
+    // indicators want screen-space without redoing the scene-coord
+    // conversion. Peers ignore them today and use sceneX/sceneY for
+    // pan/zoom-stable rendering (see CollabCursors.svelte).
+    collabStore.updateCursor(event.clientX, event.clientY, sceneX, sceneY);
   };
 
   // Phase 11 frames Map (read by handleStartPresentation + createFrameAtCenter
@@ -4758,6 +4780,11 @@
   };
 
   const onInteractivePointerMove = (event: PointerEvent) => {
+    // Phase 17 / A2: piggyback on native pointermove for cursor gossip.
+    // Cheap (early-returns when collab is off; throttled when on) so
+    // it never gates the rest of this hot path.
+    broadcastCursor(event);
+
     // B2: eraser drag. Each hit is soft-deleted and tracked in the drag
     // set so the same element isn't hit twice + history lands once.
     if (eraserDragActive) {
@@ -5525,6 +5552,20 @@
       onCancel={onCollabIdentityCancel}
     />
   {/if}
+
+  <!-- Phase 17 / A2: peer cursor overlay. Reads collab users from
+       context; renders nothing when no peers have a cursor. We pass
+       the appState slice the conversion needs as a prop so $derived
+       tracks pan/zoom without round-tripping through context. -->
+  <CollabCursors
+    appState={{
+      zoom: appState.zoom as { value: number },
+      offsetLeft: appState.offsetLeft as number,
+      offsetTop: appState.offsetTop as number,
+      scrollX: appState.scrollX as number,
+      scrollY: appState.scrollY as number,
+    }}
+  />
 
   <!-- Connector tool panel — Phase 13 -->
   {#if connectorToolActive}
