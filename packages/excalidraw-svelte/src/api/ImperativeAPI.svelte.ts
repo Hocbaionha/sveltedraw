@@ -144,7 +144,7 @@ export function createImperativeAPI(
     },
 
     setActiveTool(tool) {
-      engine.patchAppState({ activeTool: { type: tool } });
+      engine.setActiveTool(tool);
     },
 
     scrollToContent(_opts) {

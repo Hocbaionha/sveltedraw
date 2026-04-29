@@ -320,6 +320,7 @@
           (appState as Record<string, unknown>)[k] = v;
         }
       },
+      setActiveTool: (tool) => setActiveTool(tool),
       pushHistory: () => historyStore?.pushHistory(),
       bumpSceneRepaint: () => bumpSceneRepaint(),
       toSceneCoords: (clientX, clientY) => {
