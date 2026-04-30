@@ -135,7 +135,6 @@
   import EdgesRow from "./components/EdgesRow.svelte";
   import ColorRow from "./components/ColorRow.svelte";
   import PresentationMode from "./components/PresentationMode.svelte";
-  import ExportPanel from "./components/ExportPanel.svelte";
   import HelpDialog from "./components/HelpDialog.svelte";
   import MainMenu from "./components/MainMenu.svelte";
   import CanvasContextMenu from "./components/CanvasContextMenu.svelte";
@@ -213,6 +212,12 @@
     type LaserReactive,
     type LaserStore,
   } from "./plugins/builtin/laser-pointer/index.js";
+  import {
+    EXPORT_BRIDGE_KEY,
+    EXPORT_STORE_KEY,
+    type ExportBridge,
+    type ExportPanelStore,
+  } from "./plugins/builtin/export-panel/index.js";
   import { builtinPlugins } from "./plugins/builtin/index.js";
   import type { SveltedrawPlugin } from "./plugins/types.js";
   import { installSveltedrawProbe } from "./dev/probe.js";
@@ -227,8 +232,7 @@
   import { getDefaultLibraryConfig, createLibraryComponent, getCategoryLabel } from "./library/types.js";
   import type { PresentationSlide, PresentationConfig } from "./presentation/types.js";
   import { getDefaultPresentationConfig, createPresentationSlide } from "./presentation/types.js";
-  import type { ExportOptions, ExportPreset } from "./export/types.js";
-  import { getDefaultExportOptions, EXPORT_PRESETS, getDefaultBatchExportConfig } from "./export/types.js";
+  import type { ExportOptions } from "./export/types.js";
   import type { Template } from "./templates/index.js";
   // Connector tool creates real Sveltedraw arrow elements with
   // startBinding/endBinding — the custom Connector type (Phase 13)
@@ -885,7 +889,6 @@
         toggleLaser: () => toggleLaser(),
         isLaserActive: () => pluginRegistry.getStore<LaserStore>(LASER_STORE_KEY)?.isActive() ?? false,
         getLaserTrailLen: () => pluginRegistry.getStore<LaserStore>(LASER_STORE_KEY)?.trailLength() ?? 0,
-        getLaserTrailLength: () => pluginRegistry.getStore<LaserStore>(LASER_STORE_KEY)?.trailLength() ?? 0,
         setMeasurementConfig: (patch) =>
           Object.assign(measurementConfig, patch as Partial<MeasurementConfig>),
         getMeasurementConfig: () => ({ ...measurementConfig }),
@@ -1825,11 +1828,9 @@
     return () => clearInterval(id);
   });
 
-  // Phase 16 Feature 4: Export Enhancements
-  let exportPanelActive = $state(false);
-  let exportOptions = $state<ExportOptions>(getDefaultExportOptions());
-  let exportPresets = $state<ExportPreset[]>(EXPORT_PRESETS);
-  let batchExportConfig = $state(getDefaultBatchExportConfig());
+  // Phase 16 Feature 4: Export Enhancements — state + panel mount now
+  // live in the export-panel plugin. App.svelte only owns the export
+  // pipeline (handleExport below), reachable via the EXPORT_BRIDGE_KEY.
 
   // Side panels are all plugins now — toggling happens through their
   // own toolbar buttons + `pluginRegistry.toggleExclusiveSidePanel`.
@@ -2052,6 +2053,25 @@
   };
   registerCtx(LASER_BRIDGE_KEY, laserBridge);
 
+  // Bridge for the export-panel plugin — exposes the live element
+  // count + the export pipeline. The plugin owns the modal UI + the
+  // ExportOptions state; App.svelte holds the closures over scene +
+  // appState + binaryFiles that the actual byte-level export needs.
+  const exportBridge: ExportBridge = {
+    get elementCount() {
+      return scene ? scene.getNonDeletedElements().length : 0;
+    },
+    doExport: (options, onComplete) => {
+      handleExportImpl(options, {
+        scene,
+        appState,
+        binaryFiles,
+        onComplete,
+      });
+    },
+  };
+  registerCtx(EXPORT_BRIDGE_KEY, exportBridge);
+
   // ── Smart Alignment & Guides ─────────────────────────────────────────
   // Implementation in ./alignment/handlers.ts.
   const _alignmentHandlers = createAlignmentHandlers({
@@ -2220,13 +2240,20 @@
   const handlePresentationSlideJump = _presentationHandlers.jumpToSlide;
 
   // ── Phase 16 Feature 4: Export Enhancements ──────────────────────────
-  // Implementation lives in ./export/handleExport.ts.
+  // Pipeline lives in ./export/handleExport.ts; the modal UI + options
+  // state migrated to the export-panel plugin (Tier 3 wave 3). The
+  // probe surface still exposes `handleExport(opts)` so puppeteer tests
+  // can trigger the export pipeline without driving the panel UI; we
+  // route through the plugin store's close() so the panel hides if it
+  // happened to be open.
   const handleExport = (options: ExportOptions) =>
     handleExportImpl(options, {
       scene,
       appState,
       binaryFiles,
-      onComplete: () => { exportPanelActive = false; },
+      onComplete: () => {
+        pluginRegistry.getStore<ExportPanelStore>(EXPORT_STORE_KEY)?.close();
+      },
     });
 
   // ── Z-order: bring forward / send backward / to front / to back ─────
@@ -5519,7 +5546,6 @@
     onToggleLibraryPanel={() => (libraryPanelOpen = !libraryPanelOpen)}
     onCreateFrame={createFrameAtCenter}
     onStartPresentation={handleStartPresentation}
-    onOpenExport={() => (exportPanelActive = true)}
     onToggleTheme={toggleTheme}
     onSetLanguage={setLanguage}
   />
@@ -5637,27 +5663,11 @@
     />
   {/if}
 
-  <!-- Export Panel — Phase 16 Feature 4 -->
-  {#if exportPanelActive}
-    <ExportPanel
-      options={exportOptions}
-      presets={exportPresets}
-      elementCount={scene ? scene.getNonDeletedElements().length : 0}
-      onExport={handleExport}
-      onOptionsChange={(opts) => (exportOptions = opts)}
-      onPresetSelect={(preset) => {
-        exportOptions = {
-          ...exportOptions,
-          format: preset.format,
-          width: preset.width,
-          height: preset.height,
-          scale: preset.scale,
-          quality: preset.quality,
-        };
-      }}
-      onClose={() => (exportPanelActive = false)}
-    />
-  {/if}
+  <!-- Export panel mounts via the export-panel plugin (Tier 3 wave 3).
+       The plugin registers a side panel with PanelHost as the component;
+       App.svelte's `pluginRegistry.sidePanels` each-block (further down)
+       mounts it. The PanelHost gates rendering on its own `state.active`. -->
+
 
   <!-- Floating bottom-left library panel — see components/FloatingLibraryPanel.svelte. -->
   {#if libraryPanelOpen}

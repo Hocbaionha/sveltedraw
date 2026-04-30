@@ -111,6 +111,15 @@ export type {
   LaserBridge,
   LaserReactive,
 } from './plugins/builtin/laser-pointer/index.js';
+export {
+  exportPanelPlugin,
+  EXPORT_STORE_KEY,
+  EXPORT_BRIDGE_KEY,
+} from './plugins/builtin/export-panel/index.js';
+export type {
+  ExportPanelStore,
+  ExportBridge,
+} from './plugins/builtin/export-panel/index.js';
 export { COLLAB_STORE_KEY } from './collab/store.svelte.js';
 export { createCollabStore } from './collab/store.svelte.js';
 export type { CollabStore, CollabRole, CollabUser } from './collab/store.svelte.js';

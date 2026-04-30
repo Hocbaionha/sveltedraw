@@ -24,7 +24,6 @@
     onToggleLibraryPanel: () => void;
     onCreateFrame: () => void;
     onStartPresentation: () => void;
-    onOpenExport: () => void;
     onToggleTheme: () => void;
     onSetLanguage: (code: string) => void;
   };
@@ -38,7 +37,6 @@
     onToggleLibraryPanel,
     onCreateFrame,
     onStartPresentation,
-    onOpenExport,
     onToggleTheme,
     onSetLanguage,
   }: Props = $props();
@@ -91,15 +89,6 @@
     onclick={onStartPresentation}
   >
     🎬
-  </button>
-  <button
-    type="button"
-    class="sveltedraw-util-btn"
-    aria-label="Export"
-    title="Export Drawing"
-    onclick={onOpenExport}
-  >
-    💾
   </button>
   <button
     type="button"
