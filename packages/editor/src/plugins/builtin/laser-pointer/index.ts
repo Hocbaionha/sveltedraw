@@ -20,6 +20,15 @@ import LaserIcon from "./Icon.svelte";
 export const LASER_STORE_KEY: unique symbol = Symbol("laserStore");
 
 const LASER_FADE_MS = 800;
+/**
+ * Hard cap on trail samples. At pointer rates of 60-120Hz within an
+ * 800ms fade window, steady-state trail length is 50-100 samples; with
+ * coalesced touch events or pointer bursts it can spike higher. Capping
+ * at 200 keeps the per-sample [...trail, sample] clone cost bounded
+ * (otherwise an O(n) clone per pointermove turns superlinear). Older
+ * samples drop off the head before the new one is appended.
+ */
+const LASER_MAX_POINTS = 200;
 
 export type LaserStore = {
   /** Reactive read: returns true while the laser tool is on. Reads
@@ -95,7 +104,14 @@ export const laserPointerPlugin: SveltedrawPlugin = {
       recordSample: (x: number, y: number) => {
         if (!state.active) return;
         const sample: LaserPoint = { x, y, t: performance.now() };
-        state.trail = [...state.trail, sample];
+        // Cap trail length to keep allocations bounded under bursty
+        // input. When at the cap, drop the oldest sample(s) — the RAF
+        // prune loop would have eventually shifted them anyway once
+        // they aged past LASER_FADE_MS.
+        const next = state.trail.length >= LASER_MAX_POINTS
+          ? [...state.trail.slice(state.trail.length - LASER_MAX_POINTS + 1), sample]
+          : [...state.trail, sample];
+        state.trail = next;
         startRaf();
       },
       trailLength: () => state.trail.length,

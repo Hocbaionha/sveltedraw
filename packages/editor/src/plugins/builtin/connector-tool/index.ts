@@ -83,8 +83,24 @@ export const connectorToolPlugin: SveltedrawPlugin = {
           return true;
         }
 
-        // First pick: store + highlight, wait for second click.
-        if (state.firstPickId === null) {
+        // Skip elements whose type can't host bound-arrow endpoints
+        // (freedraw, line, arrow, deleted shapes). The bridge consults
+        // App.svelte's scene + the bindable-type whitelist; plugins
+        // never need to know which types qualify.
+        if (bridge && !bridge.isBindableElement(elementId)) {
+          // Treat the click as consumed so the underlying pointerdown
+          // handler doesn't fall through to its drag/select branch,
+          // but don't advance the state machine. The user can pick
+          // a bindable shape next.
+          return true;
+        }
+
+        // First pick: store + highlight, wait for second click. Also
+        // re-validate the existing first pick on every subsequent click
+        // — if the user deletes / undoes it between picks, treat the
+        // current click as a fresh first pick instead of building an
+        // arrow with a stale id.
+        if (state.firstPickId === null || (bridge && !bridge.isBindableElement(state.firstPickId))) {
           state.firstPickId = elementId;
           bridge?.setHighlight(elementId);
           return true;

@@ -36,7 +36,7 @@
     {height}
     viewBox="0 0 {width} {height}"
   >
-    {#each trail as p, i (p.t)}
+    {#each trail as p, i (i + ":" + p.t)}
       {#if i > 0}
         {@const prev = trail[i - 1]}
         {@const age = performance.now() - p.t}

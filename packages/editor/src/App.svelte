@@ -1806,12 +1806,6 @@
   let librarySelectedCategory = $state('all');
   let librarySearchQuery = $state('');
 
-  // All side panels are now plugins (Grid, Layer, Library migrated in
-  // the final wave). The registry's openExclusiveSidePanel coordinates
-  // them directly, so App.svelte no longer needs an external closer
-  // hook. If a future feature adds an inline panel, register a closer
-  // here via pluginRegistry.registerExternalSidePanelCloser.
-
   // Phase 16 Feature 3: Presentation Mode
   const presentationConfig = getDefaultPresentationConfig();
   let presentationActive = $state(false);
@@ -1968,6 +1962,8 @@
     const fromEl = scene.getElement(fromId);
     const toEl = scene.getElement(toId);
     if (!fromEl || !toEl) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((fromEl as any).isDeleted || (toEl as any).isDeleted) return;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const f = fromEl as any;
@@ -2035,7 +2031,18 @@
   // Bridge for the connector-tool plugin. createArrow stays here
   // because it needs scene mutation + pushHistory + bumpSceneRepaint;
   // setHighlight pokes appState.selectedElementIds so the user sees
-  // which shape they picked first.
+  // which shape they picked first. isBindableElement filters out
+  // shapes whose bound-arrow routing can't track (freedraw, line,
+  // arrow itself, deleted shapes).
+  const CONNECTOR_BINDABLE_TYPES: ReadonlySet<string> = new Set([
+    "rectangle",
+    "ellipse",
+    "diamond",
+    "image",
+    "frame",
+    "magicframe",
+    "text",
+  ]);
   const connectorBridge: ConnectorBridge = {
     createArrow: createConnectorArrow,
     setHighlight: (elementId) => {
@@ -2043,6 +2050,14 @@
       (appState as any).selectedElementIds = elementId
         ? { [elementId]: true }
         : {};
+    },
+    isBindableElement: (elementId) => {
+      if (!scene) return false;
+      const el = scene.getElement(elementId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const e = el as any;
+      if (!e || e.isDeleted) return false;
+      return CONNECTOR_BINDABLE_TYPES.has(e.type);
     },
   };
   registerCtx(CONNECTOR_BRIDGE_KEY, connectorBridge);
@@ -2069,12 +2084,26 @@
       return scene ? scene.getNonDeletedElements().length : 0;
     },
     doExport: (options, onComplete) => {
-      handleExportImpl(options, {
-        scene,
-        appState,
-        binaryFiles,
-        onComplete,
-      });
+      // Wrap onComplete so the panel always closes — even when
+      // handleExportImpl returns early after a window.alert(...) on
+      // failure. Without this, a failed export traps the user in the
+      // open modal with no obvious dismissal path. The promise chain
+      // mirrors handleExportImpl's internal try/catch (it returns a
+      // promise that resolves on either success or alert-and-return).
+      let done = false;
+      const fire = () => {
+        if (done) return;
+        done = true;
+        try { onComplete(); } catch { /* swallow */ }
+      };
+      Promise.resolve(
+        handleExportImpl(options, {
+          scene,
+          appState,
+          binaryFiles,
+          onComplete: fire,
+        }),
+      ).finally(fire);
     },
   };
   registerCtx(EXPORT_BRIDGE_KEY, exportBridge);
