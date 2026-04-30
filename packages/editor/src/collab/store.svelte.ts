@@ -335,6 +335,12 @@ export function createCollabStore(api: SveltedrawAPI) {
     sessionCleanup = null;
     changeCleanup?.();
     changeCleanup = null;
+    // Tear down the lazy frameId cache and its api.onChange listener.
+    // Without this each leave/rejoin cycle accrues another listener
+    // on the api, and the cache itself stays alive holding refs.
+    frameIdCacheClear?.();
+    frameIdCacheClear = null;
+    frameIdCache = null;
     provider?.destroy();
     provider = null;
     connected = false;
