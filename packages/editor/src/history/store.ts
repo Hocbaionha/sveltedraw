@@ -29,8 +29,6 @@ type SceneLike = {
   replaceAllElements: (els: AnyEl[], opts?: { skipValidation?: boolean }) => void;
 };
 
-type YMapLike = { set: (key: string, value: AnyEl[]) => void } | null;
-
 export type HistorySnapshot = {
   // Full snapshot (used as base or when delta is larger)
   full?: {
@@ -55,8 +53,6 @@ export type HistoryStoreOptions = {
   appState: any;
   scheduleSave: () => void;
   bumpSceneRepaint: () => void;
-  /** Yjs map for collab broadcast; null when collab is disabled. */
-  getYmap: () => YMapLike;
   /** Push the current entries + index back to App.svelte $state for the panel. */
   setUI: (entries: HistoryState[], currentIndex: number) => void;
   /** Cap on history length. Defaults to 500. */
@@ -82,7 +78,6 @@ export function createHistoryStore(opts: HistoryStoreOptions): HistoryStore {
     appState,
     scheduleSave,
     bumpSceneRepaint,
-    getYmap,
     setUI,
     maxHistory = 500,
   } = opts;
@@ -109,32 +104,36 @@ export function createHistoryStore(opts: HistoryStoreOptions): HistoryStore {
   };
 
   const computeDelta = (prevElements: AnyEl[], currElements: AnyEl[]) => {
-    const prevIds = new Set(prevElements.map((e: AnyEl) => e.id));
-    const currIds = new Set(currElements.map((e: AnyEl) => e.id));
+    // Index prevElements by id once. The previous implementation did
+    // .find(el => el.id === e.id) per-element TWICE inside the
+    // filter+map chain — O(N²) on scenes where most elements were
+    // modified.
+    const prevById = new Map<string, AnyEl>();
+    for (const el of prevElements) prevById.set(el.id, el);
+    const currIds = new Set<string>();
+    for (const e of currElements) currIds.add(e.id);
 
-    const added = currElements
-      .filter((e: AnyEl) => !prevIds.has(e.id))
-      .map((el: AnyEl) => deepCopyElement(el));
+    const added: AnyEl[] = [];
+    const modified: { id: string; changes: Record<string, AnyEl> }[] = [];
+    for (const e of currElements) {
+      const prevEl = prevById.get(e.id);
+      if (!prevEl) {
+        added.push(deepCopyElement(e));
+        continue;
+      }
+      if (elementsEqual(prevEl, e)) continue;
+      const changes: Record<string, AnyEl> = {};
+      const keys = new Set([...Object.keys(prevEl), ...Object.keys(e)]);
+      for (const key of keys) {
+        if (prevEl[key] !== e[key]) changes[key] = e[key];
+      }
+      modified.push({ id: e.id, changes });
+    }
 
-    const removed = Array.from(prevIds).filter((id: string) => !currIds.has(id));
-
-    const modified = currElements
-      .filter((e: AnyEl) => prevIds.has(e.id))
-      .filter((e: AnyEl) => {
-        const prevEl = prevElements.find((el: AnyEl) => el.id === e.id);
-        return !elementsEqual(prevEl, e);
-      })
-      .map((e: AnyEl) => {
-        const prevEl = prevElements.find((el: AnyEl) => el.id === e.id);
-        const changes: Record<string, AnyEl> = {};
-        const keys = new Set([...Object.keys(prevEl), ...Object.keys(e)]);
-        for (const key of keys) {
-          if (prevEl[key] !== e[key]) {
-            changes[key] = e[key];
-          }
-        }
-        return { id: e.id, changes };
-      });
+    const removed: string[] = [];
+    for (const [id] of prevById) {
+      if (!currIds.has(id)) removed.push(id);
+    }
 
     return { added, modified, removed };
   };
@@ -275,13 +274,14 @@ export function createHistoryStore(opts: HistoryStoreOptions): HistoryStore {
       history.shift();
       historyIndex--;
     }
-    // Phase 10: broadcast to collab map if connected.
-    const ymap = getYmap();
-    if (ymap) {
-      const scene = getScene();
-      const elements = scene?.getElementsIncludingDeleted() ?? [];
-      ymap.set("elements", elements);
-    }
+    // Note: Phase 10 had a direct ymap.set("elements", elements) call
+    // here for collab broadcast. That path is now dead (App.svelte
+    // wires getYmap → null) and routing collab through here would
+    // bypass the collab store's LOCAL_ORIGIN guard, fingerprint
+    // dedupe, and clone-on-push — corrupting peer state. Collab
+    // broadcast is owned by collab/store.svelte.ts (api.onChange →
+    // scheduleLocalPush). Removed the dead branch so a future re-
+    // enable can't unwittingly hit the bug.
     scheduleSave();
     syncHistoryUI();
   };

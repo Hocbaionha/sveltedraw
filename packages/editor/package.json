@@ -17,7 +17,9 @@
   "dependencies": {
     "@sveltedraw/common": "0.18.0",
     "@sveltedraw/element": "0.18.0",
+    "@sveltedraw/engine": "0.18.0",
     "@sveltedraw/math": "0.18.0",
+    "@sveltedraw/utils": "0.1.2",
     "bits-ui": "^1.3.10",
     "clsx": "1.1.1",
     "jspdf": "^4.2.1"

@@ -111,7 +111,7 @@
     <div class="CollabIdentityDialog__field">
       <div class="CollabIdentityDialog__label">{colorLabel}</div>
       <div class="CollabIdentityDialog__palette" role="radiogroup" aria-label={colorLabel}>
-        {#each palette as swatch (swatch)}
+        {#each palette as swatch, i (swatch)}
           <button
             type="button"
             class="CollabIdentityDialog__swatch"
@@ -120,7 +120,28 @@
             aria-label={swatch}
             aria-checked={swatch === color}
             role="radio"
+            tabindex={swatch === color ? 0 : -1}
             onclick={() => (color = swatch)}
+            onkeydown={(e) => {
+              // ARIA radio-group keyboard contract: arrow keys cycle
+              // selection; Home / End jump to ends; Space / Enter is
+              // already handled by the button. The previous markup
+              // had every swatch in the tab order with no arrow nav,
+              // forcing keyboard users to tab through 8 buttons.
+              if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+                color = palette[(i + 1) % palette.length];
+                e.preventDefault();
+              } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+                color = palette[(i - 1 + palette.length) % palette.length];
+                e.preventDefault();
+              } else if (e.key === "Home") {
+                color = palette[0];
+                e.preventDefault();
+              } else if (e.key === "End") {
+                color = palette[palette.length - 1];
+                e.preventDefault();
+              }
+            }}
           ></button>
         {/each}
       </div>

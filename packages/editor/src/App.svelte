@@ -1164,7 +1164,6 @@
     appState,
     scheduleSave,
     bumpSceneRepaint: () => bumpSceneRepaint(),
-    getYmap: () => null,
     setUI: (entries, idx) => {
       editorHistory = entries;
       historyCurrentIndex = idx;
@@ -1399,28 +1398,38 @@
   // own state and would just be noise as a toast.
   let collabToast: { message: string; tone: "info" | "warn" | "ok" } | null =
     $state(null);
+  let collabToastTimer: ReturnType<typeof setTimeout> | null = null;
   // prevCollabStatus is intentionally NOT $state — it's a back-channel
   // memo for the effect's transition detection, not a UI signal. The
   // effect tracks only collabStore.status; reading the previous value
   // and writing the new one happens after that read so it's a plain
   // mutation, not a reactive dep.
   let prevCollabStatus: typeof collabStore.status = "idle";
+  /** Show a toast and auto-clear it after `ms` unless replaced. */
+  const showCollabToast = (toast: NonNullable<typeof collabToast>, ms = 5000) => {
+    collabToast = toast;
+    if (collabToastTimer !== null) clearTimeout(collabToastTimer);
+    collabToastTimer = setTimeout(() => {
+      // Capture the toast we set so a later transition that replaced
+      // collabToast doesn't get prematurely cleared by this stale
+      // timer.
+      if (collabToast === toast) collabToast = null;
+      collabToastTimer = null;
+    }, ms);
+  };
   $effect(() => {
     const cur = collabStore.status;
-    // Snapshot prev → cur, then update. Wrapped in untrack so any
-    // future addition that reads other reactive state in this branch
-    // doesn't accidentally re-fire the effect on unrelated churn.
     const prev = prevCollabStatus;
     prevCollabStatus = cur;
     if (prev === "connected" && cur === "disconnected") {
       // Mid-session drop. y-websocket auto-reconnects so we promise
       // the user it's coming back; the connected→toast confirms.
-      collabToast = {
+      showCollabToast({
         message: "Connection lost. Reconnecting…",
         tone: "warn",
-      };
+      });
     } else if (prev === "disconnected" && cur === "connected") {
-      collabToast = { message: "Reconnected", tone: "ok" };
+      showCollabToast({ message: "Reconnected", tone: "ok" });
     }
     // All other transitions (idle ↔ connecting, connecting → connected
     // initial join, leaveRoom) are silent.
@@ -1433,10 +1442,15 @@
   // that motion looks continuous and cheap enough that a 4-peer room
   // sends ~80 messages/sec total.
   const CURSOR_BROADCAST_THROTTLE_MS = 50;
-  // Stable reference for the slice CollabCursors needs. Changes only
-  // when a tracked field actually changes, so the cursors overlay's
-  // internal $derived.by(users) doesn't re-run on unrelated reactive
-  // churn (selection, hover, color picker, etc.).
+  // Slice of appState that CollabCursors needs for its scene→viewport
+  // conversion. Building it in a $derived avoids recomputing the slice
+  // on every read at the call-site (the previous inline {{...}} object
+  // literal in the template re-allocated identity on every host re-
+  // render). A new object IS still produced when zoom/scroll change —
+  // that's correct, the cursors derivation needs to recompute then.
+  // Side-effect of this hoist: the prop reference stays referentially
+  // stable across reactive ticks that don't touch zoom or scroll, so
+  // any future memoization on the consumer side actually pays off.
   const collabCursorsAppState = $derived({
     zoom: appState.zoom as { value: number },
     offsetLeft: appState.offsetLeft as number,
