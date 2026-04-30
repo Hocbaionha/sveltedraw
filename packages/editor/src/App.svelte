@@ -2034,6 +2034,10 @@
   // which shape they picked first. isBindableElement filters out
   // shapes whose bound-arrow routing can't track (freedraw, line,
   // arrow itself, deleted shapes).
+  // Standalone "text" is intentionally NOT in this set: upstream
+  // Excalidraw only allows arrow-binding to text that is inside a
+  // container shape (rectangle/ellipse/etc.); free-floating text
+  // doesn't get its bound arrows re-routed reliably when moved.
   const CONNECTOR_BINDABLE_TYPES: ReadonlySet<string> = new Set([
     "rectangle",
     "ellipse",
@@ -2041,7 +2045,6 @@
     "image",
     "frame",
     "magicframe",
-    "text",
   ]);
   const connectorBridge: ConnectorBridge = {
     createArrow: createConnectorArrow,
