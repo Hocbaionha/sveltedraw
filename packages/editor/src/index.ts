@@ -19,6 +19,9 @@ export type {
   MainMenuItemDef,
 } from './plugins/types.js';
 export { examplePlugin } from './plugins/example/index.js';
+export { builtinPlugins } from './plugins/builtin/index.js';
+export { recentFilesPlugin, RECENT_FILES_STORE_KEY } from './plugins/builtin/recent-files/index.js';
+export type { RecentFilesStore } from './plugins/builtin/recent-files/index.js';
 export { COLLAB_STORE_KEY } from './collab/store.svelte.js';
 export { createCollabStore } from './collab/store.svelte.js';
 export type { CollabStore, CollabRole, CollabUser } from './collab/store.svelte.js';

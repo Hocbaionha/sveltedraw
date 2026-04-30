@@ -124,7 +124,6 @@
   import NewElementCanvas from "./components/canvases/NewElementCanvas.svelte";
   import TemplateSelector from "./components/TemplateSelector.svelte";
   import ElementLinkDialog from "./components/ElementLinkDialog.svelte";
-  import RecentFilesPanel from "./components/RecentFilesPanel.svelte";
   import SettingsPanel from "./components/SettingsPanel.svelte";
   import HelpPanel from "./components/HelpPanel.svelte";
   import ConnectorTool from "./components/ConnectorTool.svelte";
@@ -177,6 +176,8 @@
   import { createImperativeAPI } from "./api/ImperativeAPI.svelte.js";
   import { SVELTEDRAW_API_KEY, type SveltedrawAPI } from "./api/types.js";
   import { PluginRegistry, PLUGIN_REGISTRY_KEY } from "./plugins/registry.svelte.js";
+  import { recentFilesPlugin, RECENT_FILES_STORE_KEY } from "./plugins/builtin/recent-files/index.js";
+  import { builtinPlugins } from "./plugins/builtin/index.js";
   import type { SveltedrawPlugin } from "./plugins/types.js";
   import { installSveltedrawProbe } from "./dev/probe.js";
   import { handleExport as handleExportImpl } from "./export/handleExport.js";
@@ -355,6 +356,13 @@
     return value;
   };
   const contextResolver = <T>(key: symbol): T => contextSymbols.get(key) as T;
+  // Bridge for plugin getStore: prefer registry-published stores, fall
+  // back to Svelte context keys (e.g. SVELTEDRAW_API_KEY). Returns
+  // undefined if neither layer has the key.
+  const pluginGetStoreBridge = <T>(key: symbol): T | undefined => {
+    const v = contextSymbols.get(key);
+    return v === undefined ? undefined : (v as T);
+  };
 
   const imperativeAPI = createImperativeAPI(
     {
@@ -399,19 +407,31 @@
   // Reactively install/uninstall plugins when the `plugins` prop changes.
   // Runs on mount (initial install) and on every subsequent prop update.
   const buildCtx = (pluginId: string) =>
-    pluginRegistry.buildContext(pluginId, imperativeAPI, tunnels, contextResolver);
+    pluginRegistry.buildContext(pluginId, imperativeAPI, tunnels, pluginGetStoreBridge);
+
+  // Combined plugin list: built-ins shipped with the editor + extras
+  // passed through the `plugins` prop. Built-ins go first so a host
+  // plugin with the same id (theoretically) could override — though
+  // PluginRegistry.install is idempotent on id and won't double-mount.
+  // Hosts that want to disable a built-in must filter builtinPlugins
+  // themselves; expose builtinPlugins from the package surface so
+  // they can.
+  const allPlugins = $derived<SveltedrawPlugin[]>([
+    ...builtinPlugins,
+    ...plugins,
+  ]);
 
   $effect(() => {
-    const currentIds = new Set(plugins.map((p) => p.id));
+    const currentIds = new Set(allPlugins.map((p) => p.id));
 
-    // Uninstall plugins that were removed from the prop array.
+    // Uninstall plugins that were removed from the combined list.
     // installedIds allocates a snapshot Set — only called once per effect run.
     for (const id of pluginRegistry.installedIds) {
       if (!currentIds.has(id)) pluginRegistry.uninstall(id);
     }
 
     // Install any plugins not yet registered.
-    for (const plugin of plugins) {
+    for (const plugin of allPlugins) {
       if (!pluginRegistry.isInstalled(plugin.id)) {
         pluginRegistry.install(plugin, buildCtx(plugin.id));
       }
@@ -751,7 +771,6 @@
     // initial history floor captures the restored state, not "empty".
     tryLoad();
     loadLibrary();
-    loadRecentFiles();
     loadSettings();
     sceneReady++; // triggers the first static paint
 
@@ -1698,16 +1717,6 @@
     return getSelectedElements().filter((el) => !!(el as any).link);
   });
 
-  interface RecentFile {
-    id: string;
-    name: string;
-    timestamp: number;
-  }
-
-  let recentFiles = $state<RecentFile[]>([]);
-  let showRecentFiles = $state(false);
-  const RECENT_FILES_KEY = "sveltedraw-recent-files";
-
   interface AppSettings {
     theme: "light" | "dark" | "auto";
     gridVisible: boolean;
@@ -1983,50 +1992,6 @@
   const deleteLibraryItem = (id: string) => {
     libraryItems = libraryItems.filter((it) => it.id !== id);
     persistLibrary();
-  };
-
-  const loadRecentFiles = () => {
-    try {
-      const raw = localStorage.getItem(RECENT_FILES_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as RecentFile[];
-      if (Array.isArray(parsed)) recentFiles = parsed;
-    } catch {
-      /* corrupted — start fresh */
-    }
-  };
-
-  const persistRecentFiles = () => {
-    try {
-      localStorage.setItem(RECENT_FILES_KEY, JSON.stringify(recentFiles));
-    } catch {
-      /* quota exceeded */
-    }
-  };
-
-  const addToRecentFiles = (filename: string) => {
-    const existing = recentFiles.find(
-      (f) => f.name.toLowerCase() === filename.toLowerCase(),
-    );
-    if (existing) {
-      existing.timestamp = Date.now();
-    } else {
-      recentFiles.unshift({
-        id: randomId(),
-        name: filename,
-        timestamp: Date.now(),
-      });
-    }
-    // Keep only last 10 files
-    if (recentFiles.length > 10) {
-      recentFiles = recentFiles.slice(0, 10);
-    }
-    persistRecentFiles();
-  };
-
-  const deleteRecentFile = (id: string) => {
-    recentFiles = recentFiles.filter((f) => f.id !== id);
-    persistRecentFiles();
   };
 
   const loadSettings = () => {
@@ -3232,10 +3197,17 @@
         return;
       }
 
-      // Phase 12: Recent files: Ctrl+R
+      // Recent files: Ctrl+R — delegated to the recent-files plugin via
+      // its published store. If the plugin is disabled the hotkey
+      // becomes a no-op.
       if (!event.shiftKey && (event.key === "r" || event.key === "R")) {
-        showRecentFiles = true;
-        event.preventDefault();
+        const store = pluginRegistry.getStore<{ open(): void }>(
+          RECENT_FILES_STORE_KEY,
+        );
+        if (store) {
+          store.open();
+          event.preventDefault();
+        }
         return;
       }
 
@@ -5555,7 +5527,6 @@
     availableLanguages={availableLanguages}
     onToggleLibraryPanel={() => (libraryPanelOpen = !libraryPanelOpen)}
     onOpenTemplates={() => (showTemplateSelector = true)}
-    onOpenRecent={() => (showRecentFiles = true)}
     onOpenSettings={() => (showSettings = true)}
     onToggleConnector={() => (connectorToolActive = !connectorToolActive)}
     onToggleLaser={toggleLaser}
@@ -5840,15 +5811,6 @@
         />
       </div>
     </div>
-  {/if}
-
-  <!-- Recent files panel — shows last 10 files. -->
-  {#if showRecentFiles}
-    <RecentFilesPanel
-      files={recentFiles}
-      onClose={() => (showRecentFiles = false)}
-      onDelete={deleteRecentFile}
-    />
   {/if}
 
   <!-- Settings panel — user preferences. -->

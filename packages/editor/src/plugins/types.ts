@@ -50,8 +50,16 @@ export interface SveltedrawPluginContext {
   addCanvasOverlay(overlay: CanvasOverlayDef): () => void;
   addMainMenuItem(item: MainMenuItemDef): () => void;
 
-  /** Access any feature store by its context Symbol. */
-  getStore<T>(key: symbol): T;
+  /**
+   * Publish a typed store under a Symbol key. Other plugins (or built-in
+   * code) can fetch it later via getStore(key). Returns a cleanup that
+   * unpublishes the store; the registry calls it automatically when the
+   * plugin uninstalls.
+   */
+  provideStore<T>(key: symbol, store: T): () => void;
+
+  /** Access a store published by this or another plugin. */
+  getStore<T>(key: symbol): T | undefined;
 
   onSceneChange: SveltedrawAPI["onChange"];
   onSelectionChange: SveltedrawAPI["onSelectionChange"];

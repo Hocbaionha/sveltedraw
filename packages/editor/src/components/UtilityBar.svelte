@@ -41,7 +41,6 @@
     availableLanguages: readonly Language[];
     onToggleLibraryPanel: () => void;
     onOpenTemplates: () => void;
-    onOpenRecent: () => void;
     onOpenSettings: () => void;
     onToggleConnector: () => void;
     onToggleLaser: () => void;
@@ -71,7 +70,6 @@
     availableLanguages,
     onToggleLibraryPanel,
     onOpenTemplates,
-    onOpenRecent,
     onOpenSettings,
     onToggleConnector,
     onToggleLaser,
@@ -123,15 +121,6 @@
     onclick={onOpenTemplates}
   >
     📋
-  </button>
-  <button
-    type="button"
-    class="sveltedraw-util-btn"
-    aria-label="Recent files"
-    title="Recent files (Ctrl+R)"
-    onclick={onOpenRecent}
-  >
-    🕐
   </button>
   <button
     type="button"
