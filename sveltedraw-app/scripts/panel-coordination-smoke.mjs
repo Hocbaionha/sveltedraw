@@ -65,23 +65,24 @@ await evalRetry(`
 `);
 
 const result = await evalRetry(`
-  const isGridOpen = () => !!document.querySelector('.sveltedraw-grid-panel');
+  // Three plugin exclusive panels — opening any one should close the
+  // others. After Tier 2 wave 6 every side panel is a plugin so this
+  // checks the registry's openExclusiveSidePanel coordination across
+  // homogeneous plugin panels (no more inline holdouts).
+  const isGridOpen = () => !!document.querySelector('[data-panel-id="builtin/grid-panel"]');
   const isHistoryOpen = () => !!document.querySelector('[data-panel-id="builtin/history-panel"]');
   const isAlignOpen = () => !!document.querySelector('[data-panel-id="builtin/alignment-panel"]');
 
-  // Step 1: open Grid (inline panel)
   const gridBtn = document.querySelector('button[aria-label="Grid & Snap"]');
   gridBtn?.click();
   await new Promise(r => setTimeout(r, 100));
   const after1 = { grid: isGridOpen(), history: isHistoryOpen(), align: isAlignOpen() };
 
-  // Step 2: open History plugin — should close Grid
   const histBtn = document.querySelector('button[aria-label="History"]');
   histBtn?.click();
   await new Promise(r => setTimeout(r, 100));
   const after2 = { grid: isGridOpen(), history: isHistoryOpen(), align: isAlignOpen() };
 
-  // Step 3: open Alignment plugin — should close History
   const alignBtn = document.querySelector('button[aria-label="Alignment"]');
   alignBtn?.click();
   await new Promise(r => setTimeout(r, 100));

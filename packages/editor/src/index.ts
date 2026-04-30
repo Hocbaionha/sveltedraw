@@ -64,6 +64,33 @@ export type {
   MeasurementPanelStore,
   MeasurementBridge,
 } from './plugins/builtin/measurement-panel/index.js';
+export {
+  gridPanelPlugin,
+  GRID_PANEL_STORE_KEY,
+  GRID_BRIDGE_KEY,
+} from './plugins/builtin/grid-panel/index.js';
+export type {
+  GridPanelStore,
+  GridBridge,
+} from './plugins/builtin/grid-panel/index.js';
+export {
+  layerPanelPlugin,
+  LAYER_PANEL_STORE_KEY,
+  LAYER_BRIDGE_KEY,
+} from './plugins/builtin/layer-panel/index.js';
+export type {
+  LayerPanelStore,
+  LayerBridge,
+} from './plugins/builtin/layer-panel/index.js';
+export {
+  shapeLibraryPanelPlugin,
+  SHAPE_LIBRARY_PANEL_STORE_KEY,
+  SHAPE_LIBRARY_BRIDGE_KEY,
+} from './plugins/builtin/shape-library-panel/index.js';
+export type {
+  ShapeLibraryPanelStore,
+  ShapeLibraryBridge,
+} from './plugins/builtin/shape-library-panel/index.js';
 export { COLLAB_STORE_KEY } from './collab/store.svelte.js';
 export { createCollabStore } from './collab/store.svelte.js';
 export type { CollabStore, CollabRole, CollabUser } from './collab/store.svelte.js';

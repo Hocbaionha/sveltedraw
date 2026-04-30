@@ -124,7 +124,6 @@
   import NewElementCanvas from "./components/canvases/NewElementCanvas.svelte";
   import ElementLinkDialog from "./components/ElementLinkDialog.svelte";
   import ConnectorTool from "./components/ConnectorTool.svelte";
-  import GridPanel from "./components/GridPanel.svelte";
   import GridRenderer from "./components/GridRenderer.svelte";
   import SnapGuideRenderer from "./components/SnapGuideRenderer.svelte";
   import LaserOverlay from "./components/LaserOverlay.svelte";
@@ -137,8 +136,6 @@
   import FormatRow from "./components/FormatRow.svelte";
   import EdgesRow from "./components/EdgesRow.svelte";
   import ColorRow from "./components/ColorRow.svelte";
-  import LayerPanel from "./components/LayerPanel.svelte";
-  import ShapeLibraryPanel from "./components/ShapeLibraryPanel.svelte";
   import PresentationMode from "./components/PresentationMode.svelte";
   import ExportPanel from "./components/ExportPanel.svelte";
   import HelpDialog from "./components/HelpDialog.svelte";
@@ -192,6 +189,18 @@
     MEASUREMENT_PANEL_STORE_KEY,
     type MeasurementBridge,
   } from "./plugins/builtin/measurement-panel/index.js";
+  import {
+    GRID_BRIDGE_KEY,
+    type GridBridge,
+  } from "./plugins/builtin/grid-panel/index.js";
+  import {
+    LAYER_BRIDGE_KEY,
+    type LayerBridge,
+  } from "./plugins/builtin/layer-panel/index.js";
+  import {
+    SHAPE_LIBRARY_BRIDGE_KEY,
+    type ShapeLibraryBridge,
+  } from "./plugins/builtin/shape-library-panel/index.js";
   import { builtinPlugins } from "./plugins/builtin/index.js";
   import type { SveltedrawPlugin } from "./plugins/types.js";
   import { installSveltedrawProbe } from "./dev/probe.js";
@@ -833,9 +842,9 @@
         insertLibraryItem: (item) => insertLibraryItem(item as LibraryItem),
         deleteLibraryItem: (id) => deleteLibraryItem(id),
         getLibraryItems: () => libraryItems,
-        toggleSidePanel: (name) => toggleSidePanel(name as SidePanelId),
+        toggleSidePanel: (name) => toggleSidePanel(name),
         closeAllSidePanels: () => closeAllSidePanels(),
-        isSidePanelOpen: (name) => isSidePanelOpen(name as SidePanelId),
+        isSidePanelOpen: (name) => isSidePanelOpen(name),
         handleExport: (opts) => handleExport(opts as ExportOptions),
         startPresentation: () => handleStartPresentation(),
         exitPresentation: () => handlePresentationExit(),
@@ -1770,8 +1779,9 @@
   // (selectedCount + onLayout exposed through bridge). The
   // auto-layout panel UI is owned by builtin/autolayout-panel plugin.
 
-  // Phase 14: Grid & Snap System
-  let gridPanelActive = $state(false);
+  // Phase 14: Grid & Snap System — gridConfig + snapConfig stay in
+  // App.svelte (snap math runs in pointer-move drag handler). Panel
+  // UI owned by builtin/grid-panel plugin via bridge.
   let gridConfig = $state<GridConfig>({
     enabled: true,
     size: 20,
@@ -1794,8 +1804,9 @@
   let snapGuides = $state<SnapGuide[]>([]);
   let isDraggingForSnap = $state(false);
 
-  // Phase 15: Layer Management
-  let layerPanelActive = $state(false);
+  // Phase 15: Layer Management — layers + selectedLayerId stay in
+  // App.svelte (layer factory needs scene + appState). Panel UI
+  // owned by builtin/layer-panel plugin via bridge.
   let layers = $state<LayerItem[]>([]);
   let selectedLayerId = $state<string | null>(null);
   let expandedGroups = $state<Set<string>>(new Set());
@@ -1804,24 +1815,20 @@
   let editorHistory = $state<HistoryState[]>([]);
   let historyCurrentIndex = $state(0);
 
-  // Phase 16 Feature 2: Shape Library & Component Manager
+  // Phase 16 Feature 2: Shape Library & Component Manager — library
+  // state + handlers stay in App.svelte. Panel UI owned by
+  // builtin/shape-library-panel plugin via bridge.
   const libraryConfig = getDefaultLibraryConfig();
-  let libraryPanelActive = $state(false);
   let libraryComponents = $state<LibraryComponent[]>([]);
   let libraryCategories = $state<LibraryCategory[]>(libraryConfig.defaultCategories);
   let librarySelectedCategory = $state('all');
   let librarySearchQuery = $state('');
 
-  // Register inline-panel closer with the plugin registry so that
-  // opening an exclusive plugin side panel closes Grid/Layer/Library
-  // (and any future inline panels). Without this hook, the registry's
-  // openExclusiveSidePanel only walks plugin panels; inline ones
-  // would visually stack on the right edge.
-  pluginRegistry.registerExternalSidePanelCloser(() => {
-    gridPanelActive = false;
-    layerPanelActive = false;
-    libraryPanelActive = false;
-  });
+  // All side panels are now plugins (Grid, Layer, Library migrated in
+  // the final wave). The registry's openExclusiveSidePanel coordinates
+  // them directly, so App.svelte no longer needs an external closer
+  // hook. If a future feature adds an inline panel, register a closer
+  // here via pluginRegistry.registerExternalSidePanelCloser.
 
   // Phase 16 Feature 3: Presentation Mode
   const presentationConfig = getDefaultPresentationConfig();
@@ -1847,40 +1854,16 @@
   let exportPresets = $state<ExportPreset[]>(EXPORT_PRESETS);
   let batchExportConfig = $state(getDefaultBatchExportConfig());
 
-  // Unified side-panel toggle: mutually exclusive. Opening one closes
-  // the others so they don't stack/overlap off-screen. Keep connector
-  // tool out of this group — it's tied to a drawing tool, not a panel.
-  type SidePanelId =
-    | "grid"
-    | "layer"
-    | "library";
-
-  const isSidePanelOpen = (name: SidePanelId): boolean => {
-    switch (name) {
-      case "grid": return gridPanelActive;
-      case "layer": return layerPanelActive;
-      case "library": return libraryPanelActive;
-    }
-  };
-
+  // Side panels are all plugins now — toggling happens through their
+  // own toolbar buttons + `pluginRegistry.toggleExclusiveSidePanel`.
+  // Functions kept as no-ops so probe surface still resolves the
+  // method names. Will go away when probe drops them.
+  const isSidePanelOpen = (_name: string): boolean => false;
   const closeAllSidePanels = () => {
-    gridPanelActive = false;
-    layerPanelActive = false;
-    libraryPanelActive = false;
-    // Close any plugin-owned exclusive panels so opening a still-
-    // inline side panel doesn't leave plugin panels dangling open.
     pluginRegistry.openExclusiveSidePanel(null);
   };
-
-  const toggleSidePanel = (name: SidePanelId) => {
-    const wasOpen = isSidePanelOpen(name);
-    closeAllSidePanels();
-    if (wasOpen) return;
-    switch (name) {
-      case "grid": gridPanelActive = true; break;
-      case "layer": layerPanelActive = true; break;
-      case "library": libraryPanelActive = true; break;
-    }
+  const toggleSidePanel = (_name: string) => {
+    // No-op: side panels are now plugin-owned.
   };
 
   const loadLibrary = () => {
@@ -2117,6 +2100,16 @@
   };
   registerCtx(MEASUREMENT_BRIDGE_KEY, measurementBridge);
 
+  // Bridge for the Grid + Snap plugin — configs stay in App.svelte
+  // because snap math runs in the pointer-move drag handler.
+  const gridBridge: GridBridge = {
+    get gridConfig() { return gridConfig; },
+    get snapConfig() { return snapConfig; },
+    setGridConfig: (next) => { gridConfig = next; },
+    setSnapConfig: (next) => { snapConfig = next; },
+  };
+  registerCtx(GRID_BRIDGE_KEY, gridBridge);
+
   // Phase 15: Layer Management — implementation in ./layers/handlers.ts.
   const _layerHandlers = createLayerHandlers({
     getScene: () => scene,
@@ -2140,6 +2133,20 @@
   const handleLayerOpacityChange = _layerHandlers.handleLayerOpacityChange;
   const handleCreateGroup = _layerHandlers.handleCreateGroup;
   const handleDeleteGroup = _layerHandlers.handleDeleteGroup;
+
+  // Bridge for the Layer panel plugin.
+  const layerBridge: LayerBridge = {
+    get layers() { return layers; },
+    get selectedLayerId() { return selectedLayerId; },
+    onLayerSelect: handleLayerSelect,
+    onLayerVisibilityChange: handleLayerVisibilityChange,
+    onLayerLockChange: handleLayerLockChange,
+    onLayerOpacityChange: handleLayerOpacityChange,
+    onCreateGroup: handleCreateGroup,
+    onDeleteGroup: handleDeleteGroup,
+    onReorderLayers: handleReorderLayers,
+  };
+  registerCtx(LAYER_BRIDGE_KEY, layerBridge);
 
   // ── Phase 16: History Management ──────────────────────────────────
   const handleHistoryJump = historyStore.jumpTo;
@@ -2170,6 +2177,23 @@
   const handleLibraryComponentDelete = _libraryHandlers.deleteComponent;
   const handleLibraryExport = _libraryHandlers.exportLibrary;
   const handleLibraryImport = _libraryHandlers.importLibrary;
+
+  // Bridge for the Shape Library plugin. Library state + handlers all
+  // live in App.svelte (handlers wire into scene mutation +
+  // persistence); plugin owns only the panel UI.
+  const shapeLibraryBridge: ShapeLibraryBridge = {
+    get components() { return libraryComponents; },
+    get categories() { return libraryCategories; },
+    get selectedCategoryId() { return librarySelectedCategory; },
+    get searchQuery() { return librarySearchQuery; },
+    setSelectedCategory: (id) => { librarySelectedCategory = id; },
+    setSearchQuery: (q) => { librarySearchQuery = q; },
+    onSelectComponent: handleLibraryComponentSelect,
+    onDeleteComponent: handleLibraryComponentDelete,
+    onExport: handleLibraryExport,
+    onImport: handleLibraryImport,
+  };
+  registerCtx(SHAPE_LIBRARY_BRIDGE_KEY, shapeLibraryBridge);
 
   // ── Phase 16 Feature 3: Presentation Mode ──────────────────────────
   // Implementation in ./presentation/handlers.ts.
@@ -5499,9 +5523,6 @@
     libraryPanelOpen={libraryPanelOpen}
     connectorToolActive={connectorToolActive}
     laserActive={laserActive}
-    gridPanelActive={gridPanelActive}
-    layerPanelActive={layerPanelActive}
-    shapeLibraryPanelActive={libraryPanelActive}
     theme={(appState as any).theme}
     libraryLabel={t("toolBar.library")}
     currentLangCode={currentLangCode}
@@ -5510,7 +5531,6 @@
     onToggleConnector={() => (connectorToolActive = !connectorToolActive)}
     onToggleLaser={toggleLaser}
     onCreateFrame={createFrameAtCenter}
-    onToggleSidePanel={toggleSidePanel}
     onStartPresentation={handleStartPresentation}
     onOpenExport={() => (exportPanelActive = true)}
     onToggleTheme={toggleTheme}
@@ -5615,53 +5635,11 @@
 
 
 
-  <!-- Grid & Snap panel — Phase 14 Feature 1 -->
-  {#if gridPanelActive}
-    <div class="sveltedraw-grid-panel">
-      <GridPanel
-        {gridConfig}
-        {snapConfig}
-        onGridConfigChange={(newConfig) => (gridConfig = newConfig)}
-        onSnapConfigChange={(newConfig) => (snapConfig = newConfig)}
-      />
-    </div>
-  {/if}
-
-  <!-- Layer panel — Phase 15 Feature 1 + 2 + 3 + 4 -->
-  {#if layerPanelActive}
-    <div class="sveltedraw-layer-panel">
-      <LayerPanel
-        {layers}
-        {selectedLayerId}
-        onLayerSelect={handleLayerSelect}
-        onLayerVisibilityChange={handleLayerVisibilityChange}
-        onLayerLockChange={handleLayerLockChange}
-        onLayerOpacityChange={handleLayerOpacityChange}
-        onCreateGroup={handleCreateGroup}
-        onDeleteGroup={handleDeleteGroup}
-        onReorderLayers={handleReorderLayers}
-      />
-    </div>
-  {/if}
-
-
-  <!-- Shape Library panel — Phase 16 Feature 2 -->
-  {#if libraryPanelActive}
-    <div class="sveltedraw-shape-library-panel">
-      <ShapeLibraryPanel
-        components={libraryComponents}
-        categories={libraryCategories}
-        selectedCategoryId={librarySelectedCategory}
-        searchQuery={librarySearchQuery}
-        onSelectComponent={handleLibraryComponentSelect}
-        onDeleteComponent={handleLibraryComponentDelete}
-        onCategoryChange={(id) => (librarySelectedCategory = id)}
-        onSearchChange={(q) => (librarySearchQuery = q)}
-        onExportLibrary={handleLibraryExport}
-        onImportLibrary={handleLibraryImport}
-      />
-    </div>
-  {/if}
+  <!-- Grid & Snap, Layer, ShapeLibrary panels are now plugins:
+       builtin/grid-panel, builtin/layer-panel, builtin/shape-library-
+       panel. App.svelte publishes bridges (GRID_BRIDGE_KEY,
+       LAYER_BRIDGE_KEY, SHAPE_LIBRARY_BRIDGE_KEY) so the plugins read
+       reactive state + invoke handlers without owning them. -->
 
   <!-- Presentation Mode — Phase 16 Feature 3 -->
   {#if presentationActive}

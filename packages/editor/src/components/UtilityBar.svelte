@@ -15,18 +15,10 @@
   import type { ToolbarItemDef } from "../plugins/types.js";
 
   type Language = { code: string; label: string };
-  type SidePanelId =
-    | "grid"
-    | "layer"
-    | "library";
-
   type Props = {
     libraryPanelOpen: boolean;
     connectorToolActive: boolean;
     laserActive: boolean;
-    gridPanelActive: boolean;
-    layerPanelActive: boolean;
-    shapeLibraryPanelActive: boolean;
     theme: string;
     libraryLabel: string;
     currentLangCode: string;
@@ -35,7 +27,6 @@
     onToggleConnector: () => void;
     onToggleLaser: () => void;
     onCreateFrame: () => void;
-    onToggleSidePanel: (panel: SidePanelId) => void;
     onStartPresentation: () => void;
     onOpenExport: () => void;
     onToggleTheme: () => void;
@@ -46,9 +37,6 @@
     libraryPanelOpen,
     connectorToolActive,
     laserActive,
-    gridPanelActive,
-    layerPanelActive,
-    shapeLibraryPanelActive,
     theme,
     libraryLabel,
     currentLangCode,
@@ -57,7 +45,6 @@
     onToggleConnector,
     onToggleLaser,
     onCreateFrame,
-    onToggleSidePanel,
     onStartPresentation,
     onOpenExport,
     onToggleTheme,
@@ -123,36 +110,6 @@
     onclick={onCreateFrame}
   >
     ⬛
-  </button>
-  <button
-    type="button"
-    class="sveltedraw-util-btn"
-    class:active={gridPanelActive}
-    aria-label="Grid & Snap"
-    title="Grid & Snap Settings"
-    onclick={() => onToggleSidePanel("grid")}
-  >
-    ⊞
-  </button>
-  <button
-    type="button"
-    class="sveltedraw-util-btn"
-    class:active={layerPanelActive}
-    aria-label="Layers"
-    title="Layer Management"
-    onclick={() => onToggleSidePanel("layer")}
-  >
-    📑
-  </button>
-  <button
-    type="button"
-    class="sveltedraw-util-btn"
-    class:active={shapeLibraryPanelActive}
-    aria-label="Shape Library"
-    title="Shape Library & Components"
-    onclick={() => onToggleSidePanel("library")}
-  >
-    📚
   </button>
   <button
     type="button"

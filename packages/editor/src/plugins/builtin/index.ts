@@ -11,6 +11,9 @@ import { historyPanelPlugin } from "./history-panel/index.js";
 import { alignmentPanelPlugin } from "./alignment-panel/index.js";
 import { autoLayoutPanelPlugin } from "./autolayout-panel/index.js";
 import { measurementPanelPlugin } from "./measurement-panel/index.js";
+import { gridPanelPlugin } from "./grid-panel/index.js";
+import { layerPanelPlugin } from "./layer-panel/index.js";
+import { shapeLibraryPanelPlugin } from "./shape-library-panel/index.js";
 import type { SveltedrawPlugin } from "../types.js";
 
 /**
@@ -27,4 +30,7 @@ export const builtinPlugins: readonly SveltedrawPlugin[] = [
   alignmentPanelPlugin,
   autoLayoutPanelPlugin,
   measurementPanelPlugin,
+  gridPanelPlugin,
+  layerPanelPlugin,
+  shapeLibraryPanelPlugin,
 ];
