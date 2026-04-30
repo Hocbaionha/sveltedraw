@@ -16,9 +16,6 @@
 
   type Language = { code: string; label: string };
   type SidePanelId =
-    | "alignment"
-    | "measurement"
-    | "autolayout"
     | "grid"
     | "layer"
     | "library";
@@ -27,9 +24,6 @@
     libraryPanelOpen: boolean;
     connectorToolActive: boolean;
     laserActive: boolean;
-    alignmentPanelActive: boolean;
-    measurementPanelActive: boolean;
-    autoLayoutPanelActive: boolean;
     gridPanelActive: boolean;
     layerPanelActive: boolean;
     shapeLibraryPanelActive: boolean;
@@ -52,9 +46,6 @@
     libraryPanelOpen,
     connectorToolActive,
     laserActive,
-    alignmentPanelActive,
-    measurementPanelActive,
-    autoLayoutPanelActive,
     gridPanelActive,
     layerPanelActive,
     shapeLibraryPanelActive,
@@ -132,36 +123,6 @@
     onclick={onCreateFrame}
   >
     ⬛
-  </button>
-  <button
-    type="button"
-    class="sveltedraw-util-btn"
-    class:active={alignmentPanelActive}
-    aria-label="Alignment tool"
-    title="Alignment & Distribution (Ctrl+Alt+L, etc)"
-    onclick={() => onToggleSidePanel("alignment")}
-  >
-    ◫
-  </button>
-  <button
-    type="button"
-    class="sveltedraw-util-btn"
-    class:active={measurementPanelActive}
-    aria-label="Measurements"
-    title="Measurements & Dimensions (Ctrl+M)"
-    onclick={() => onToggleSidePanel("measurement")}
-  >
-    📏
-  </button>
-  <button
-    type="button"
-    class="sveltedraw-util-btn"
-    class:active={autoLayoutPanelActive}
-    aria-label="Auto Layout"
-    title="Auto Layout (Ctrl+L)"
-    onclick={() => onToggleSidePanel("autolayout")}
-  >
-    🎯
   </button>
   <button
     type="button"

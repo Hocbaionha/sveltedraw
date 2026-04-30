@@ -37,6 +37,33 @@ export type {
   HistoryPanelStore,
   HistoryUIBridge,
 } from './plugins/builtin/history-panel/index.js';
+export {
+  alignmentPanelPlugin,
+  ALIGNMENT_PANEL_STORE_KEY,
+  ALIGNMENT_BRIDGE_KEY,
+} from './plugins/builtin/alignment-panel/index.js';
+export type {
+  AlignmentPanelStore,
+  AlignmentBridge,
+} from './plugins/builtin/alignment-panel/index.js';
+export {
+  autoLayoutPanelPlugin,
+  AUTOLAYOUT_PANEL_STORE_KEY,
+  AUTOLAYOUT_BRIDGE_KEY,
+} from './plugins/builtin/autolayout-panel/index.js';
+export type {
+  AutoLayoutPanelStore,
+  AutoLayoutBridge,
+} from './plugins/builtin/autolayout-panel/index.js';
+export {
+  measurementPanelPlugin,
+  MEASUREMENT_PANEL_STORE_KEY,
+  MEASUREMENT_BRIDGE_KEY,
+} from './plugins/builtin/measurement-panel/index.js';
+export type {
+  MeasurementPanelStore,
+  MeasurementBridge,
+} from './plugins/builtin/measurement-panel/index.js';
 export { COLLAB_STORE_KEY } from './collab/store.svelte.js';
 export { createCollabStore } from './collab/store.svelte.js';
 export type { CollabStore, CollabRole, CollabUser } from './collab/store.svelte.js';

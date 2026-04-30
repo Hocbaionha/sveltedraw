@@ -124,9 +124,6 @@
   import NewElementCanvas from "./components/canvases/NewElementCanvas.svelte";
   import ElementLinkDialog from "./components/ElementLinkDialog.svelte";
   import ConnectorTool from "./components/ConnectorTool.svelte";
-  import AlignmentPanel from "./components/AlignmentPanel.svelte";
-  import MeasurementPanel from "./components/MeasurementPanel.svelte";
-  import AutoLayoutPanel from "./components/AutoLayoutPanel.svelte";
   import GridPanel from "./components/GridPanel.svelte";
   import GridRenderer from "./components/GridRenderer.svelte";
   import SnapGuideRenderer from "./components/SnapGuideRenderer.svelte";
@@ -181,6 +178,20 @@
     HISTORY_UI_BRIDGE_KEY,
     type HistoryUIBridge,
   } from "./plugins/builtin/history-panel/index.js";
+  import {
+    ALIGNMENT_BRIDGE_KEY,
+    type AlignmentBridge,
+  } from "./plugins/builtin/alignment-panel/index.js";
+  import {
+    AUTOLAYOUT_BRIDGE_KEY,
+    AUTOLAYOUT_PANEL_STORE_KEY,
+    type AutoLayoutBridge,
+  } from "./plugins/builtin/autolayout-panel/index.js";
+  import {
+    MEASUREMENT_BRIDGE_KEY,
+    MEASUREMENT_PANEL_STORE_KEY,
+    type MeasurementBridge,
+  } from "./plugins/builtin/measurement-panel/index.js";
   import { builtinPlugins } from "./plugins/builtin/index.js";
   import type { SveltedrawPlugin } from "./plugins/types.js";
   import { installSveltedrawProbe } from "./dev/probe.js";
@@ -1739,12 +1750,14 @@
   let connectorToolActive = $state(false);
   let selectedForConnection: string | null = $state(null);
 
-  // Phase 13: Smart Alignment & Guides
-  let alignmentPanelActive = $state(false);
+  // Phase 13: Smart Alignment & Guides — guide overlay state stays in
+  // App.svelte (canvas rendering reads it). The alignment panel UI +
+  // toolbar trigger are owned by builtin/alignment-panel plugin.
   let alignmentGuides = $state<AlignmentGuide[]>([]);
 
-  // Phase 13: Measurement & Dimensions
-  let measurementPanelActive = $state(false);
+  // Phase 13: Measurement & Dimensions — config stays in App.svelte
+  // (probe surface + future snap math reads it). The measurement
+  // panel UI is owned by builtin/measurement-panel plugin via bridge.
   let measurementConfig = $state<MeasurementConfig>({
     showRulers: false,
     showDistances: false,
@@ -1753,8 +1766,9 @@
     precision: 1,
   });
 
-  // Phase 13: Auto-Layout Algorithm
-  let autoLayoutPanelActive = $state(false);
+  // Phase 13: Auto-Layout Algorithm — handlers stay in App.svelte
+  // (selectedCount + onLayout exposed through bridge). The
+  // auto-layout panel UI is owned by builtin/autolayout-panel plugin.
 
   // Phase 14: Grid & Snap System
   let gridPanelActive = $state(false);
@@ -1826,18 +1840,12 @@
   // the others so they don't stack/overlap off-screen. Keep connector
   // tool out of this group — it's tied to a drawing tool, not a panel.
   type SidePanelId =
-    | "alignment"
-    | "measurement"
-    | "autolayout"
     | "grid"
     | "layer"
     | "library";
 
   const isSidePanelOpen = (name: SidePanelId): boolean => {
     switch (name) {
-      case "alignment": return alignmentPanelActive;
-      case "measurement": return measurementPanelActive;
-      case "autolayout": return autoLayoutPanelActive;
       case "grid": return gridPanelActive;
       case "layer": return layerPanelActive;
       case "library": return libraryPanelActive;
@@ -1845,15 +1853,11 @@
   };
 
   const closeAllSidePanels = () => {
-    alignmentPanelActive = false;
-    measurementPanelActive = false;
-    autoLayoutPanelActive = false;
     gridPanelActive = false;
     layerPanelActive = false;
     libraryPanelActive = false;
-    // Close any plugin-owned exclusive panels (e.g. builtin/history-panel)
-    // so opening a still-inline side panel doesn't leave plugin panels
-    // dangling open.
+    // Close any plugin-owned exclusive panels so opening a still-
+    // inline side panel doesn't leave plugin panels dangling open.
     pluginRegistry.openExclusiveSidePanel(null);
   };
 
@@ -1862,9 +1866,6 @@
     closeAllSidePanels();
     if (wasOpen) return;
     switch (name) {
-      case "alignment": alignmentPanelActive = true; break;
-      case "measurement": measurementPanelActive = true; break;
-      case "autolayout": autoLayoutPanelActive = true; break;
       case "grid": gridPanelActive = true; break;
       case "layer": layerPanelActive = true; break;
       case "library": libraryPanelActive = true; break;
@@ -2070,6 +2071,40 @@
   const handleDistribute = _alignmentHandlers.handleDistribute;
   const updateAlignmentGuides = _alignmentHandlers.updateAlignmentGuides;
   const handleAutoLayout = _alignmentHandlers.handleAutoLayout;
+
+  // Bridges for the alignment / autolayout / measurement plugins.
+  // Each bridge exposes the editor's reactive sources via getters
+  // so plugin components track dependencies through the property
+  // accesses (Svelte's $derived registers the underlying $state proxy
+  // reads when those getters fire).
+  const alignmentBridge: AlignmentBridge = {
+    get selectedCount() { return getSelectedElements().length; },
+    align: handleAlign,
+    distribute: handleDistribute,
+  };
+  registerCtx(ALIGNMENT_BRIDGE_KEY, alignmentBridge);
+
+  const autoLayoutBridge: AutoLayoutBridge = {
+    get selectedCount() { return getSelectedElements().length; },
+    applyLayout: handleAutoLayout,
+  };
+  registerCtx(AUTOLAYOUT_BRIDGE_KEY, autoLayoutBridge);
+
+  const measurementBridge: MeasurementBridge = {
+    get selectedElements() {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return getSelectedElements().map((el: any) => ({
+        id: el.id,
+        x: el.x,
+        y: el.y,
+        width: el.width,
+        height: el.height,
+      }));
+    },
+    get config() { return measurementConfig; },
+    setConfig: (next) => { measurementConfig = next; },
+  };
+  registerCtx(MEASUREMENT_BRIDGE_KEY, measurementBridge);
 
   // Phase 15: Layer Management — implementation in ./layers/handlers.ts.
   const _layerHandlers = createLayerHandlers({
@@ -3152,17 +3187,27 @@
         return;
       }
 
-      // Phase 13: Measurement panel: Ctrl+M
+      // Measurement panel: Ctrl+M — delegated to plugin store.
       if (!event.shiftKey && (event.key === "m" || event.key === "M")) {
-        toggleSidePanel("measurement");
-        event.preventDefault();
+        const store = pluginRegistry.getStore<{ toggle(): void }>(
+          MEASUREMENT_PANEL_STORE_KEY,
+        );
+        if (store) {
+          store.toggle();
+          event.preventDefault();
+        }
         return;
       }
 
-      // Phase 13: Auto-Layout panel: Ctrl+L
+      // Auto-Layout panel: Ctrl+L — delegated to plugin store.
       if (!event.shiftKey && (event.key === "l" || event.key === "L")) {
-        toggleSidePanel("autolayout");
-        event.preventDefault();
+        const store = pluginRegistry.getStore<{ toggle(): void }>(
+          AUTOLAYOUT_PANEL_STORE_KEY,
+        );
+        if (store) {
+          store.toggle();
+          event.preventDefault();
+        }
         return;
       }
 
@@ -5443,9 +5488,6 @@
     libraryPanelOpen={libraryPanelOpen}
     connectorToolActive={connectorToolActive}
     laserActive={laserActive}
-    alignmentPanelActive={alignmentPanelActive}
-    measurementPanelActive={measurementPanelActive}
-    autoLayoutPanelActive={autoLayoutPanelActive}
     gridPanelActive={gridPanelActive}
     layerPanelActive={layerPanelActive}
     shapeLibraryPanelActive={libraryPanelActive}
@@ -5553,43 +5595,13 @@
     </div>
   {/if}
 
-  <!-- Alignment panel — Phase 13 Feature 2 -->
-  {#if alignmentPanelActive}
-    <div class="sveltedraw-alignment-panel">
-      <AlignmentPanel
-        selectedCount={getSelectedElements().length}
-        onAlign={handleAlign}
-        onDistribute={handleDistribute}
-      />
-    </div>
-  {/if}
+  <!-- Alignment / Measurement / Auto-Layout panels are now plugins:
+       builtin/alignment-panel, builtin/measurement-panel,
+       builtin/autolayout-panel. Each owns its toolbar button + side
+       panel; App.svelte publishes a bridge so the plugins can call
+       handleAlign / handleDistribute / handleAutoLayout and read
+       measurementConfig. -->
 
-  <!-- Measurement panel — Phase 13 Feature 3 -->
-  {#if measurementPanelActive}
-    <div class="sveltedraw-measurement-panel">
-      <MeasurementPanel
-        selectedElements={getSelectedElements().map(el => ({
-          id: el.id,
-          x: el.x,
-          y: el.y,
-          width: el.width,
-          height: el.height,
-        }))}
-        config={measurementConfig}
-        onConfigChange={(newConfig) => (measurementConfig = newConfig)}
-      />
-    </div>
-  {/if}
-
-  <!-- Auto-Layout panel — Phase 13 Feature 4 -->
-  {#if autoLayoutPanelActive}
-    <div class="sveltedraw-autolayout-panel">
-      <AutoLayoutPanel
-        selectedCount={getSelectedElements().length}
-        onLayout={handleAutoLayout}
-      />
-    </div>
-  {/if}
 
 
   <!-- Grid & Snap panel — Phase 14 Feature 1 -->

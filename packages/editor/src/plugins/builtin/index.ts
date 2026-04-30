@@ -8,6 +8,9 @@ import { settingsPlugin } from "./settings/index.js";
 import { helpPlugin } from "./help/index.js";
 import { templatesPlugin } from "./templates/index.js";
 import { historyPanelPlugin } from "./history-panel/index.js";
+import { alignmentPanelPlugin } from "./alignment-panel/index.js";
+import { autoLayoutPanelPlugin } from "./autolayout-panel/index.js";
+import { measurementPanelPlugin } from "./measurement-panel/index.js";
 import type { SveltedrawPlugin } from "../types.js";
 
 /**
@@ -21,4 +24,7 @@ export const builtinPlugins: readonly SveltedrawPlugin[] = [
   helpPlugin,
   templatesPlugin,
   historyPanelPlugin,
+  alignmentPanelPlugin,
+  autoLayoutPanelPlugin,
+  measurementPanelPlugin,
 ];
