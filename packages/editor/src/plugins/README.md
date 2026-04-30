@@ -91,17 +91,26 @@ Each plugin extraction must keep these green:
 
 ## What's not yet extracted
 
-The following features still live inline in App.svelte. Their inline
-dependencies on hot-path code (pointer handlers, drag math, scene
-mutations) make extraction risky without further refactor:
+Every side-panel feature has been migrated as of Tier 2 wave 6. The
+following remain inline because their hot-path coupling makes
+extraction higher risk than the side-panel migrations:
 
-- Layer / History / Library / ShapeLibrary panels
-- Alignment / Measurement / AutoLayout / Grid panels
-- Connector tool (intersects pointer handler)
-- Laser pointer (RAF loop + pointer-move integration)
-- ExportPanel (depends on heavy `handleExport`)
-- PresentationMode (probe-tested heavily; high regression risk)
+- **Connector tool** — intersects pointer handler dispatch (4310-4335
+  in App.svelte). Extracting requires the registry to expose a
+  pointer-event interceptor or similar.
+- **Laser pointer** — runs an RAF loop pruning a per-frame trail
+  array; the loop reads `laserActive` + `laserTrail` directly.
+  Extracting means publishing the trail through a bridge AND wiring
+  pointer-move broadcast.
+- **ExportPanel** — `handleExport` is heavy (~150 LOC of format
+  switching, font embedding, batch export). Surface change risk is
+  high.
+- **PresentationMode** — fullscreen routing + heavy probe surface
+  (`startPresentation`, `exitPresentation`, slide jump APIs all in
+  honest-test smoke). Migration requires careful probe shim.
+- **Modal-style dialogs** (Link dialog, OverwriteConfirm, ProjectName,
+  PasteChart) — each has tight coupling to a specific user flow,
+  not a general "open a panel" pattern.
 
-Migrating these is "Tier 3" work — see the OCP discussion in the project
-memory for the cost/benefit analysis. Tier 1+2 prove the registry
-infrastructure is sound; Tier 3 is the ongoing migration pass.
+These are "Tier 3" — out of current scope but the registry contract
+supports them when motivation arises.
