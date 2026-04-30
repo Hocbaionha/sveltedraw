@@ -7,6 +7,7 @@ import { recentFilesPlugin } from "./recent-files/index.js";
 import { settingsPlugin } from "./settings/index.js";
 import { helpPlugin } from "./help/index.js";
 import { templatesPlugin } from "./templates/index.js";
+import { historyPanelPlugin } from "./history-panel/index.js";
 import type { SveltedrawPlugin } from "../types.js";
 
 /**
@@ -19,4 +20,5 @@ export const builtinPlugins: readonly SveltedrawPlugin[] = [
   settingsPlugin,
   helpPlugin,
   templatesPlugin,
+  historyPanelPlugin,
 ];

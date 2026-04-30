@@ -141,7 +141,6 @@
   import EdgesRow from "./components/EdgesRow.svelte";
   import ColorRow from "./components/ColorRow.svelte";
   import LayerPanel from "./components/LayerPanel.svelte";
-  import HistoryPanel from "./components/HistoryPanel.svelte";
   import ShapeLibraryPanel from "./components/ShapeLibraryPanel.svelte";
   import PresentationMode from "./components/PresentationMode.svelte";
   import ExportPanel from "./components/ExportPanel.svelte";
@@ -177,6 +176,11 @@
   import { SETTINGS_STORE_KEY } from "./plugins/builtin/settings/index.js";
   import { HELP_STORE_KEY } from "./plugins/builtin/help/index.js";
   import { TEMPLATES_STORE_KEY } from "./plugins/builtin/templates/index.js";
+  import {
+    HISTORY_PANEL_STORE_KEY,
+    HISTORY_UI_BRIDGE_KEY,
+    type HistoryUIBridge,
+  } from "./plugins/builtin/history-panel/index.js";
   import { builtinPlugins } from "./plugins/builtin/index.js";
   import type { SveltedrawPlugin } from "./plugins/types.js";
   import { installSveltedrawProbe } from "./dev/probe.js";
@@ -1134,6 +1138,19 @@
   });
   const { pushHistory, undo, redo } = historyStore;
 
+  // Publish a reactive bridge to the editor history so the
+  // builtin/history-panel plugin can render it without taking
+  // ownership of the undo/redo source of truth. The getters close
+  // over the $state proxies; reading them inside the plugin's
+  // <HistoryPanel> component tracks dependencies normally.
+  const historyUIBridge: HistoryUIBridge = {
+    get history() { return editorHistory; },
+    get currentIndex() { return historyCurrentIndex; },
+    jumpTo: (i: number) => historyStore.jumpTo(i),
+    clearKeepCurrent: () => historyStore.clearKeepCurrent(),
+  };
+  registerCtx(HISTORY_UI_BRIDGE_KEY, historyUIBridge);
+
   // ── Collab wiring (Phase 17) ─────────────────────────────────────────
   // Identity is persisted across sessions in localStorage; the dialog
   // (Commit 2) updates it. For now, anon-fallback covers auto-start +
@@ -1770,7 +1787,6 @@
   let expandedGroups = $state<Set<string>>(new Set());
 
   // Phase 16: History Panel & Timeline
-  let historyPanelActive = $state(false);
   let editorHistory = $state<HistoryState[]>([]);
   let historyCurrentIndex = $state(0);
 
@@ -1815,7 +1831,6 @@
     | "autolayout"
     | "grid"
     | "layer"
-    | "history"
     | "library";
 
   const isSidePanelOpen = (name: SidePanelId): boolean => {
@@ -1825,7 +1840,6 @@
       case "autolayout": return autoLayoutPanelActive;
       case "grid": return gridPanelActive;
       case "layer": return layerPanelActive;
-      case "history": return historyPanelActive;
       case "library": return libraryPanelActive;
     }
   };
@@ -1836,8 +1850,11 @@
     autoLayoutPanelActive = false;
     gridPanelActive = false;
     layerPanelActive = false;
-    historyPanelActive = false;
     libraryPanelActive = false;
+    // Close any plugin-owned exclusive panels (e.g. builtin/history-panel)
+    // so opening a still-inline side panel doesn't leave plugin panels
+    // dangling open.
+    pluginRegistry.openExclusiveSidePanel(null);
   };
 
   const toggleSidePanel = (name: SidePanelId) => {
@@ -1850,7 +1867,6 @@
       case "autolayout": autoLayoutPanelActive = true; break;
       case "grid": gridPanelActive = true; break;
       case "layer": layerPanelActive = true; break;
-      case "history": historyPanelActive = true; break;
       case "library": libraryPanelActive = true; break;
     }
   };
@@ -5432,7 +5448,6 @@
     autoLayoutPanelActive={autoLayoutPanelActive}
     gridPanelActive={gridPanelActive}
     layerPanelActive={layerPanelActive}
-    historyPanelActive={historyPanelActive}
     shapeLibraryPanelActive={libraryPanelActive}
     theme={(appState as any).theme}
     libraryLabel={t("toolBar.library")}
@@ -5606,17 +5621,6 @@
     </div>
   {/if}
 
-  <!-- History panel — Phase 16 Feature 1 -->
-  {#if historyPanelActive}
-    <div class="sveltedraw-history-panel">
-      <HistoryPanel
-        history={editorHistory}
-        currentIndex={historyCurrentIndex}
-        onJumpToState={handleHistoryJump}
-        onClearHistory={handleHistoryClear}
-      />
-    </div>
-  {/if}
 
   <!-- Shape Library panel — Phase 16 Feature 2 -->
   {#if libraryPanelActive}

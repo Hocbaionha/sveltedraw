@@ -85,6 +85,44 @@ export class PluginRegistry {
   }
 
   /**
+   * Open one exclusive side panel and close every other exclusive one.
+   * The registry walks `sidePanels`, calls `setOpen(false)` on each
+   * exclusive panel that isn't the target, then `setOpen(true)` on the
+   * target. Pass null to close all exclusives.
+   */
+  openExclusiveSidePanel(panelId: string | null): void {
+    for (const p of this.sidePanels) {
+      if (!p.exclusive || !p.setOpen) continue;
+      const isTarget = p.id === panelId;
+      // Only flip state when needed — avoids stomping on un-changed panels
+      // (which would still trigger reactive subscribers).
+      if (p.isOpen?.() !== isTarget) p.setOpen(isTarget);
+    }
+  }
+
+  /**
+   * Toggle one exclusive panel: if already open → close it; otherwise
+   * open it (closing all other exclusives). Returns the new open state.
+   */
+  toggleExclusiveSidePanel(panelId: string): boolean {
+    const target = this.sidePanels.find((p) => p.id === panelId);
+    if (!target?.exclusive || !target.isOpen || !target.setOpen) return false;
+    if (target.isOpen()) {
+      target.setOpen(false);
+      return false;
+    }
+    this.openExclusiveSidePanel(panelId);
+    return true;
+  }
+
+  /** Snapshot of currently-open exclusive panel ids. */
+  get openExclusivePanelIds(): readonly string[] {
+    return this.sidePanels
+      .filter((p) => p.exclusive && p.isOpen?.())
+      .map((p) => p.id);
+  }
+
+  /**
    * Build a SveltedrawPluginContext scoped to the given plugin id.
    * `bridgeGetStore` lets the host fall back to a Svelte-context-keyed
    * store when no plugin has claimed the symbol — used for non-plugin
@@ -133,6 +171,10 @@ export class PluginRegistry {
         if (fromRegistry !== undefined) return fromRegistry as T;
         return bridgeGetStore<T>(key);
       },
+      toggleExclusiveSidePanel: (localPanelId: string): boolean =>
+        registry.toggleExclusiveSidePanel(qualify(localPanelId)),
+      closeAllExclusiveSidePanels: (): void =>
+        registry.openExclusiveSidePanel(null),
       addToolbarItem: (item) => {
         const qualified = { ...item, id: qualify(item.id) };
         registry.toolbarItems = [...registry.toolbarItems, qualified];

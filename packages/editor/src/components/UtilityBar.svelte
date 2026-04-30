@@ -21,7 +21,6 @@
     | "autolayout"
     | "grid"
     | "layer"
-    | "history"
     | "library";
 
   type Props = {
@@ -33,7 +32,6 @@
     autoLayoutPanelActive: boolean;
     gridPanelActive: boolean;
     layerPanelActive: boolean;
-    historyPanelActive: boolean;
     shapeLibraryPanelActive: boolean;
     theme: string;
     libraryLabel: string;
@@ -59,7 +57,6 @@
     autoLayoutPanelActive,
     gridPanelActive,
     layerPanelActive,
-    historyPanelActive,
     shapeLibraryPanelActive,
     theme,
     libraryLabel,
@@ -185,16 +182,6 @@
     onclick={() => onToggleSidePanel("layer")}
   >
     📑
-  </button>
-  <button
-    type="button"
-    class="sveltedraw-util-btn"
-    class:active={historyPanelActive}
-    aria-label="History"
-    title="Undo/Redo History"
-    onclick={() => onToggleSidePanel("history")}
-  >
-    ⏮
   </button>
   <button
     type="button"

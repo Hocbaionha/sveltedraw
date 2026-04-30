@@ -28,6 +28,15 @@ export { helpPlugin, HELP_STORE_KEY } from './plugins/builtin/help/index.js';
 export type { HelpStore } from './plugins/builtin/help/index.js';
 export { templatesPlugin, TEMPLATES_STORE_KEY } from './plugins/builtin/templates/index.js';
 export type { TemplatesStore } from './plugins/builtin/templates/index.js';
+export {
+  historyPanelPlugin,
+  HISTORY_PANEL_STORE_KEY,
+  HISTORY_UI_BRIDGE_KEY,
+} from './plugins/builtin/history-panel/index.js';
+export type {
+  HistoryPanelStore,
+  HistoryUIBridge,
+} from './plugins/builtin/history-panel/index.js';
 export { COLLAB_STORE_KEY } from './collab/store.svelte.js';
 export { createCollabStore } from './collab/store.svelte.js';
 export type { CollabStore, CollabRole, CollabUser } from './collab/store.svelte.js';

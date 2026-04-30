@@ -22,6 +22,21 @@ export interface SidePanelDef {
   triggerIcon: Component | Snippet;
   /** Svelte 5 component mounted when the panel is open. */
   component: Component;
+  /**
+   * If true, the panel participates in mutual-exclusion: opening it
+   * closes every other exclusive panel. Plugins implement this by
+   * exposing an `isOpen()` reader + `setOpen(v)` writer through the
+   * registry's `setExclusiveOpen` API. Panels without this flag are
+   * independent (e.g. floating overlays, modal-style dialogs).
+   */
+  exclusive?: boolean;
+  /**
+   * If exclusive, this plugin's open/close hooks. Required when
+   * `exclusive: true`. The registry calls `setOpen(false)` on every
+   * other exclusive panel when this one opens.
+   */
+  isOpen?: () => boolean;
+  setOpen?: (v: boolean) => void;
 }
 
 export interface CanvasOverlayDef {
@@ -60,6 +75,17 @@ export interface SveltedrawPluginContext {
 
   /** Access a store published by this or another plugin. */
   getStore<T>(key: symbol): T | undefined;
+
+  /**
+   * Toggle one of this plugin's exclusive side panels. Pass the panel's
+   * LOCAL id (the same string the plugin used in addSidePanel({id})) —
+   * the context qualifies it with the plugin id internally. Returns
+   * the new open state.
+   */
+  toggleExclusiveSidePanel(localPanelId: string): boolean;
+
+  /** Close every exclusive side panel registry-wide. */
+  closeAllExclusiveSidePanels(): void;
 
   onSceneChange: SveltedrawAPI["onChange"];
   onSelectionChange: SveltedrawAPI["onSelectionChange"];
