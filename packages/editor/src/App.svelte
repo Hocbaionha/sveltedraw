@@ -124,8 +124,6 @@
   import NewElementCanvas from "./components/canvases/NewElementCanvas.svelte";
   import TemplateSelector from "./components/TemplateSelector.svelte";
   import ElementLinkDialog from "./components/ElementLinkDialog.svelte";
-  import SettingsPanel from "./components/SettingsPanel.svelte";
-  import HelpPanel from "./components/HelpPanel.svelte";
   import ConnectorTool from "./components/ConnectorTool.svelte";
   import AlignmentPanel from "./components/AlignmentPanel.svelte";
   import MeasurementPanel from "./components/MeasurementPanel.svelte";
@@ -177,6 +175,8 @@
   import { SVELTEDRAW_API_KEY, type SveltedrawAPI } from "./api/types.js";
   import { PluginRegistry, PLUGIN_REGISTRY_KEY } from "./plugins/registry.svelte.js";
   import { recentFilesPlugin, RECENT_FILES_STORE_KEY } from "./plugins/builtin/recent-files/index.js";
+  import { SETTINGS_STORE_KEY } from "./plugins/builtin/settings/index.js";
+  import { HELP_STORE_KEY } from "./plugins/builtin/help/index.js";
   import { builtinPlugins } from "./plugins/builtin/index.js";
   import type { SveltedrawPlugin } from "./plugins/types.js";
   import { installSveltedrawProbe } from "./dev/probe.js";
@@ -771,7 +771,6 @@
     // initial history floor captures the restored state, not "empty".
     tryLoad();
     loadLibrary();
-    loadSettings();
     sceneReady++; // triggers the first static paint
 
     // Initialize the original Fonts loader. It takes a scene object
@@ -1717,29 +1716,6 @@
     return getSelectedElements().filter((el) => !!(el as any).link);
   });
 
-  interface AppSettings {
-    theme: "light" | "dark" | "auto";
-    gridVisible: boolean;
-    gridSize: number;
-    snapToGrid: boolean;
-    autoSaveInterval: number;
-    undoHistorySize: number;
-  }
-
-  const DEFAULT_SETTINGS: AppSettings = {
-    theme: "light",
-    gridVisible: true,
-    gridSize: 20,
-    snapToGrid: false,
-    autoSaveInterval: 30,
-    undoHistorySize: 500,
-  };
-
-  let appSettings = $state<AppSettings>({ ...DEFAULT_SETTINGS });
-  let showSettings = $state(false);
-  const SETTINGS_KEY = "sveltedraw-settings";
-
-  let showHelpPanel = $state(false);
 
   // Connector tool: click first shape → click second shape → arrow with
   // startBinding/endBinding between them. The arrow is a normal element,
@@ -1992,46 +1968,6 @@
   const deleteLibraryItem = (id: string) => {
     libraryItems = libraryItems.filter((it) => it.id !== id);
     persistLibrary();
-  };
-
-  const loadSettings = () => {
-    try {
-      const raw = localStorage.getItem(SETTINGS_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as AppSettings;
-      appSettings = { ...DEFAULT_SETTINGS, ...parsed };
-      applySettings();
-    } catch {
-      /* corrupted — use defaults */
-    }
-  };
-
-  const persistSettings = () => {
-    try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(appSettings));
-    } catch {
-      /* quota exceeded */
-    }
-  };
-
-  const applySettings = () => {
-    // Apply theme
-    if (appSettings.theme === "dark") {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (appState as any).theme = "dark";
-    } else if (appSettings.theme === "light") {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (appState as any).theme = "light";
-    }
-    // Apply grid settings
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (appState as any).gridModeEnabled = appSettings.gridVisible;
-  };
-
-  const updateSettings = (newSettings: AppSettings) => {
-    appSettings = newSettings;
-    applySettings();
-    persistSettings();
   };
 
   // Load template and create elements from it
@@ -3211,10 +3147,15 @@
         return;
       }
 
-      // Phase 12: Settings: Ctrl+,
+      // Settings: Ctrl+, — delegated to the settings plugin.
       if (!event.shiftKey && event.key === ",") {
-        showSettings = true;
-        event.preventDefault();
+        const store = pluginRegistry.getStore<{ open(): void }>(
+          SETTINGS_STORE_KEY,
+        );
+        if (store) {
+          store.open();
+          event.preventDefault();
+        }
         return;
       }
 
@@ -3493,10 +3434,13 @@
       return;
     }
 
-    // Show comprehensive help on F1.
+    // Show comprehensive help on F1 — delegated to the help plugin.
     if (event.key === "F1") {
-      showHelpPanel = true;
-      event.preventDefault();
+      const store = pluginRegistry.getStore<{ open(): void }>(HELP_STORE_KEY);
+      if (store) {
+        store.open();
+        event.preventDefault();
+      }
       return;
     }
 
@@ -5527,7 +5471,6 @@
     availableLanguages={availableLanguages}
     onToggleLibraryPanel={() => (libraryPanelOpen = !libraryPanelOpen)}
     onOpenTemplates={() => (showTemplateSelector = true)}
-    onOpenSettings={() => (showSettings = true)}
     onToggleConnector={() => (connectorToolActive = !connectorToolActive)}
     onToggleLaser={toggleLaser}
     onCreateFrame={createFrameAtCenter}
@@ -5536,7 +5479,6 @@
     onOpenExport={() => (exportPanelActive = true)}
     onToggleTheme={toggleTheme}
     onSetLanguage={setLanguage}
-    onOpenHelp={() => (showHelpPanel = true)}
   />
 
   <!-- Phase 17: Live collaboration trigger. Tucked under the utility bar
@@ -5814,18 +5756,7 @@
   {/if}
 
   <!-- Settings panel — user preferences. -->
-  {#if showSettings}
-    <SettingsPanel
-      settings={appSettings}
-      onSettingsChange={updateSettings}
-      onClose={() => (showSettings = false)}
-    />
-  {/if}
-
   <!-- Help panel — comprehensive documentation. -->
-  {#if showHelpPanel}
-    <HelpPanel onClose={() => (showHelpPanel = false)} />
-  {/if}
 
   <!-- Plugin-contributed side panels. Each plugin owns its own open
        state internally, so we always mount its component (the plugin

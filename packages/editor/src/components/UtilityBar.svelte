@@ -41,7 +41,6 @@
     availableLanguages: readonly Language[];
     onToggleLibraryPanel: () => void;
     onOpenTemplates: () => void;
-    onOpenSettings: () => void;
     onToggleConnector: () => void;
     onToggleLaser: () => void;
     onCreateFrame: () => void;
@@ -50,7 +49,6 @@
     onOpenExport: () => void;
     onToggleTheme: () => void;
     onSetLanguage: (code: string) => void;
-    onOpenHelp: () => void;
   };
 
   let {
@@ -70,7 +68,6 @@
     availableLanguages,
     onToggleLibraryPanel,
     onOpenTemplates,
-    onOpenSettings,
     onToggleConnector,
     onToggleLaser,
     onCreateFrame,
@@ -79,7 +76,6 @@
     onOpenExport,
     onToggleTheme,
     onSetLanguage,
-    onOpenHelp,
   }: Props = $props();
 
   // Plugin-contributed toolbar items. Optional context: hosts that build
@@ -121,15 +117,6 @@
     onclick={onOpenTemplates}
   >
     📋
-  </button>
-  <button
-    type="button"
-    class="sveltedraw-util-btn"
-    aria-label="Settings"
-    title="Settings (Ctrl+,)"
-    onclick={onOpenSettings}
-  >
-    ⚙️
   </button>
   <button
     type="button"
@@ -267,15 +254,6 @@
       <option value={lang.code}>{lang.label}</option>
     {/each}
   </select>
-  <button
-    type="button"
-    class="sveltedraw-util-btn"
-    aria-label="Help"
-    title="Help (F1)"
-    onclick={onOpenHelp}
-  >
-    ❓
-  </button>
 
   <!-- Plugin-contributed toolbar items, grouped to match the built-in
        layout. Each plugin's onActivate runs synchronously; isActive is
