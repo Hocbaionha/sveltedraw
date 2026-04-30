@@ -123,7 +123,6 @@
   import InteractiveCanvas from "./components/canvases/InteractiveCanvas.svelte";
   import NewElementCanvas from "./components/canvases/NewElementCanvas.svelte";
   import ElementLinkDialog from "./components/ElementLinkDialog.svelte";
-  import ConnectorTool from "./components/ConnectorTool.svelte";
   import GridRenderer from "./components/GridRenderer.svelte";
   import SnapGuideRenderer from "./components/SnapGuideRenderer.svelte";
   import LaserOverlay from "./components/LaserOverlay.svelte";
@@ -201,6 +200,12 @@
     SHAPE_LIBRARY_BRIDGE_KEY,
     type ShapeLibraryBridge,
   } from "./plugins/builtin/shape-library-panel/index.js";
+  import {
+    CONNECTOR_BRIDGE_KEY,
+    CONNECTOR_STORE_KEY,
+    type ConnectorBridge,
+    type ConnectorStore,
+  } from "./plugins/builtin/connector-tool/index.js";
   import { builtinPlugins } from "./plugins/builtin/index.js";
   import type { SveltedrawPlugin } from "./plugins/types.js";
   import { installSveltedrawProbe } from "./dev/probe.js";
@@ -1753,11 +1758,9 @@
   });
 
 
-  // Connector tool: click first shape → click second shape → arrow with
-  // startBinding/endBinding between them. The arrow is a normal element,
-  // so it renders + exports + undoes like any other arrow.
-  let connectorToolActive = $state(false);
-  let selectedForConnection: string | null = $state(null);
+  // Connector tool state moved to builtin/connector-tool plugin. The
+  // pointerdown handler routes hits through the plugin's store; this
+  // file no longer tracks active/firstPick directly.
 
   // Phase 13: Smart Alignment & Guides — guide overlay state stays in
   // App.svelte (canvas rendering reads it). The alignment panel UI +
@@ -2051,6 +2054,21 @@
     pushHistory();
     bumpSceneRepaint();
   };
+
+  // Bridge for the connector-tool plugin. createArrow stays here
+  // because it needs scene mutation + pushHistory + bumpSceneRepaint;
+  // setHighlight pokes appState.selectedElementIds so the user sees
+  // which shape they picked first.
+  const connectorBridge: ConnectorBridge = {
+    createArrow: createConnectorArrow,
+    setHighlight: (elementId) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (appState as any).selectedElementIds = elementId
+        ? { [elementId]: true }
+        : {};
+    },
+  };
+  registerCtx(CONNECTOR_BRIDGE_KEY, connectorBridge);
 
   // ── Smart Alignment & Guides ─────────────────────────────────────────
   // Implementation in ./alignment/handlers.ts.
@@ -3214,11 +3232,13 @@
         return;
       }
 
-      // Phase 13: Connector tool: Ctrl+Shift+C
+      // Connector tool: Ctrl+Shift+C — delegated to plugin store.
       if (event.shiftKey && (event.key === "c" || event.key === "C")) {
-        connectorToolActive = !connectorToolActive;
-        selectedForConnection = null;
-        event.preventDefault();
+        const store = pluginRegistry.getStore<ConnectorStore>(CONNECTOR_STORE_KEY);
+        if (store) {
+          store.toggle();
+          event.preventDefault();
+        }
         return;
       }
 
@@ -4402,37 +4422,22 @@
       // First finger: fall through to the normal pointerdown handler.
     }
 
-    // ── Connector tool: pick two shapes, link them with a bound arrow ──
-    if (connectorToolActive) {
-      const { x: cx, y: cy } = toSceneCoords(event.clientX, event.clientY);
-      const hit = hitTestAt(cx, cy);
-      if (!hit) {
-        // Click on empty space exits the tool without linking.
-        connectorToolActive = false;
-        selectedForConnection = null;
-        event.preventDefault();
-        return;
+    // ── Connector tool — delegated to builtin/connector-tool plugin ──
+    // The plugin owns the active flag + first-pick state. We hit-test
+    // here (it needs the live event + canvas coords), then hand the
+    // result to the plugin's store. handlePick returns true when the
+    // event was consumed; on true we preventDefault + return so the
+    // selection/draw fall-through doesn't run.
+    {
+      const connector = pluginRegistry.getStore<ConnectorStore>(CONNECTOR_STORE_KEY);
+      if (connector?.isActive()) {
+        const { x: cx, y: cy } = toSceneCoords(event.clientX, event.clientY);
+        const hit = hitTestAt(cx, cy);
+        if (connector.handlePick(hit?.id ?? null)) {
+          event.preventDefault();
+          return;
+        }
       }
-      if (!selectedForConnection) {
-        selectedForConnection = hit.id;
-        // Highlight the first pick so the user sees what they selected.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (appState as any).selectedElementIds = { [hit.id]: true };
-        event.preventDefault();
-        return;
-      }
-      if (selectedForConnection === hit.id) {
-        // Same shape clicked twice — ignore (can't self-connect).
-        event.preventDefault();
-        return;
-      }
-      createConnectorArrow(selectedForConnection, hit.id);
-      selectedForConnection = null;
-      connectorToolActive = false;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (appState as any).selectedElementIds = {};
-      event.preventDefault();
-      return;
     }
 
     // ── Pan gesture (middle mouse OR space held OR left+Alt via original)
@@ -5521,14 +5526,12 @@
   <!-- Top-right utility bar — see components/UtilityBar.svelte. -->
   <UtilityBar
     libraryPanelOpen={libraryPanelOpen}
-    connectorToolActive={connectorToolActive}
     laserActive={laserActive}
     theme={(appState as any).theme}
     libraryLabel={t("toolBar.library")}
     currentLangCode={currentLangCode}
     availableLanguages={availableLanguages}
     onToggleLibraryPanel={() => (libraryPanelOpen = !libraryPanelOpen)}
-    onToggleConnector={() => (connectorToolActive = !connectorToolActive)}
     onToggleLaser={toggleLaser}
     onCreateFrame={createFrameAtCenter}
     onStartPresentation={handleStartPresentation}
@@ -5613,18 +5616,10 @@
     </div>
   {/if}
 
-  <!-- Connector tool panel — Phase 13 -->
-  {#if connectorToolActive}
-    <div class="sveltedraw-connector-panel">
-      <ConnectorTool
-        hasFirstPick={selectedForConnection !== null}
-        onCancel={() => {
-          connectorToolActive = false;
-          selectedForConnection = null;
-        }}
-      />
-    </div>
-  {/if}
+  <!-- Connector tool indicator now lives in builtin/connector-tool
+       plugin's PanelHost. Pointerdown handler routes through the
+       plugin's store; the indicator panel mounts when the tool is
+       active. -->
 
   <!-- Alignment / Measurement / Auto-Layout panels are now plugins:
        builtin/alignment-panel, builtin/measurement-panel,

@@ -14,6 +14,7 @@ import { measurementPanelPlugin } from "./measurement-panel/index.js";
 import { gridPanelPlugin } from "./grid-panel/index.js";
 import { layerPanelPlugin } from "./layer-panel/index.js";
 import { shapeLibraryPanelPlugin } from "./shape-library-panel/index.js";
+import { connectorToolPlugin } from "./connector-tool/index.js";
 import type { SveltedrawPlugin } from "../types.js";
 
 /**
@@ -33,4 +34,5 @@ export const builtinPlugins: readonly SveltedrawPlugin[] = [
   gridPanelPlugin,
   layerPanelPlugin,
   shapeLibraryPanelPlugin,
+  connectorToolPlugin,
 ];

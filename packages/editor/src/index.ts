@@ -91,6 +91,15 @@ export type {
   ShapeLibraryPanelStore,
   ShapeLibraryBridge,
 } from './plugins/builtin/shape-library-panel/index.js';
+export {
+  connectorToolPlugin,
+  CONNECTOR_STORE_KEY,
+  CONNECTOR_BRIDGE_KEY,
+} from './plugins/builtin/connector-tool/index.js';
+export type {
+  ConnectorStore,
+  ConnectorBridge,
+} from './plugins/builtin/connector-tool/index.js';
 export { COLLAB_STORE_KEY } from './collab/store.svelte.js';
 export { createCollabStore } from './collab/store.svelte.js';
 export type { CollabStore, CollabRole, CollabUser } from './collab/store.svelte.js';

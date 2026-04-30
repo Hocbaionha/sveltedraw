@@ -17,14 +17,12 @@
   type Language = { code: string; label: string };
   type Props = {
     libraryPanelOpen: boolean;
-    connectorToolActive: boolean;
     laserActive: boolean;
     theme: string;
     libraryLabel: string;
     currentLangCode: string;
     availableLanguages: readonly Language[];
     onToggleLibraryPanel: () => void;
-    onToggleConnector: () => void;
     onToggleLaser: () => void;
     onCreateFrame: () => void;
     onStartPresentation: () => void;
@@ -35,14 +33,12 @@
 
   let {
     libraryPanelOpen,
-    connectorToolActive,
     laserActive,
     theme,
     libraryLabel,
     currentLangCode,
     availableLanguages,
     onToggleLibraryPanel,
-    onToggleConnector,
     onToggleLaser,
     onCreateFrame,
     onStartPresentation,
@@ -81,16 +77,6 @@
     onclick={onToggleLibraryPanel}
   >
     📚
-  </button>
-  <button
-    type="button"
-    class="sveltedraw-util-btn"
-    class:active={connectorToolActive}
-    aria-label="Connector tool"
-    title="Connector tool (Ctrl+Shift+C)"
-    onclick={onToggleConnector}
-  >
-    ⚡
   </button>
   <button
     type="button"
