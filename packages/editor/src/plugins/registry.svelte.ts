@@ -28,6 +28,16 @@ export class PluginRegistry {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private stores = new Map<symbol, any>();
 
+  /**
+   * Reactive version counter — bumped on every provideStore / release.
+   * getStore reads it so $derived/$effect consumers re-run when the set
+   * of published stores changes (i.e. a plugin installs late and now
+   * has a store to hand out). Without this, a $derived that runs before
+   * a plugin installs would never subscribe to anything reactive, then
+   * fail to re-evaluate once the store appears.
+   */
+  private storesVersion = $state(0);
+
   private cleanups = new Map<string, () => void>();
 
   /** Whether a plugin is currently installed (O(1), no allocation). */
@@ -81,6 +91,9 @@ export class PluginRegistry {
    *  claimed the key. Built-in editor code (App.svelte / honest-tests)
    *  uses this to discover plugin functionality without an import. */
   getStore<T>(key: symbol): T | undefined {
+    // Touch the reactive version so $derived consumers re-run when a
+    // plugin provides/releases a store after this $derived first ran.
+    void this.storesVersion;
     return this.stores.get(key) as T | undefined;
   }
 
@@ -187,10 +200,12 @@ export class PluginRegistry {
           );
         }
         registry.stores.set(key, store);
+        registry.storesVersion++;
         ownedStoreKeys.push(key);
         return () => {
           if (registry.stores.get(key) === store) {
             registry.stores.delete(key);
+            registry.storesVersion++;
           }
         };
       },

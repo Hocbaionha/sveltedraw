@@ -17,13 +17,11 @@
   type Language = { code: string; label: string };
   type Props = {
     libraryPanelOpen: boolean;
-    laserActive: boolean;
     theme: string;
     libraryLabel: string;
     currentLangCode: string;
     availableLanguages: readonly Language[];
     onToggleLibraryPanel: () => void;
-    onToggleLaser: () => void;
     onCreateFrame: () => void;
     onStartPresentation: () => void;
     onOpenExport: () => void;
@@ -33,13 +31,11 @@
 
   let {
     libraryPanelOpen,
-    laserActive,
     theme,
     libraryLabel,
     currentLangCode,
     availableLanguages,
     onToggleLibraryPanel,
-    onToggleLaser,
     onCreateFrame,
     onStartPresentation,
     onOpenExport,
@@ -77,16 +73,6 @@
     onclick={onToggleLibraryPanel}
   >
     📚
-  </button>
-  <button
-    type="button"
-    class="sveltedraw-util-btn"
-    class:active={laserActive}
-    aria-label="Laser pointer"
-    title="Laser pointer (K, L in presentation)"
-    onclick={onToggleLaser}
-  >
-    ✦
   </button>
   <button
     type="button"

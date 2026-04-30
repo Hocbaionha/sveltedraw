@@ -125,7 +125,6 @@
   import ElementLinkDialog from "./components/ElementLinkDialog.svelte";
   import GridRenderer from "./components/GridRenderer.svelte";
   import SnapGuideRenderer from "./components/SnapGuideRenderer.svelte";
-  import LaserOverlay from "./components/LaserOverlay.svelte";
   import MeasurementOverlay from "./components/MeasurementOverlay.svelte";
   import LinkChip from "./components/LinkChip.svelte";
   import ShadowPresetsRow from "./components/ShadowPresetsRow.svelte";
@@ -206,6 +205,14 @@
     type ConnectorBridge,
     type ConnectorStore,
   } from "./plugins/builtin/connector-tool/index.js";
+  import {
+    LASER_BRIDGE_KEY,
+    LASER_STORE_KEY,
+    LASER_REACTIVE_KEY,
+    type LaserBridge,
+    type LaserReactive,
+    type LaserStore,
+  } from "./plugins/builtin/laser-pointer/index.js";
   import { builtinPlugins } from "./plugins/builtin/index.js";
   import type { SveltedrawPlugin } from "./plugins/types.js";
   import { installSveltedrawProbe } from "./dev/probe.js";
@@ -876,8 +883,9 @@
         confirmLinkDialog: (v) => confirmLinkDialog(v),
         isLinkDialogOpen: () => linkDialogOpen,
         toggleLaser: () => toggleLaser(),
-        isLaserActive: () => laserActive,
-        getLaserTrailLen: () => laserTrail.length,
+        isLaserActive: () => pluginRegistry.getStore<LaserStore>(LASER_STORE_KEY)?.isActive() ?? false,
+        getLaserTrailLen: () => pluginRegistry.getStore<LaserStore>(LASER_STORE_KEY)?.trailLength() ?? 0,
+        getLaserTrailLength: () => pluginRegistry.getStore<LaserStore>(LASER_STORE_KEY)?.trailLength() ?? 0,
         setMeasurementConfig: (patch) =>
           Object.assign(measurementConfig, patch as Partial<MeasurementConfig>),
         getMeasurementConfig: () => ({ ...measurementConfig }),
@@ -1032,12 +1040,10 @@
       containerEl?.removeEventListener("dragover", onContainerDragOver);
       containerEl?.removeEventListener("drop", onContainerDrop);
       teardownTouch();
-      // A2: stop the laser RAF loop on unmount so callbacks don't fire
-      // against a torn-down component.
-      if (laserRafId !== null) {
-        cancelAnimationFrame(laserRafId);
-        laserRafId = null;
-      }
+      // Laser RAF cleanup is now inside the laser-pointer plugin's
+      // install() return — runs automatically when the plugin
+      // uninstalls (App.svelte cleanup → builtinPlugins removed →
+      // each plugin's cleanup fires).
       // Flush the pending save synchronously on unmount too.
       flushPendingSave();
       // Phase 17: tear down any active collab session. leaveRoom is
@@ -1101,12 +1107,10 @@
     // Commit any in-progress polyline before switching tool — otherwise
     // the floating newElement would leak across tool changes.
     if (polylineActive) commitPolyline();
-    // A2: switching tools (or entering selection) exits laser. Matches
-    // the plan's "Laser mode auto-exits on Esc or tool switch".
-    if (laserActive) {
-      laserActive = false;
-      laserTrail = [];
-    }
+    // Switching tools cancels the laser pointer — delegated to the
+    // plugin store. Matches the prior "Laser auto-exits on Esc or tool
+    // switch" behavior.
+    pluginRegistry.getStore<LaserStore>(LASER_STORE_KEY)?.cancel();
     // Preserve the lock flag across tool changes: if the user had
     // "tool lock" enabled with a drawing tool and draws a shape,
     // the pointerup handler skips the auto-switch — but when the
@@ -1665,44 +1669,14 @@
     bumpSceneRepaint();
   };
 
-  // A2: laser pointer. `laserActive` toggles the tool; `laserTrail` holds
-  // recent pointer samples; a RAF loop prunes points older than LASER_FADE_MS
-  // so the SVG overlay shows a fading trail. Points are in viewport coords
-  // (container-relative) — renderer doesn't need zoom/scroll math that way.
-  const LASER_FADE_MS = 800;
-  let laserActive = $state(false);
-  let laserTrail = $state<Array<{ x: number; y: number; t: number }>>([]);
-  // `laserFrame` bumps every RAF tick so the polyline re-evaluates opacity
-  // continuously — otherwise a stationary pointer leaves the trail at a
-  // stale opacity until the next sample lands.
-  let laserFrame = $state(0);
-  let laserRafId: number | null = null;
-
-  const pruneLaserTrail = () => {
-    const cutoff = performance.now() - LASER_FADE_MS;
-    let i = 0;
-    while (i < laserTrail.length && laserTrail[i].t < cutoff) i++;
-    if (i > 0) laserTrail = laserTrail.slice(i);
-    laserFrame++;
-    if (laserActive || laserTrail.length > 0) {
-      laserRafId = requestAnimationFrame(pruneLaserTrail);
-    } else {
-      laserRafId = null;
-    }
-  };
-
-  const startLaserRaf = () => {
-    if (laserRafId !== null) return;
-    laserRafId = requestAnimationFrame(pruneLaserTrail);
-  };
-
-  const toggleLaser = () => {
-    laserActive = !laserActive;
-    if (laserActive) {
-      startLaserRaf();
-    } else {
-      laserTrail = [];
-    }
+  // Laser pointer migrated to builtin/laser-pointer plugin. The plugin
+  // owns active flag + trail + RAF loop; App.svelte's pointermove
+  // handler just calls store.recordSample(x, y) with container-relative
+  // coords (the plugin can't read event.clientX/Y or container rect).
+  // toggleLaser is preserved as a thin shim for the probe surface
+  // (honest-tests call probe.toggleLaser).
+  const toggleLaser = (): void => {
+    pluginRegistry.getStore<LaserStore>(LASER_STORE_KEY)?.toggle();
   };
 
   const openLinkDialog = () => {
@@ -2069,6 +2043,14 @@
     },
   };
   registerCtx(CONNECTOR_BRIDGE_KEY, connectorBridge);
+
+  // Bridge for the laser-pointer plugin — exposes the canvas
+  // dimensions for the SVG overlay viewBox.
+  const laserBridge: LaserBridge = {
+    get width() { return appState.width as number; },
+    get height() { return appState.height as number; },
+  };
+  registerCtx(LASER_BRIDGE_KEY, laserBridge);
 
   // ── Smart Alignment & Guides ─────────────────────────────────────────
   // Implementation in ./alignment/handlers.ts.
@@ -3490,11 +3472,8 @@
 
     // Escape → clear in-progress element + selection + back to selection tool.
     if (event.key === "Escape") {
-      // A2: Esc also turns off laser if active.
-      if (laserActive) {
-        laserActive = false;
-        laserTrail = [];
-      }
+      // Esc cancels the laser pointer if active (delegated to plugin).
+      pluginRegistry.getStore<LaserStore>(LASER_STORE_KEY)?.cancel();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (appState as any).newElement = null;
       polylineActive = false;
@@ -4826,13 +4805,17 @@
     // A2: laser trail. Record container-relative coords so the SVG overlay
     // (also container-relative) can render without extra math. Runs before
     // any drawing/drag handlers so it fires even during pan or pinch.
-    if (laserActive && containerEl) {
-      const r = containerEl.getBoundingClientRect();
-      laserTrail = [
-        ...laserTrail,
-        { x: event.clientX - r.left, y: event.clientY - r.top, t: performance.now() },
-      ];
-      startLaserRaf();
+    // Laser pointer trail sample — delegated to plugin store. The plugin
+    // owns the active flag + RAF loop + trail array; this hot-path
+    // call early-returns when inactive (single boolean check) so no
+    // perf cost when off. Container-relative coords because the
+    // laser-pointer overlay is also container-relative.
+    if (containerEl) {
+      const laser = pluginRegistry.getStore<LaserStore>(LASER_STORE_KEY);
+      if (laser?.isActive()) {
+        const r = containerEl.getBoundingClientRect();
+        laser.recordSample(event.clientX - r.left, event.clientY - r.top);
+      }
     }
 
     // ── Pinch update: when 2+ touches are active, compute new
@@ -5386,8 +5369,11 @@
         ? "sveltedraw--view-mode"
         : "",
       editorInterface.formFactor === "phone" ? "sveltedraw--mobile" : "",
-      // A2: crosshair cursor while laser tool is active.
-      laserActive ? "sveltedraw--laser" : "",
+      // Crosshair cursor while laser tool is active. Reads through
+      // the plugin's LASER_REACTIVE_KEY view (returns a getter-backed
+      // object so reading `.active` from inside this $derived tracks
+      // through Svelte's $state proxy).
+      pluginRegistry.getStore<LaserReactive>(LASER_REACTIVE_KEY)?.active ? "sveltedraw--laser" : "",
       // B2: eraser cursor hint.
       (appState.activeTool as any)?.type === "eraser" ? "sveltedraw--eraser" : "",
     ]
@@ -5526,13 +5512,11 @@
   <!-- Top-right utility bar — see components/UtilityBar.svelte. -->
   <UtilityBar
     libraryPanelOpen={libraryPanelOpen}
-    laserActive={laserActive}
     theme={(appState as any).theme}
     libraryLabel={t("toolBar.library")}
     currentLangCode={currentLangCode}
     availableLanguages={availableLanguages}
     onToggleLibraryPanel={() => (libraryPanelOpen = !libraryPanelOpen)}
-    onToggleLaser={toggleLaser}
     onCreateFrame={createFrameAtCenter}
     onStartPresentation={handleStartPresentation}
     onOpenExport={() => (exportPanelActive = true)}
@@ -6066,15 +6050,8 @@
     sceneNonce={sceneReady}
   />
 
-  <!-- A2: laser pointer overlay — extracted to LaserOverlay.svelte. -->
-  <LaserOverlay
-    active={laserActive}
-    trail={laserTrail}
-    frame={laserFrame}
-    fadeMs={LASER_FADE_MS}
-    width={appState.width}
-    height={appState.height}
-  />
+  <!-- Laser pointer overlay now mounts via the laser-pointer plugin's
+       canvas-overlay registration (z-index 20, decorative). -->
 
   <InteractiveCanvas
     appState={{

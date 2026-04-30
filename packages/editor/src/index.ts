@@ -100,6 +100,17 @@ export type {
   ConnectorStore,
   ConnectorBridge,
 } from './plugins/builtin/connector-tool/index.js';
+export {
+  laserPointerPlugin,
+  LASER_STORE_KEY,
+  LASER_BRIDGE_KEY,
+  LASER_REACTIVE_KEY,
+} from './plugins/builtin/laser-pointer/index.js';
+export type {
+  LaserStore,
+  LaserBridge,
+  LaserReactive,
+} from './plugins/builtin/laser-pointer/index.js';
 export { COLLAB_STORE_KEY } from './collab/store.svelte.js';
 export { createCollabStore } from './collab/store.svelte.js';
 export type { CollabStore, CollabRole, CollabUser } from './collab/store.svelte.js';
