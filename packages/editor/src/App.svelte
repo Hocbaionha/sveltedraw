@@ -1112,6 +1112,10 @@
     // plugin store. Matches the prior "Laser auto-exits on Esc or tool
     // switch" behavior.
     pluginRegistry.getStore<LaserStore>(LASER_STORE_KEY)?.cancel();
+    // Same for the connector tool — leaving its state.active true while
+    // another tool is selected would cause the next pointerdown to be
+    // intercepted by handlePick and silently spawn an arrow.
+    pluginRegistry.getStore<ConnectorStore>(CONNECTOR_STORE_KEY)?.cancel();
     // Preserve the lock flag across tool changes: if the user had
     // "tool lock" enabled with a drawing tool and draws a shape,
     // the pointerup handler skips the auto-switch — but when the
@@ -3504,6 +3508,12 @@
     if (event.key === "Escape") {
       // Esc cancels the laser pointer if active (delegated to plugin).
       pluginRegistry.getStore<LaserStore>(LASER_STORE_KEY)?.cancel();
+      // Esc also cancels the connector tool. Without this, an Esc after
+      // a first pick would leave the plugin in active=true / firstPickId
+      // set, and the very next click on any shape would silently fire
+      // off an unwanted arrow. The plugin's cancel is selection-aware
+      // (only clears the highlight when one was applied).
+      pluginRegistry.getStore<ConnectorStore>(CONNECTOR_STORE_KEY)?.cancel();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (appState as any).newElement = null;
       polylineActive = false;

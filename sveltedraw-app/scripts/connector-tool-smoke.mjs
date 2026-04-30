@@ -153,6 +153,29 @@ const tests = await ev(`
     detail: 'selectedElementIds=' + JSON.stringify(p.appState.selectedElementIds),
   });
 
+  // ── Esc must cancel connector even mid-pick. Without this, after
+  //    Esc the plugin keeps state.active=true / firstPickId=rect-A,
+  //    and the next pointerdown on any shape silently spawns an arrow.
+  toolBtn?.click(); // turn on again
+  await new Promise(r => setTimeout(r, 80));
+  dispatchPointer(140, 130); // first pick on rect-A
+  await new Promise(r => setTimeout(r, 80));
+  const container = document.querySelector('.sveltedraw-container');
+  container?.focus();
+  container?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+  await new Promise(r => setTimeout(r, 100));
+  // After Esc, a click on rect-B must NOT create a new arrow because
+  // the tool is no longer active.
+  const arrowsBeforeEscClick = p.scene.getNonDeletedElements().filter(e => e.type === 'arrow').length;
+  dispatchPointer(440, 230); // would-be second pick on rect-B
+  await new Promise(r => setTimeout(r, 150));
+  const arrowsAfterEscClick = p.scene.getNonDeletedElements().filter(e => e.type === 'arrow').length;
+  tests.push({
+    name: 'Esc cancels connector mid-pick (no zombie arrow on next click)',
+    ok: arrowsAfterEscClick === arrowsBeforeEscClick,
+    detail: 'arrows before=' + arrowsBeforeEscClick + ' after=' + arrowsAfterEscClick,
+  });
+
   return tests;
 `);
 
