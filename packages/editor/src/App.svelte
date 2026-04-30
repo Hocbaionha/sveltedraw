@@ -207,9 +207,7 @@
   import {
     LASER_BRIDGE_KEY,
     LASER_STORE_KEY,
-    LASER_REACTIVE_KEY,
     type LaserBridge,
-    type LaserReactive,
     type LaserStore,
   } from "./plugins/builtin/laser-pointer/index.js";
   import {
@@ -2057,8 +2055,13 @@
   // count + the export pipeline. The plugin owns the modal UI + the
   // ExportOptions state; App.svelte holds the closures over scene +
   // appState + binaryFiles that the actual byte-level export needs.
+  // `scene` is a non-reactive local, so the elementCount getter touches
+  // `sceneReady` (the same nonce the canvas-render effect bumps) so any
+  // consumer reading the count inside a $derived re-runs after element
+  // adds/deletes.
   const exportBridge: ExportBridge = {
     get elementCount() {
+      void sceneReady;
       return scene ? scene.getNonDeletedElements().length : 0;
     },
     doExport: (options, onComplete) => {
@@ -5396,11 +5399,12 @@
         ? "sveltedraw--view-mode"
         : "",
       editorInterface.formFactor === "phone" ? "sveltedraw--mobile" : "",
-      // Crosshair cursor while laser tool is active. Reads through
-      // the plugin's LASER_REACTIVE_KEY view (returns a getter-backed
-      // object so reading `.active` from inside this $derived tracks
-      // through Svelte's $state proxy).
-      pluginRegistry.getStore<LaserReactive>(LASER_REACTIVE_KEY)?.active ? "sveltedraw--laser" : "",
+      // Crosshair cursor while laser tool is active. The registry's
+      // storesVersion counter makes getStore() reactive to plugin
+      // install order; `isActive()` reads `state.active` off the $state
+      // proxy — reads inside the function body still register with
+      // this $derived's tracking scope.
+      pluginRegistry.getStore<LaserStore>(LASER_STORE_KEY)?.isActive() ? "sveltedraw--laser" : "",
       // B2: eraser cursor hint.
       (appState.activeTool as any)?.type === "eraser" ? "sveltedraw--eraser" : "",
     ]
@@ -6328,10 +6332,9 @@
      jump to the URL without opening the dialog. */
   /* .sveltedraw-link-chip styles live in LinkChip.svelte now. */
 
-  /* A2: laser overlay pinned over the canvas. pointer-events: none so the
-     trail never blocks clicks on the underlying canvas. Z-index above the
-     canvas layer but below side panels. */
-  /* .sveltedraw-laser-overlay styles live in LaserOverlay.svelte now. */
+  /* Laser overlay: cursor crosshair on the editor container while the
+     tool is active. The SVG itself + its layout live in LaserOverlay.svelte
+     (mounted by the laser-pointer plugin). */
   :global(.sveltedraw--laser) { cursor: crosshair; }
   :global(.sveltedraw--eraser) { cursor: crosshair; }
 
@@ -6714,24 +6717,6 @@
 
   .sveltedraw-collab-toast--ok :global(.Toast) {
     border-left: 4px solid #2f9e44;
-  }
-
-  .sveltedraw-connector-panel {
-    position: absolute;
-    bottom: 16px;
-    right: 20px;
-    width: 280px;
-    max-height: 50vh;
-    background: #fff;
-    border: 1px solid #d1d4da;
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    z-index: 40;
-    overflow-y: auto;
-  }
-  :global(.sveltedraw.theme--dark) .sveltedraw-connector-panel {
-    background: #232329;
-    border-color: #363636;
   }
 
   .sveltedraw-alignment-panel {

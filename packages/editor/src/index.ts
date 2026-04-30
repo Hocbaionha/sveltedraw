@@ -104,12 +104,10 @@ export {
   laserPointerPlugin,
   LASER_STORE_KEY,
   LASER_BRIDGE_KEY,
-  LASER_REACTIVE_KEY,
 } from './plugins/builtin/laser-pointer/index.js';
 export type {
   LaserStore,
   LaserBridge,
-  LaserReactive,
 } from './plugins/builtin/laser-pointer/index.js';
 export {
   exportPanelPlugin,

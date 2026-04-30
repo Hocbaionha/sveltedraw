@@ -86,9 +86,10 @@ const tests = await ev(`
   const overlay = document.querySelector('svg.sveltedraw-laser-overlay');
   const lines = overlay ? overlay.querySelectorAll('line') : [];
   const trailLen = p.getLaserTrailLen?.() ?? 0;
+  // 3 samples should produce 2 line segments (one per consecutive pair).
   tests.push({
-    name: 'Pointermove records trail (svg has line segments)',
-    ok: lines.length >= 1,
+    name: 'Pointermove records trail (3 samples => 2 svg line segments)',
+    ok: lines.length >= 2 && trailLen >= 3,
     detail: 'overlay=' + !!overlay + ' lines=' + lines.length + ' trailLen=' + trailLen,
   });
 

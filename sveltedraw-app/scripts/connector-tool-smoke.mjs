@@ -136,6 +136,23 @@ const tests = await ev(`
     ok: arrow?.endBinding?.elementId === 'rect-B',
   });
 
+  // ── Toggle-off without first-pick must NOT clobber existing selection.
+  //    Pre-select rect-A, toggle the connector tool on then off without
+  //    clicking any shape; selection should still be rect-A.
+  p.appState.selectedElementIds = { 'rect-A': true };
+  await new Promise(r => setTimeout(r, 50));
+  const toolBtn = document.querySelector('button[data-plugin-toolbar-id="builtin/connector-tool/toggle"]')
+    ?? document.querySelector('button[title^="Connector tool"]');
+  toolBtn?.click(); // turn on
+  await new Promise(r => setTimeout(r, 80));
+  toolBtn?.click(); // turn off — without a first pick
+  await new Promise(r => setTimeout(r, 80));
+  tests.push({
+    name: 'Toggle off without first-pick preserves prior selection',
+    ok: p.appState.selectedElementIds?.['rect-A'] === true,
+    detail: 'selectedElementIds=' + JSON.stringify(p.appState.selectedElementIds),
+  });
+
   return tests;
 `);
 

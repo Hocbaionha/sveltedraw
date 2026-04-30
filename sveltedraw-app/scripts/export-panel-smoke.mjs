@@ -52,46 +52,40 @@ const tests = await ev(`
   const p = window.__sveltedrawProbe;
   const tests = [];
 
-  // ── 1. UtilityBar Export button (the 💾 utility-bar button) opens the panel
-  const utilBtn = document.querySelector('button[aria-label="Export"].sveltedraw-util-btn');
-  utilBtn?.click();
+  // ── 1. Plugin's toolbar button (the only Export button in the bar
+  //      after wave 3 cleanup — UtilityBar dropped its hardcoded copy)
+  //      opens the panel. Selecting by data-plugin-toolbar-id proves
+  //      the click is exercising the plugin path, not a stray fallback.
+  const pluginBtn = document.querySelector('button[data-plugin-toolbar-id="builtin/export-panel/open"]');
+  pluginBtn?.click();
   await new Promise(r => setTimeout(r, 200));
   const panelOpen = !!document.querySelector('.export-panel-overlay');
   tests.push({
-    name: 'UtilityBar Export button opens panel',
-    ok: panelOpen,
-    detail: 'overlay=' + panelOpen + ' btnFound=' + !!utilBtn,
+    name: 'Plugin toolbar button opens panel',
+    ok: panelOpen && !!pluginBtn,
+    detail: 'overlay=' + panelOpen + ' pluginBtn=' + !!pluginBtn,
   });
 
-  // ── 2. Close button (X) hides the panel
-  const closeBtn = document.querySelector('.export-panel-overlay .close-btn, .export-panel-overlay button[aria-label="Close"], .export-panel-overlay [data-close]');
-  // Fallback: click overlay backdrop (onclick={onClose} on the overlay)
+  // ── 2. There must be exactly ONE Export button (no leftover hardcoded)
+  const allExportBtns = document.querySelectorAll('button[aria-label="Export"]');
+  tests.push({
+    name: 'Only one Export button after wave 3 cleanup',
+    ok: allExportBtns.length === 1,
+    detail: 'count=' + allExportBtns.length,
+  });
+
+  // ── 3. Close (click overlay backdrop) hides the panel
   const overlayEl = document.querySelector('.export-panel-overlay');
-  if (closeBtn) {
-    closeBtn.click();
-  } else if (overlayEl) {
-    overlayEl.click();
-  }
+  overlayEl?.click();
   await new Promise(r => setTimeout(r, 150));
   const closedAfterX = !document.querySelector('.export-panel-overlay');
-  tests.push({
-    name: 'Close hides panel',
-    ok: closedAfterX,
-  });
+  tests.push({ name: 'Click backdrop hides panel', ok: closedAfterX });
 
-  // ── 3. Plugin toolbar item also toggles
-  const tbBtn = document.querySelector('button[data-plugin-toolbar-id="builtin/export-panel/open"], button[aria-label="Export"]:not(.sveltedraw-util-btn)');
-  // Fallback: any toolbar button whose title is "Export"
-  const fallback = Array.from(document.querySelectorAll('button[title="Export"]')).find((b) => !b.classList.contains('sveltedraw-util-btn'));
-  const pluginBtn = tbBtn ?? fallback ?? utilBtn;
+  // ── 3b. Plugin store toggle re-opens
   pluginBtn?.click();
   await new Promise(r => setTimeout(r, 150));
   const reopened = !!document.querySelector('.export-panel-overlay');
-  tests.push({
-    name: 'Plugin toolbar opens panel',
-    ok: reopened,
-    detail: 'btnUsed=' + (tbBtn ? 'plugin' : (fallback ? 'fallback' : 'utility')),
-  });
+  tests.push({ name: 'Plugin button toggles back on', ok: reopened });
 
   // ── 4. Bridge: clicking Export inside the panel triggers doExport
   // Install the download hook so we capture the blob without the

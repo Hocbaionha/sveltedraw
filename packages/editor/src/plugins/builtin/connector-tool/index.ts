@@ -48,9 +48,16 @@ export const connectorToolPlugin: SveltedrawPlugin = {
     const bridge = ctx.getStore<ConnectorBridge>(CONNECTOR_BRIDGE_KEY) ?? null;
 
     const cancel = (): void => {
+      // Only clear the highlight when we actually applied one. Calling
+      // setHighlight(null) unconditionally would wipe whatever selection
+      // the user already had before activating the tool — the bridge
+      // implementation overwrites selectedElementIds wholesale.
+      const hadHighlight = state.firstPickId !== null;
       state.active = false;
       state.firstPickId = null;
-      bridge?.setHighlight(null);
+      if (hadHighlight) {
+        bridge?.setHighlight(null);
+      }
     };
 
     bindPanelHost({ state, onCancel: cancel });

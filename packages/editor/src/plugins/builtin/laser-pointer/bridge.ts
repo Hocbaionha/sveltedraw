@@ -13,22 +13,3 @@ export type LaserBridge = {
   /** Reactive: editor canvas height. */
   readonly height: number;
 };
-
-/**
- * Reactive view published BY the laser plugin (not by App.svelte).
- * Lets App.svelte read the active flag inside reactive contexts
- * ($derived, $effect) — calling pluginRegistry.getStore<LaserStore>()
- * .isActive() doesn't track the underlying $state because the
- * function call boundary swallows the reactive read.
- *
- * The plugin's install() publishes a getter that returns state.active
- * directly off the $state proxy, so any consumer reading
- * `view.active` from inside a $derived gets proper tracking.
- */
-export const LASER_REACTIVE_KEY: unique symbol = Symbol("laserReactive");
-
-export type LaserReactive = {
-  /** Reactive: true when the laser tool is on. Read inside $derived /
-   *  $effect to get reactivity through the property access. */
-  readonly active: boolean;
-};

@@ -121,6 +121,7 @@
       class:active={item.isActive?.()}
       aria-label={item.title}
       title={item.title}
+      data-plugin-toolbar-id={item.id}
       onclick={item.onActivate}
     >
       {#if typeof item.icon === "function"}
@@ -136,6 +137,7 @@
       class:active={item.isActive?.()}
       aria-label={item.title}
       title={item.title}
+      data-plugin-toolbar-id={item.id}
       onclick={item.onActivate}
     >
       {#if typeof item.icon === "function"}
@@ -151,6 +153,7 @@
       class:active={item.isActive?.()}
       aria-label={item.title}
       title={item.title}
+      data-plugin-toolbar-id={item.id}
       onclick={item.onActivate}
     >
       {#if typeof item.icon === "function"}

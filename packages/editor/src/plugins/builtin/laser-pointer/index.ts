@@ -13,12 +13,7 @@
 
 import type { SveltedrawPlugin, SveltedrawPluginContext } from "../../types.js";
 import { createState, type LaserPoint } from "./state.svelte.js";
-import {
-  LASER_BRIDGE_KEY,
-  LASER_REACTIVE_KEY,
-  type LaserBridge,
-  type LaserReactive,
-} from "./bridge.js";
+import { LASER_BRIDGE_KEY, type LaserBridge } from "./bridge.js";
 import Overlay, { bindOverlay } from "./Overlay.svelte";
 import LaserIcon from "./Icon.svelte";
 
@@ -27,6 +22,11 @@ export const LASER_STORE_KEY: unique symbol = Symbol("laserStore");
 const LASER_FADE_MS = 800;
 
 export type LaserStore = {
+  /** Reactive read: returns true while the laser tool is on. Reads
+   *  the underlying $state proxy directly, so consumers calling this
+   *  inside a $derived/$effect get tracked. (Combined with the
+   *  registry's storesVersion counter, the very first call after a
+   *  plugin install is also reactive.) */
   isActive(): boolean;
   /** Toggle on/off. Re-arms the RAF loop on enable; clears the trail
    *  on disable. */
@@ -40,8 +40,8 @@ export type LaserStore = {
   trailLength(): number;
 };
 
-export { LASER_BRIDGE_KEY, LASER_REACTIVE_KEY };
-export type { LaserBridge, LaserReactive };
+export { LASER_BRIDGE_KEY };
+export type { LaserBridge };
 
 export const laserPointerPlugin: SveltedrawPlugin = {
   id: "builtin/laser-pointer",
@@ -102,14 +102,6 @@ export const laserPointerPlugin: SveltedrawPlugin = {
     };
     const releaseStore = ctx.provideStore(LASER_STORE_KEY, store);
 
-    // Reactive view — App.svelte reads via $derived to track active
-    // changes through the property access. Plain getter returning
-    // state.active directly off the $state proxy.
-    const reactive: LaserReactive = {
-      get active() { return state.active; },
-    };
-    const releaseReactive = ctx.provideStore(LASER_REACTIVE_KEY, reactive);
-
     const removeToolbarItem = ctx.addToolbarItem({
       id: "toggle",
       icon: LaserIcon,
@@ -135,7 +127,6 @@ export const laserPointerPlugin: SveltedrawPlugin = {
         rafId = null;
       }
       releaseStore();
-      releaseReactive();
       removeToolbarItem();
       removeCanvasOverlay();
     };
