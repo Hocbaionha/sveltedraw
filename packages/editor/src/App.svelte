@@ -122,7 +122,6 @@
   import StaticCanvas from "./components/canvases/StaticCanvas.svelte";
   import InteractiveCanvas from "./components/canvases/InteractiveCanvas.svelte";
   import NewElementCanvas from "./components/canvases/NewElementCanvas.svelte";
-  import TemplateSelector from "./components/TemplateSelector.svelte";
   import ElementLinkDialog from "./components/ElementLinkDialog.svelte";
   import ConnectorTool from "./components/ConnectorTool.svelte";
   import AlignmentPanel from "./components/AlignmentPanel.svelte";
@@ -177,6 +176,7 @@
   import { recentFilesPlugin, RECENT_FILES_STORE_KEY } from "./plugins/builtin/recent-files/index.js";
   import { SETTINGS_STORE_KEY } from "./plugins/builtin/settings/index.js";
   import { HELP_STORE_KEY } from "./plugins/builtin/help/index.js";
+  import { TEMPLATES_STORE_KEY } from "./plugins/builtin/templates/index.js";
   import { builtinPlugins } from "./plugins/builtin/index.js";
   import type { SveltedrawPlugin } from "./plugins/types.js";
   import { installSveltedrawProbe } from "./dev/probe.js";
@@ -1596,7 +1596,6 @@
 
   let libraryItems = $state<LibraryItem[]>([]);
   let libraryPanelOpen = $state(false);
-  let showTemplateSelector = $state(false);
 
   // A1: element-link dialog. Opens via Ctrl+K or context-menu on a single
   // selected element. `targetId` points at the element whose link we edit.
@@ -1968,41 +1967,6 @@
   const deleteLibraryItem = (id: string) => {
     libraryItems = libraryItems.filter((it) => it.id !== id);
     persistLibrary();
-  };
-
-  // Load template and create elements from it
-  const selectTemplate = (template: Template) => {
-    if (!scene) return;
-
-    // Convert template elements to proper drawing elements.
-    // NOTE: `newElement` is typed to generic shapes (rect/ellipse/diamond/
-    // selection) and does not accept `text`. Text elements should really
-    // go through `newTextElement` — falling through `as any` keeps the
-    // existing permissive template-loading behavior until that's wired up.
-    const newElements = template.elements.map((templateEl: any) => {
-      const el = newElement({
-        type: templateEl.type || 'rectangle',
-        x: templateEl.x ?? 0,
-        y: templateEl.y ?? 0,
-        width: templateEl.width ?? 100,
-        height: templateEl.height ?? 100,
-        strokeColor: templateEl.strokeColor ?? '#000000',
-        backgroundColor: templateEl.backgroundColor ?? '#ffffff',
-        fillStyle: templateEl.fillStyle ?? 'solid',
-        strokeWidth: templateEl.strokeWidth ?? 1,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ...({ text: templateEl.text ?? '' } as any),
-      });
-      return el;
-    });
-
-    // Clear existing elements and replace with template
-    scene.replaceAllElements(newElements, { skipValidation: true });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (appState as any).selectedElementIds = {};
-    pushHistory();
-    bumpSceneRepaint();
-    showTemplateSelector = false;
   };
 
   // Create an arrow element from center of `fromEl` to center of `toEl`
@@ -3126,10 +3090,15 @@
         return;
       }
 
-      // Phase 12: Template selector: Ctrl+N (new with template)
+      // Template selector: Ctrl+N — delegated to the templates plugin.
       if (!event.shiftKey && (event.key === "n" || event.key === "N")) {
-        showTemplateSelector = true;
-        event.preventDefault();
+        const store = pluginRegistry.getStore<{ open(): void }>(
+          TEMPLATES_STORE_KEY,
+        );
+        if (store) {
+          store.open();
+          event.preventDefault();
+        }
         return;
       }
 
@@ -5470,7 +5439,6 @@
     currentLangCode={currentLangCode}
     availableLanguages={availableLanguages}
     onToggleLibraryPanel={() => (libraryPanelOpen = !libraryPanelOpen)}
-    onOpenTemplates={() => (showTemplateSelector = true)}
     onToggleConnector={() => (connectorToolActive = !connectorToolActive)}
     onToggleLaser={toggleLaser}
     onCreateFrame={createFrameAtCenter}
@@ -5718,13 +5686,6 @@
   {/if}
 
   <!-- Template selector — modal for choosing pre-made templates. -->
-  {#if showTemplateSelector}
-    <TemplateSelector
-      onSelect={selectTemplate}
-      onClose={() => (showTemplateSelector = false)}
-    />
-  {/if}
-
   <!-- A1: element-link dialog. Modal overlay; Ctrl+K, context menu, and the
        hover chip all flow through openLinkDialog(). The overlay is just a
        backdrop — click closes; keyboard Esc also closes via the dialog's

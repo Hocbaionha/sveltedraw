@@ -26,6 +26,8 @@ export { settingsPlugin, SETTINGS_STORE_KEY } from './plugins/builtin/settings/i
 export type { SettingsStore } from './plugins/builtin/settings/index.js';
 export { helpPlugin, HELP_STORE_KEY } from './plugins/builtin/help/index.js';
 export type { HelpStore } from './plugins/builtin/help/index.js';
+export { templatesPlugin, TEMPLATES_STORE_KEY } from './plugins/builtin/templates/index.js';
+export type { TemplatesStore } from './plugins/builtin/templates/index.js';
 export { COLLAB_STORE_KEY } from './collab/store.svelte.js';
 export { createCollabStore } from './collab/store.svelte.js';
 export type { CollabStore, CollabRole, CollabUser } from './collab/store.svelte.js';

@@ -40,7 +40,6 @@
     currentLangCode: string;
     availableLanguages: readonly Language[];
     onToggleLibraryPanel: () => void;
-    onOpenTemplates: () => void;
     onToggleConnector: () => void;
     onToggleLaser: () => void;
     onCreateFrame: () => void;
@@ -67,7 +66,6 @@
     currentLangCode,
     availableLanguages,
     onToggleLibraryPanel,
-    onOpenTemplates,
     onToggleConnector,
     onToggleLaser,
     onCreateFrame,
@@ -108,15 +106,6 @@
     onclick={onToggleLibraryPanel}
   >
     📚
-  </button>
-  <button
-    type="button"
-    class="sveltedraw-util-btn"
-    aria-label="New from template"
-    title="New from template (Ctrl+N)"
-    onclick={onOpenTemplates}
-  >
-    📋
   </button>
   <button
     type="button"
