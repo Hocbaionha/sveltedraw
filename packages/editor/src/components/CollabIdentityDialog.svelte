@@ -64,8 +64,12 @@
   // not update the form (Svelte's expected behavior for prop-as-default).
   // svelte-ignore state_referenced_locally
   let name = $state(defaultName);
+  // Defensive: palette is always populated by the host (COLLAB_PALETTE
+  // in App.svelte), but if a host passes an empty array we fall back
+  // to a neutral grey rather than letting `color` be `undefined` (which
+  // breaks awareness gossip downstream).
   // svelte-ignore state_referenced_locally
-  let color = $state(defaultColor ?? palette[0]);
+  let color = $state(defaultColor ?? palette[0] ?? "#888888");
   let persist = $state(true);
 
   // Trim-and-validate. We disable submit on empty/whitespace-only names

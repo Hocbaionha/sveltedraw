@@ -80,9 +80,19 @@ export function createCollabStore(api: SveltedrawAPI) {
   // Y.js observers survive provider.destroy() and must be explicitly removed.
   let sessionCleanup: (() => void) | null = null;
 
+  // Monotonic session token. Incremented on every joinRoom() so any
+  // callback that captured an older value can detect "I'm from a stale
+  // session" without relying solely on `provider !== ws` (which holds
+  // for ws-vs-doc identity but doesn't help when provider is briefly
+  // null between leaveRoom and the next joinRoom). Every async / event
+  // callback that touches store state checks this token first.
+  let sessionToken = 0;
+
   function joinRoom(opts: JoinRoomOpts): Promise<void> {
     // Clean up previous session first.
     leaveRoom();
+    const mySession = ++sessionToken;
+    const isStaleSession = (): boolean => mySession !== sessionToken;
 
     return new Promise((resolve, reject) => {
       const ydoc = new Y.Doc();
@@ -106,21 +116,27 @@ export function createCollabStore(api: SveltedrawAPI) {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
-        // Guard: if leaveRoom() was called while this Promise was in flight,
-        // the state has already been reset — don't overwrite it.
-        if (provider !== ws) { resolve(); return; }
+        // Guard: if leaveRoom() (or another joinRoom) ran while this
+        // Promise was in flight, the state has already been reset —
+        // don't overwrite it. The session-token check catches the
+        // case where provider has been reassigned to a fresh ws
+        // between the trigger event and this settle.
+        if (isStaleSession() || provider !== ws) { resolve(); return; }
         fn();
       };
 
       const timer = setTimeout(() => {
-        settle(() => reject(new Error("Connection timed out")));
+        settle(() => {
+          leaveRoom();
+          reject(new Error("Connection timed out"));
+        });
       }, 10_000);
 
       // Resolve on first "connected", then keep mirroring every status
       // change for the rest of the session. y-websocket emits "connecting"
       // / "connected" / "disconnected" on its own reconnect cycle.
       ws.on("status", ({ status: wsStatus }: { status: string }) => {
-        if (provider !== ws) return; // stale event from torn-down session
+        if (isStaleSession() || provider !== ws) return; // stale event from torn-down session
         if (wsStatus === "connected") {
           status = "connected";
           connected = true;
@@ -140,8 +156,16 @@ export function createCollabStore(api: SveltedrawAPI) {
       });
 
       ws.on("connection-error", (event: Event) => {
-        if (provider === ws) status = "disconnected";
-        settle(() => reject(new Error(`WebSocket connection error: ${(event as ErrorEvent).message ?? "unknown"}`)));
+        if (!isStaleSession() && provider === ws) status = "disconnected";
+        settle(() => {
+          // Tear down everything attached to this aborted session before
+          // we hand the rejection up. Without this the awareness/zone
+          // observers registered below would leak (they survive
+          // provider.destroy()), and the change-listener attached to the
+          // api on the resolve path can dangle if the ordering shifts.
+          leaveRoom();
+          reject(new Error(`WebSocket connection error: ${(event as ErrorEvent).message ?? "unknown"}`));
+        });
       });
 
       const onAwarenessChange = () => {
@@ -186,29 +210,58 @@ export function createCollabStore(api: SveltedrawAPI) {
       //      would push the just-applied remote state straight back. The
       //      `isApplyingRemote` flag suppresses outbound for that
       //      synchronous window.
-      // `lastSyncedJson` covers the gap between "remote applied" and
-      // "debounced push fires": without it, the timer reads the post-
-      // apply scene and pings back an equivalent payload to peers, which
-      // re-fires their observer → debounced push → ... ad nauseam.
+      //
+      // No-op redelivery suppression uses a fast content-fingerprint —
+      // a hash of (id, type, x, y, w, h, version) per element. We do
+      // NOT JSON-stringify the entire scene per tick: with a few
+      // thousand elements that's multi-MB strings allocated 12×/sec,
+      // which would peg the main thread well before Yjs becomes the
+      // bottleneck. The fingerprint catches the round-trip case (we
+      // pushed X, peer's broadcast comes back identical) where the
+      // critical fields are byte-identical; minor non-tracked drift
+      // (e.g. updatedAt) just means a single redundant ymap.set, not
+      // a feedback loop, because our LOCAL_ORIGIN guard catches that.
       let isApplyingRemote = false;
-      let lastSyncedJson: string | null = null;
+      let lastSyncedFingerprint: string | null = null;
       let pendingPushTimer: ReturnType<typeof setTimeout> | null = null;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fingerprint = (els: any[]): string => {
+        // Compact, allocation-light digest — concatenation rather than
+        // JSON.stringify. Each element contributes ~70 bytes; for 5k
+        // elements that's ~350KB instead of multiple MB.
+        let s = "";
+        for (let i = 0; i < els.length; i++) {
+          const e = els[i];
+          if (!e) continue;
+          s += e.id + "|" + e.type + "|" + e.x + "," + e.y + "|"
+            + e.width + "x" + e.height + "|" + e.angle + "|" + e.version + ";";
+        }
+        return s;
+      };
 
       const pushLocalNow = (): void => {
         if (pendingPushTimer !== null) {
           clearTimeout(pendingPushTimer);
           pendingPushTimer = null;
         }
+        // Stale-session guard: the debounce fired after leaveRoom() or
+        // a fresh joinRoom replaced this session. Both checks are
+        // belt-and-suspenders: provider !== ws catches identity drift,
+        // isStaleSession catches the brief window where provider may
+        // already be the new session's ws.
+        if (isStaleSession() || provider !== ws) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const live = api.getElements() as any[];
+        const fp = fingerprint(live);
+        if (fp === lastSyncedFingerprint) return;
+        lastSyncedFingerprint = fp;
         // Plain JSON-safe copies — yjs cannot serialize Svelte $state
         // proxies, and any retained ref into the ymap would mutate the
-        // shared map under our feet on the next scene tick.
+        // shared map under our feet on the next scene tick. The clone
+        // happens once per push (debounced), not once per scene tick.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const payload = api.getElements().map((el: any) =>
-          JSON.parse(JSON.stringify(el)),
-        );
-        const json = JSON.stringify(payload);
-        if (json === lastSyncedJson) return;
-        lastSyncedJson = json;
+        const payload = live.map((el: any) => JSON.parse(JSON.stringify(el)));
         ydoc.transact(() => {
           ymap.set("elements", payload);
         }, LOCAL_ORIGIN);
@@ -235,9 +288,10 @@ export function createCollabStore(api: SveltedrawAPI) {
         if (!event.changes.keys.has("elements")) return;
         const remote = ymap.get("elements");
         if (!Array.isArray(remote)) return;
-        const incomingJson = JSON.stringify(remote);
-        if (incomingJson === lastSyncedJson) return;
-        lastSyncedJson = incomingJson;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const fp = fingerprint(remote as any[]);
+        if (fp === lastSyncedFingerprint) return;
+        lastSyncedFingerprint = fp;
         isApplyingRemote = true;
         try {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -273,6 +327,10 @@ export function createCollabStore(api: SveltedrawAPI) {
   }
 
   function leaveRoom(): void {
+    // Bump the session token so any pending callbacks captured in the
+    // outgoing session see isStaleSession() === true and bail before
+    // mutating store state.
+    sessionToken++;
     sessionCleanup?.();
     sessionCleanup = null;
     changeCleanup?.();
@@ -288,15 +346,36 @@ export function createCollabStore(api: SveltedrawAPI) {
     myZone = null;
   }
 
+  // id → frameId index, rebuilt on demand only when the scene changes.
+  // canEdit can fire many times per drag tick in a student-role room
+  // (one call per affected element); the previous implementation did a
+  // linear .find through the full element array per call, giving O(N²)
+  // on big scenes. The cache invalidates on every scene change and
+  // rebuilds lazily on the next read.
+  let frameIdCache: Map<string, string | null> | null = null;
+  let frameIdCacheClear: (() => void) | null = null;
+  const getFrameIdMap = (): Map<string, string | null> => {
+    if (frameIdCache) return frameIdCache;
+    const m = new Map<string, string | null>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const el of api.getElements() as any[]) {
+      m.set(el.id, el.frameId ?? null);
+    }
+    frameIdCache = m;
+    if (!frameIdCacheClear) {
+      frameIdCacheClear = api.onChange(() => {
+        frameIdCache = null;
+      });
+    }
+    return m;
+  };
+
   function canEdit(elementId: string): boolean {
     if (myRole === "teacher") return true;
     if (myRole === "viewer") return false;
     // student: only elements inside their assigned zone frame.
     if (!myZone) return false;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const element = api.getElements().find((e: any) => e.id === elementId);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (element as any)?.frameId === myZone;
+    return getFrameIdMap().get(elementId) === myZone;
   }
 
   function assignZone(userId: string, frameId: string | null): void {

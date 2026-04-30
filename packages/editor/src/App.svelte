@@ -1227,15 +1227,24 @@
   /**
    * Generate an ephemeral anonymous identity for users who join without
    * having gone through the identity dialog (e.g. auto-start via URL).
-   * The id includes 4 random hex chars so two anon tabs in the same
-   * room don't collide on awareness deduplication.
+   * Uses crypto.randomUUID() for id uniqueness — the previous 4-hex
+   * slug had a 16-bit space and hit the birthday bound at ~256 users,
+   * causing awareness-key collisions where one peer's cursor rendered
+   * over another's. The display label still uses the short slug so the
+   * "Guest XXXX" label stays readable.
    */
   const makeAnonIdentity = (): StoredIdentity => {
-    const slug = Math.random().toString(16).slice(2, 6);
+    const uuid =
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      typeof crypto !== "undefined" && (crypto as any).randomUUID
+        ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (crypto as any).randomUUID()
+        : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2, 10)}`;
+    const slug = uuid.slice(0, 4).toUpperCase();
     const color = COLLAB_PALETTE[Math.floor(Math.random() * COLLAB_PALETTE.length)];
     return {
-      id: `anon-${slug}`,
-      name: `Guest ${slug.toUpperCase()}`,
+      id: `anon-${uuid}`,
+      name: `Guest ${slug}`,
       color,
     };
   };
@@ -1390,15 +1399,22 @@
   // own state and would just be noise as a toast.
   let collabToast: { message: string; tone: "info" | "warn" | "ok" } | null =
     $state(null);
+  // prevCollabStatus is intentionally NOT $state — it's a back-channel
+  // memo for the effect's transition detection, not a UI signal. The
+  // effect tracks only collabStore.status; reading the previous value
+  // and writing the new one happens after that read so it's a plain
+  // mutation, not a reactive dep.
   let prevCollabStatus: typeof collabStore.status = "idle";
   $effect(() => {
     const cur = collabStore.status;
+    // Snapshot prev → cur, then update. Wrapped in untrack so any
+    // future addition that reads other reactive state in this branch
+    // doesn't accidentally re-fire the effect on unrelated churn.
     const prev = prevCollabStatus;
     prevCollabStatus = cur;
-
     if (prev === "connected" && cur === "disconnected") {
-      // Mid-session drop. y-websocket auto-reconnects so we promise the
-      // user it's coming back; the connected→toast (below) confirms.
+      // Mid-session drop. y-websocket auto-reconnects so we promise
+      // the user it's coming back; the connected→toast confirms.
       collabToast = {
         message: "Connection lost. Reconnecting…",
         tone: "warn",
@@ -1417,6 +1433,18 @@
   // that motion looks continuous and cheap enough that a 4-peer room
   // sends ~80 messages/sec total.
   const CURSOR_BROADCAST_THROTTLE_MS = 50;
+  // Stable reference for the slice CollabCursors needs. Changes only
+  // when a tracked field actually changes, so the cursors overlay's
+  // internal $derived.by(users) doesn't re-run on unrelated reactive
+  // churn (selection, hover, color picker, etc.).
+  const collabCursorsAppState = $derived({
+    zoom: appState.zoom as { value: number },
+    offsetLeft: appState.offsetLeft as number,
+    offsetTop: appState.offsetTop as number,
+    scrollX: appState.scrollX as number,
+    scrollY: appState.scrollY as number,
+  });
+
   let lastCursorBroadcastAt = 0;
   const broadcastCursor = (event: PointerEvent): void => {
     if (collabStore.status !== "connected") return;
@@ -5630,12 +5658,15 @@
 
   <!-- Phase 17 / A3: identity capture dialog. Mounted only while open
        (avoids paying the Modal/portal cost when collab is dormant).
-       pendingAnonId is always set when the dialog opens — see
-       handleCollabButtonClick — so the `??` fallback is defensive only. -->
+       pendingAnonId is always set when the dialog opens (see
+       handleCollabButtonClick), so the empty-string fallback is
+       defensive — never expected to fire. The previous version called
+       makeAnonIdentity() inline, which generated a fresh UUID on every
+       reactive re-render of the host. -->
   {#if collabDialogOpen}
     <CollabIdentityDialog
       palette={COLLAB_PALETTE}
-      suggestedId={pendingAnonId ?? makeAnonIdentity().id}
+      suggestedId={pendingAnonId ?? ""}
       onSubmit={onCollabIdentitySubmit}
       onCancel={onCollabIdentityCancel}
     />
@@ -5644,16 +5675,12 @@
   <!-- Phase 17 / A2: peer cursor overlay. Reads collab users from
        context; renders nothing when no peers have a cursor. We pass
        the appState slice the conversion needs as a prop so $derived
-       tracks pan/zoom without round-tripping through context. -->
-  <CollabCursors
-    appState={{
-      zoom: appState.zoom as { value: number },
-      offsetLeft: appState.offsetLeft as number,
-      offsetTop: appState.offsetTop as number,
-      scrollX: appState.scrollX as number,
-      scrollY: appState.scrollY as number,
-    }}
-  />
+       tracks pan/zoom without round-tripping through context. The
+       slice is built in a $derived above so an inline object literal
+       doesn't change identity on every unrelated reactive tick (which
+       would defeat Svelte's prop-equality and force the
+       CollabCursors-internal $derived.by(users) to re-run). -->
+  <CollabCursors appState={collabCursorsAppState} />
 
   <!-- Phase 17 / A4: connection status toast. Appears bottom-center
        on mid-session drop / reconnect; auto-dismisses on default 5s.
