@@ -1,17 +1,20 @@
 <script lang="ts" module>
   import type { HelpState } from "./state.svelte.js";
 
-  let bindings: { state: HelpState } | null = null;
+  type Bindings = { state: HelpState };
 
-  export function bindPanelHost(b: { state: HelpState }): void {
-    bindings = b;
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  let bindings = $state<{ value: Bindings | null }>({ value: null });
+
+  export function bindPanelHost(b: Bindings): void {
+    bindings.value = b;
   }
 </script>
 
 <script lang="ts">
   import HelpPanel from "../../../components/HelpPanel.svelte";
 
-  const safe = $derived(bindings);
+  const safe = $derived(bindings.value);
 </script>
 
 {#if safe?.state.open}

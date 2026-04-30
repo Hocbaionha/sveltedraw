@@ -1,7 +1,9 @@
 <script lang="ts" module>
-  // Module-level binding so the parameterless component the registry
-  // mounts can still reach the plugin-local state. Set inside install()
-  // before addSidePanel registers this component.
+  // Module-level bindings backed by $state so reassignment after the
+  // component first mounts (uninstall + reinstall, HMR, etc.) is
+  // tracked reactively. Plugin install() sets `bindings.value` before
+  // addSidePanel registers this component, so the first mount sees a
+  // non-null value too.
 
   import type { RecentFilesState } from "./state.svelte.js";
 
@@ -10,20 +12,18 @@
     onDelete: (id: string) => void;
   };
 
-  let bindings: Bindings | null = null;
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  let bindings = $state<{ value: Bindings | null }>({ value: null });
 
   export function bindPanelHost(b: Bindings): void {
-    bindings = b;
+    bindings.value = b;
   }
 </script>
 
 <script lang="ts">
   import RecentFilesPanel from "../../../components/RecentFilesPanel.svelte";
 
-  // Reactive read of the module-level singleton. Defensive null check;
-  // bindings are set synchronously inside install() before the
-  // registry mounts this component.
-  const safe = $derived(bindings);
+  const safe = $derived(bindings.value);
 </script>
 
 {#if safe?.state.open}

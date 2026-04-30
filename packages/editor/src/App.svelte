@@ -1812,6 +1812,17 @@
   let librarySelectedCategory = $state('all');
   let librarySearchQuery = $state('');
 
+  // Register inline-panel closer with the plugin registry so that
+  // opening an exclusive plugin side panel closes Grid/Layer/Library
+  // (and any future inline panels). Without this hook, the registry's
+  // openExclusiveSidePanel only walks plugin panels; inline ones
+  // would visually stack on the right edge.
+  pluginRegistry.registerExternalSidePanelCloser(() => {
+    gridPanelActive = false;
+    layerPanelActive = false;
+    libraryPanelActive = false;
+  });
+
   // Phase 16 Feature 3: Presentation Mode
   const presentationConfig = getDefaultPresentationConfig();
   let presentationActive = $state(false);

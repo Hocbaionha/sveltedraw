@@ -85,12 +85,43 @@ export class PluginRegistry {
   }
 
   /**
+   * External side-panel closers — callbacks the host (App.svelte)
+   * registers so the registry can close inline-rendered side panels
+   * when an exclusive plugin panel opens. Without this, opening a
+   * plugin exclusive panel would leave inline panels (Grid, Layer,
+   * Library at time of writing) visually stacked on the same right-
+   * side anchor.
+   */
+  private externalSidePanelClosers: (() => void)[] = [];
+
+  /**
+   * Register a function the registry should invoke before opening any
+   * exclusive side panel. Use for inline (non-plugin) panels that
+   * occupy the same screen real estate as plugin panels. Returns a
+   * dispose fn that unregisters the closer.
+   */
+  registerExternalSidePanelCloser(cb: () => void): () => void {
+    this.externalSidePanelClosers.push(cb);
+    return () => {
+      const i = this.externalSidePanelClosers.indexOf(cb);
+      if (i >= 0) this.externalSidePanelClosers.splice(i, 1);
+    };
+  }
+
+  /**
    * Open one exclusive side panel and close every other exclusive one.
-   * The registry walks `sidePanels`, calls `setOpen(false)` on each
-   * exclusive panel that isn't the target, then `setOpen(true)` on the
-   * target. Pass null to close all exclusives.
+   * Also calls every registered external closer so inline (non-plugin)
+   * panels close in lockstep. The registry walks `sidePanels`, calls
+   * `setOpen(false)` on each exclusive panel that isn't the target,
+   * then `setOpen(true)` on the target. Pass null to close all
+   * exclusives + all inline panels.
    */
   openExclusiveSidePanel(panelId: string | null): void {
+    // External closers run first — closing inline panels before plugin
+    // panels means a brief frame won't show both classes of panel.
+    for (const cb of this.externalSidePanelClosers) {
+      try { cb(); } catch { /* swallow — one closer's failure shouldn't block others */ }
+    }
     for (const p of this.sidePanels) {
       if (!p.exclusive || !p.setOpen) continue;
       const isTarget = p.id === panelId;

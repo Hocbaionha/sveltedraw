@@ -1,3 +1,22 @@
+// Smoke test for the side-panel coordination bug fix.
+//
+// Pre-fix behavior: opening a plugin exclusive panel (Alignment, etc.)
+// did NOT close still-inline panels (Grid). Both rendered on the same
+// right-edge anchor, visually stacking.
+//
+// Post-fix: registry.openExclusiveSidePanel runs registered external
+// closers (App.svelte hooks one that clears gridPanelActive /
+// layerPanelActive / libraryPanelActive) BEFORE flipping plugin
+// panel state. So opening Alignment closes any open inline panel.
+//
+// Verification flow:
+//   1. Open Grid (inline panel) via its UtilityBar button
+//   2. Confirm Grid is open + History plugin panel is closed
+//   3. Click History plugin button
+//   4. Confirm History opens AND Grid closes (the fix)
+//   5. Click Alignment plugin button
+//   6. Confirm Alignment opens AND History closes (plugin↔plugin still works)
+
 import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -5,8 +24,8 @@ import { join } from "node:path";
 import WebSocket from "ws";
 
 const APP_URL = "http://localhost:3001/#app";
-const CDP_PORT = 9357;
-const tmp = mkdtempSync(join(tmpdir(), "chrome-hp-smoke-"));
+const CDP_PORT = 9359;
+const tmp = mkdtempSync(join(tmpdir(), "chrome-coord-smoke-"));
 const chrome = spawn("C:/Program Files/Google/Chrome/Application/chrome.exe", [
   "--headless=new", `--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${tmp}`,
   "--no-first-run", "--no-default-browser-check", "--disable-gpu", "--window-size=1280,900",
@@ -46,35 +65,36 @@ await evalRetry(`
 `);
 
 const result = await evalRetry(`
-  // History plugin should auto-install. Plugin button has title "History"
-  // and renders in the "view" group of plugins (after built-in items).
-  const btn = document.querySelector('button[aria-label="History"]');
+  const isGridOpen = () => !!document.querySelector('.sveltedraw-grid-panel');
+  const isHistoryOpen = () => !!document.querySelector('[data-panel-id="builtin/history-panel"]');
+  const isAlignOpen = () => !!document.querySelector('[data-panel-id="builtin/alignment-panel"]');
 
-  // Panels render under [data-panel-id="builtin/history-panel"] via the
-  // shared SidePanelChrome wrapper introduced in the registry-cleanup
-  // pass.
-  const sel = '[data-panel-id="builtin/history-panel"]';
-  const panel0 = document.querySelector(sel);
-
-  // Click toggles it open
-  btn?.click();
+  // Step 1: open Grid (inline panel)
+  const gridBtn = document.querySelector('button[aria-label="Grid & Snap"]');
+  gridBtn?.click();
   await new Promise(r => setTimeout(r, 100));
-  const panel1 = document.querySelector(sel);
+  const after1 = { grid: isGridOpen(), history: isHistoryOpen(), align: isAlignOpen() };
 
-  // Click again toggles it closed
-  btn?.click();
+  // Step 2: open History plugin — should close Grid
+  const histBtn = document.querySelector('button[aria-label="History"]');
+  histBtn?.click();
   await new Promise(r => setTimeout(r, 100));
-  const panel2 = document.querySelector(sel);
+  const after2 = { grid: isGridOpen(), history: isHistoryOpen(), align: isAlignOpen() };
 
-  return {
-    button: !!btn,
-    hiddenInitially: !panel0,
-    openedAfterClick: !!panel1,
-    closedAfterSecondClick: !panel2,
-  };
+  // Step 3: open Alignment plugin — should close History
+  const alignBtn = document.querySelector('button[aria-label="Alignment"]');
+  alignBtn?.click();
+  await new Promise(r => setTimeout(r, 100));
+  const after3 = { grid: isGridOpen(), history: isHistoryOpen(), align: isAlignOpen() };
+
+  return { after1, after2, after3 };
 `);
 
 console.log(JSON.stringify(result, null, 2));
 ws.close();
-const ok = result.button && result.hiddenInitially && result.openedAfterClick && result.closedAfterSecondClick;
+
+const ok =
+  result.after1.grid && !result.after1.history && !result.after1.align &&
+  !result.after2.grid && result.after2.history && !result.after2.align &&
+  !result.after3.grid && !result.after3.history && result.after3.align;
 process.exit(ok ? 0 : 1);

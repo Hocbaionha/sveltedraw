@@ -8,17 +8,18 @@
     onSelect: (template: Template) => void;
   };
 
-  let bindings: Bindings | null = null;
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  let bindings = $state<{ value: Bindings | null }>({ value: null });
 
   export function bindPanelHost(b: Bindings): void {
-    bindings = b;
+    bindings.value = b;
   }
 </script>
 
 <script lang="ts">
   import TemplateSelector from "../../../components/TemplateSelector.svelte";
 
-  const safe = $derived(bindings);
+  const safe = $derived(bindings.value);
 </script>
 
 {#if safe?.state.open}

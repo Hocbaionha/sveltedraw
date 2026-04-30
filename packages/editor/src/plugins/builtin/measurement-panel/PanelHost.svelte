@@ -7,45 +7,30 @@
     bridge: MeasurementBridge | null;
   };
 
-  let bindings: Bindings | null = null;
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  let bindings = $state<{ value: Bindings | null }>({ value: null });
 
   export function bindPanelHost(b: Bindings): void {
-    bindings = b;
+    bindings.value = b;
   }
 </script>
 
 <script lang="ts">
   import MeasurementPanel from "../../../components/MeasurementPanel.svelte";
+  import SidePanelChrome from "../SidePanelChrome.svelte";
 
-  const safe = $derived(bindings);
+  const safe = $derived(bindings.value);
 </script>
 
-{#if safe?.state.open && safe.bridge}
-  <div class="sveltedraw-measurement-panel">
+<SidePanelChrome
+  open={!!(safe?.state.open && safe.bridge)}
+  id="builtin/measurement-panel"
+>
+  {#if safe?.bridge}
     <MeasurementPanel
       selectedElements={safe.bridge.selectedElements as Array<{ id: string; x: number; y: number; width: number; height: number }>}
       config={safe.bridge.config}
       onConfigChange={(next) => safe.bridge?.setConfig(next)}
     />
-  </div>
-{/if}
-
-<style>
-  .sveltedraw-measurement-panel {
-    position: absolute;
-    top: 110px;
-    right: 16px;
-    width: var(--right-sidebar-width, 302px);
-    max-height: calc(100vh - 130px);
-    background: #fff;
-    border: 1px solid #d1d4da;
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    z-index: 40;
-    overflow: hidden;
-  }
-  :global(.sveltedraw.theme--dark) .sveltedraw-measurement-panel {
-    background: #232329;
-    border-color: #363636;
-  }
-</style>
+  {/if}
+</SidePanelChrome>
