@@ -58,7 +58,13 @@ export function loadPersistedScene(opts: {
       );
       return false;
     }
-    scene.replaceAllElements(parsed.elements, { skipValidation: true });
+    // Apply appState BEFORE the scene mutation. If a key assignment
+    // throws (e.g. a frozen sub-object on a host extension), the
+    // catch returns false and we leave the editor in its initial
+    // state — better than the half-state where the scene shows
+    // restored elements but appState (zoom/scroll/theme) is partly
+    // applied. Bootstrap then seeds an undo floor against initial
+    // state and the user can reload to retry.
     for (const [k, v] of Object.entries(parsed.appState ?? {})) {
       // activeTool is skipped explicitly: older saves persisted it,
       // but restoring it here would bypass setActiveTool → plugin
@@ -83,6 +89,7 @@ export function loadPersistedScene(opts: {
       }
       appState[k] = v;
     }
+    scene.replaceAllElements(parsed.elements, { skipValidation: true });
     return true;
   } catch (err) {
     // eslint-disable-next-line no-console

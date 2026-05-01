@@ -270,6 +270,64 @@ const tests = await ev(`
     detail: 'final link=' + JSON.stringify(liveEl6?.link),
   });
 
+  // ── 11. confirmLinkDialog("   ") normalizes to null
+  // Regression coverage for pass-5 I6: whitespace-only input is
+  // treated as an empty link.
+  const ELEM7 = "link-test-ws-" + Date.now().toString(36);
+  p.scene.replaceAllElements([{
+    id: ELEM7, type: 'rectangle', x: 0, y: 0, width: 50, height: 50, angle: 0,
+    strokeColor: '#000', backgroundColor: 'transparent', fillStyle: 'solid',
+    strokeWidth: 1, strokeStyle: 'solid', roundness: null, roughness: 0,
+    opacity: 100, groupIds: [], frameId: null, index: 'a6',
+    boundElements: null, updated: Date.now(), link: 'https://before-ws.example', locked: false,
+    seed: 7, version: 1, versionNonce: 1, isDeleted: false,
+  }]);
+  p.appState.selectedElementIds = { [ELEM7]: true };
+  p.bumpSceneRepaint();
+  await new Promise(r => setTimeout(r, 80));
+  p.openLinkDialog();
+  await new Promise(r => setTimeout(r, 80));
+  p.confirmLinkDialog('   ');
+  await new Promise(r => setTimeout(r, 80));
+  const liveEl7 = p.scene.getElement(ELEM7);
+  tests.push({
+    name: 'confirmLinkDialog("   ") normalizes whitespace-only to null',
+    ok: liveEl7 && liveEl7.link === null,
+    detail: 'final link=' + JSON.stringify(liveEl7?.link),
+  });
+
+  // ── 12. openLinkDialog with selection size != 1 is a no-op
+  // Regression coverage for pass-1 #5 (open() gate).
+  const ELEM8a = "link-multi-a-" + Date.now().toString(36);
+  const ELEM8b = "link-multi-b-" + Date.now().toString(36);
+  p.scene.replaceAllElements([
+    {
+      id: ELEM8a, type: 'rectangle', x: 0, y: 0, width: 50, height: 50, angle: 0,
+      strokeColor: '#000', backgroundColor: 'transparent', fillStyle: 'solid',
+      strokeWidth: 1, strokeStyle: 'solid', roundness: null, roughness: 0,
+      opacity: 100, groupIds: [], frameId: null, index: 'a7',
+      boundElements: null, updated: Date.now(), link: null, locked: false,
+      seed: 8, version: 1, versionNonce: 1, isDeleted: false,
+    },
+    {
+      id: ELEM8b, type: 'rectangle', x: 100, y: 100, width: 50, height: 50, angle: 0,
+      strokeColor: '#000', backgroundColor: 'transparent', fillStyle: 'solid',
+      strokeWidth: 1, strokeStyle: 'solid', roundness: null, roughness: 0,
+      opacity: 100, groupIds: [], frameId: null, index: 'a8',
+      boundElements: null, updated: Date.now(), link: null, locked: false,
+      seed: 9, version: 1, versionNonce: 1, isDeleted: false,
+    },
+  ]);
+  p.appState.selectedElementIds = { [ELEM8a]: true, [ELEM8b]: true };
+  p.bumpSceneRepaint();
+  await new Promise(r => setTimeout(r, 80));
+  p.openLinkDialog();
+  await new Promise(r => setTimeout(r, 80));
+  tests.push({
+    name: 'openLinkDialog no-ops with multi-selection',
+    ok: p.isLinkDialogOpen() === false,
+  });
+
   return tests;
 `);
 

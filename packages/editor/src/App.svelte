@@ -1245,14 +1245,14 @@
       if (!scene) return;
       const el = scene.getElement(id);
       if (!el) return;
-      // Normalize empty string to null. ElementLinkDialog emits ""
-      // for "user backspaced everything"; the engine renders the
-      // link chip on `el.link` truthiness, so "" hides the chip but
-      // persists a useless empty string in localStorage. Storing
-      // null keeps the saved scene clean and matches the "no link"
-      // initial state.
+      // Normalize empty/whitespace-only string to null.
+      // ElementLinkDialog emits "" for "user backspaced everything";
+      // the engine renders the link chip on `el.link` truthiness,
+      // so "" or "   " hides the chip but persists a useless string
+      // in localStorage. Storing null keeps the saved scene clean
+      // and matches the "no link" initial state.
       const normalized: string | null =
-        nextLink === "" || nextLink == null ? null : nextLink;
+        nextLink == null || nextLink.trim() === "" ? null : nextLink;
       // Short-circuit a no-op confirm — otherwise the dialog's
       // "Confirm" button always pushes a history entry, even when
       // the user just hit Enter on an unchanged link. That makes

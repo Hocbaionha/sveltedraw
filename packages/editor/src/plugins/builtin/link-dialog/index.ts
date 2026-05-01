@@ -90,10 +90,19 @@ export const linkDialogPlugin: SveltedrawPlugin = {
       isOpen: () => state.open,
       confirm: (nextLink) => {
         if (!state.targetId) return;
-        bridge.setLink(state.targetId, nextLink);
+        // Clear state BEFORE calling bridge.setLink. setLink calls
+        // pushHistory + bumpSceneRepaint synchronously, which dispatches
+        // onElementChange — and our auto-close handler below checks
+        // `state.open` as the first gate. Clearing state first makes
+        // that path a clean short-circuit. Doing it the other way
+        // around (mutate, then clear) works today only because the
+        // auto-close handler's `change.id !== state.targetId` check
+        // happens to also short-circuit — fragile to reorder.
+        const targetId = state.targetId;
         state.open = false;
         state.targetId = null;
         state.originalLink = null;
+        bridge.setLink(targetId, nextLink);
       },
     };
     const releaseStore = ctx.provideStore(LINK_DIALOG_STORE_KEY, store);

@@ -57,7 +57,19 @@
       aria-modal="true"
       tabindex="-1"
       onclick={(e) => e.stopPropagation()}
-      onkeydown={(e) => { if (e.key === "Escape") safe.onClose(); }}
+      onkeydown={(e) => {
+        // Escape on this card closes the modal. ElementLinkDialog
+        // ALSO has a window-level Escape listener that calls
+        // onClose, so Escape in the input field reaches both —
+        // benign because `store.close()` sets state.open=false
+        // and Svelte 5 $state doesn't re-trigger reactions when a
+        // value is set to its existing value, so the double-write
+        // is a no-op. Keep this local handler for accessibility:
+        // a non-interactive div with onclick needs a keyboard
+        // equivalent, and Escape-to-close is the correct one for
+        // a modal card.
+        if (e.key === "Escape") safe.onClose();
+      }}
     >
       <ElementLinkDialog
         link={liveLink}
