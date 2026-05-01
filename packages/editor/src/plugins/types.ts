@@ -179,8 +179,11 @@ export type ElementChangeObserver<T = any> = (
  * claimed, the host routes subsequent pointer events of the same
  * gesture to this tool only.
  *
- * `passthrough()` is the explicit opt-out — call it to let the host's
- * default selection/drag flow handle the rest of the gesture. The
+ * `passthrough()` is meaningful ONLY in onPointerDown — call it to
+ * let the host's default selection/drag flow handle the rest of the
+ * gesture. In onPointerMove / onPointerUp / onPointerCancel the
+ * passthrough callable is a no-op (the gesture's claim was decided
+ * at pointerdown time and can't be retroactively given back). The
  * connector tool, for example, doesn't claim the gesture (it just
  * does a hit-test on pointerdown and calls handlePick), so its
  * onPointerDown would call passthrough().
@@ -195,11 +198,11 @@ export type ToolPointerContext<TElement = any> = {
   /** Element under the cursor at event time, or null. */
   hitElement: TElement | null;
   /**
-   * Lift the gesture lock — let the host's default handler run for
-   * this and subsequent events of the gesture. Idempotent. Should be
-   * called from onPointerDown when the tool decides not to take the
-   * drag (e.g. "first-pick" tools that consume the click but not the
-   * drag).
+   * Down-only: lift the gesture lock so the host's default flow
+   * handles the rest of the gesture. Calling this from move/up/cancel
+   * is a silent no-op (the gesture is already claimed; releasing
+   * mid-flight isn't supported — call onPointerCancel-style cleanup
+   * inside your tool instead).
    */
   passthrough: () => void;
   /** Push a history snapshot. Call after committing a draw. */
@@ -238,11 +241,15 @@ export interface ToolPluginDef {
    *  Mirrors onActivate; both optional. */
   onDeactivate?: () => void;
   /**
-   * Called from the host's pointerdown handler. Returning nothing
-   * (or an explicit { claim: true }) claims the gesture — the host
-   * routes pointermove / up / cancel to this tool until release.
-   * Calling ctx.passthrough() inside the handler explicitly LIFTS
-   * the claim (host falls through to its default behavior).
+   * Called from the host's pointerdown handler. Default behavior is
+   * "claim the gesture": the host routes subsequent move / up /
+   * cancel events to this tool until pointerup. Calling
+   * `ctx.passthrough()` inside this handler is the OPT-OUT — the
+   * host immediately falls through to its default behavior for this
+   * pointerdown AND every subsequent event of the gesture.
+   *
+   * Return value is ignored. (Earlier drafts mentioned `{ claim: true }`;
+   * that path was dropped — passthrough() is the single signal.)
    */
   onPointerDown?: (ctx: ToolPointerContext) => void;
   onPointerMove?: (ctx: ToolPointerContext) => void;

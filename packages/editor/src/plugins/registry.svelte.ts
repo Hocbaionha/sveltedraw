@@ -80,6 +80,22 @@ export class PluginRegistry {
   private activeToolGesture: { name: string; pointerId: number | null } | null = null;
 
   /**
+   * Per-plugin disposer registry. Every Tier-1/2 hook that returns
+   * a dispose closure ALSO records that closure here under the
+   * plugin id. Uninstall iterates and runs each — idempotent (each
+   * dispose handles its own already-removed case), so plugins that
+   * properly clean up in their own teardown pay nothing extra.
+   *
+   * This is the safety net behind the prefix-strip pattern used for
+   * UI items (toolbar / panel / overlay / menu / chrome / context-
+   * menu). Non-UI registrations (pointer observers / mutation filters
+   * / window listeners / element observers / tools / actions) don't
+   * carry a plugin-id-prefixed key, so the only way to sweep them
+   * on uninstall is to remember the disposers per-plugin.
+   */
+  private pluginDisposers = new Map<string, Array<() => void>>();
+
+  /**
    * Plugin-published stores keyed by Symbol. Single-writer: a key can
    * be claimed by at most one plugin at a time; subsequent provideStore
    * calls on the same key throw to surface accidental collisions early.
@@ -128,24 +144,40 @@ export class PluginRegistry {
   install(plugin: SveltedrawPlugin, ctx: SveltedrawPluginContext): void {
     if (this.cleanups.has(plugin.id)) return; // already installed
     // Track stores claimed during install so uninstall releases them
-    // even if the plugin author forgets to wire them into their cleanup.
-    const claimedKeys: symbol[] = [];
+    // even if the plugin author forgets to wire them into their
+    // cleanup. Capture (key, value) pairs so the defensive sweep can
+    // distinguish "still mine" from "claimed, released, then claimed
+    // again by another plugin" — deleting unconditionally by key
+    // would silently unpublish the second plugin's store.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const claimed: { key: symbol; value: any }[] = [];
     const wrappedCtx: SveltedrawPluginContext = {
       ...ctx,
       provideStore: <T>(key: symbol, store: T) => {
         const release = ctx.provideStore(key, store);
-        claimedKeys.push(key);
+        claimed.push({ key, value: store });
         return release;
       },
     };
     const cleanup = plugin.install(wrappedCtx);
     this.cleanups.set(plugin.id, () => {
       cleanup?.();
-      // Defensive store cleanup: release any keys the plugin claimed
-      // and didn't unwind itself.
-      for (const k of claimedKeys) {
-        this.stores.delete(k);
+      // Defensive store cleanup: release only entries whose value
+      // matches what THIS plugin published. If another plugin has
+      // taken the symbol since release, that other plugin's store
+      // stays put.
+      let touched = false;
+      for (const { key, value } of claimed) {
+        if (this.stores.get(key) === value) {
+          this.stores.delete(key);
+          touched = true;
+        }
       }
+      // Bump the reactive version so $derived consumers re-resolve
+      // their getStore call after uninstall removes a store. Without
+      // this, a consumer that read the store inside a $derived
+      // wouldn't notice it disappeared.
+      if (touched) this.storesVersion++;
     });
   }
 
@@ -174,7 +206,21 @@ export class PluginRegistry {
       console.error(`[plugin:${pluginId}] cleanup threw`, err);
     }
     this.cleanups.delete(pluginId);
-    // Items are identified by the prefix convention enforced in buildContext.
+    // Run any disposers the plugin's own cleanup didn't run. Each
+    // wrapped dispose is idempotent — if the plugin already called
+    // it, this is a no-op. Iterate a copy because the disposers
+    // self-remove from the bucket as they fire.
+    const remainingDisposers = this.pluginDisposers.get(pluginId);
+    if (remainingDisposers) {
+      for (const d of [...remainingDisposers]) d();
+      this.pluginDisposers.delete(pluginId);
+    }
+    // UI items are identified by the prefix convention enforced in
+    // buildContext. The prefix-strip is now a defense-in-depth net
+    // beneath the disposer sweep above — disposers should have
+    // already removed these entries; the filters catch anything that
+    // slipped through (e.g. a plugin that mutated registry arrays
+    // directly through the api, which it shouldn't).
     const prefix = `${pluginId}/`;
     this.toolbarItems = this.toolbarItems.filter((i) => !i.id.startsWith(prefix));
     this.sidePanels = this.sidePanels.filter((p) => !p.id.startsWith(prefix));
@@ -258,15 +304,13 @@ export class PluginRegistry {
   markEditorReady(): void {
     if (this.editorReady) return;
     this.editorReady = true;
+    // Queued callbacks were wrapped by buildContext.onEditorReady to
+    // capture their pluginId — `cb()` itself records any returned
+    // teardown into editorReadyTeardowns under the right pluginId.
+    // Nothing to do here besides invoke them in registration order.
     for (const cb of this.editorReadyCallbacks) {
       try {
-        const teardown = cb();
-        // Teardowns from queued callbacks aren't tied to a specific
-        // pluginId here (they were registered through the plugin
-        // context's onEditorReady, which records into editorReadyTeardowns
-        // under the pluginId key). The synchronous-fire path below
-        // handles the same plumbing for late registrations.
-        void teardown;
+        cb();
       } catch (err) {
         // eslint-disable-next-line no-console
         console.error("[plugin] editor-ready callback threw", err);
@@ -335,6 +379,13 @@ export class PluginRegistry {
     if (!tool || !tool.onPointerMove) return false;
     const passthrough = () => {};
     const ctx = ctxBuilder(passthrough);
+    // Gate by pointerId — multi-touch sees pointermove from each
+    // pointer and we only want the one that originally claimed the
+    // gesture to flow through. Without this, a second finger landing
+    // mid-drag would route every move through the tool too.
+    if (gesture.pointerId !== null && ctx.event.pointerId !== gesture.pointerId) {
+      return false;
+    }
     try {
       tool.onPointerMove(ctx);
     } catch (err) {
@@ -352,14 +403,17 @@ export class PluginRegistry {
     const tool = this.toolPlugins.get(gesture.name);
     const passthrough = () => {};
     const ctx = ctxBuilder(passthrough);
+    if (gesture.pointerId !== null && ctx.event.pointerId !== gesture.pointerId) {
+      return false;
+    }
     try {
       tool?.onPointerUp?.(ctx);
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error(`[plugin:tool:${gesture.name}] onPointerUp threw`, err);
     }
-    // Release the gesture claim regardless — pointerup ends the
-    // gesture by definition.
+    // Release the gesture claim — pointerup of the claiming pointerId
+    // ends the gesture.
     this.activeToolGesture = null;
     return true;
   }
@@ -372,6 +426,9 @@ export class PluginRegistry {
     const tool = this.toolPlugins.get(gesture.name);
     const passthrough = () => {};
     const ctx = ctxBuilder(passthrough);
+    if (gesture.pointerId !== null && ctx.event.pointerId !== gesture.pointerId) {
+      return false;
+    }
     try {
       tool?.onPointerCancel?.(ctx);
     } catch (err) {
@@ -380,6 +437,19 @@ export class PluginRegistry {
     }
     this.activeToolGesture = null;
     return true;
+  }
+
+  /**
+   * Drop any in-flight tool-plugin gesture claim. Called by the host
+   * when something invalidates the gesture out-of-band — typically
+   * a second touch landing (pinch start), a tool switch happening
+   * mid-drag, or a pointercancel event.
+   *
+   * Idempotent. Does NOT fire onDeactivate (the tool is still the
+   * active tool, just no gesture in flight).
+   */
+  cancelActiveToolGesture(): void {
+    this.activeToolGesture = null;
   }
 
   /**
@@ -471,6 +541,37 @@ export class PluginRegistry {
     const qualify = (id: string) =>
       id.startsWith(`${pluginId}/`) ? id : `${pluginId}/${id}`;
 
+    /**
+     * Wrap a dispose closure so the registry remembers it under
+     * pluginId. The returned closure is BOTH idempotent (the inner
+     * dispose's behavior + a flag here) and self-removing (calling
+     * it manually unhooks the registry-side reference). On
+     * uninstall, the registry iterates remaining wrapped disposers
+     * and calls them.
+     */
+    const track = (dispose: () => void): (() => void) => {
+      let disposed = false;
+      const wrapped = () => {
+        if (disposed) return;
+        disposed = true;
+        try { dispose(); } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error(`[plugin:${pluginId}] dispose threw`, err);
+        }
+        // Remove from the per-plugin bucket so uninstall doesn't
+        // try to call it again.
+        const list = registry.pluginDisposers.get(pluginId);
+        if (list) {
+          const i = list.indexOf(wrapped);
+          if (i >= 0) list.splice(i, 1);
+        }
+      };
+      const list = registry.pluginDisposers.get(pluginId) ?? [];
+      list.push(wrapped);
+      registry.pluginDisposers.set(pluginId, list);
+      return wrapped;
+    };
+
     return {
       api,
       tunnels,
@@ -483,12 +584,12 @@ export class PluginRegistry {
         registry.stores.set(key, store);
         registry.storesVersion++;
         ownedStoreKeys.push(key);
-        return () => {
+        return track(() => {
           if (registry.stores.get(key) === store) {
             registry.stores.delete(key);
             registry.storesVersion++;
           }
-        };
+        });
       },
       // Read order: registry-published store first, then the host's
       // own context (Svelte setContext) so symbols like SVELTEDRAW_API_KEY
@@ -505,30 +606,30 @@ export class PluginRegistry {
       addToolbarItem: (item) => {
         const qualified = { ...item, id: qualify(item.id) };
         registry.toolbarItems = [...registry.toolbarItems, qualified];
-        return () => {
+        return track(() => {
           registry.toolbarItems = registry.toolbarItems.filter((i) => i.id !== qualified.id);
-        };
+        });
       },
       addSidePanel: (panel) => {
         const qualified = { ...panel, id: qualify(panel.id) };
         registry.sidePanels = [...registry.sidePanels, qualified];
-        return () => {
+        return track(() => {
           registry.sidePanels = registry.sidePanels.filter((p) => p.id !== qualified.id);
-        };
+        });
       },
       addCanvasOverlay: (overlay) => {
         const qualified = { ...overlay, id: qualify(overlay.id) };
         registry.canvasOverlays = [...registry.canvasOverlays, qualified];
-        return () => {
+        return track(() => {
           registry.canvasOverlays = registry.canvasOverlays.filter((o) => o.id !== qualified.id);
-        };
+        });
       },
       addMainMenuItem: (item) => {
         const qualified = { ...item, id: qualify(item.id) };
         registry.menuItems = [...registry.menuItems, qualified];
-        return () => {
+        return track(() => {
           registry.menuItems = registry.menuItems.filter((m) => m.id !== qualified.id);
-        };
+        });
       },
       addAction: (action) => {
         if (!registry.actionManager) {
@@ -537,41 +638,42 @@ export class PluginRegistry {
           );
         }
         const qualified = { ...action, id: qualify(action.id) };
-        return registry.actionManager.register(qualified);
+        const dispose = registry.actionManager.register(qualified);
+        return track(dispose);
       },
       addChromeItem: (item) => {
         const qualified = { ...item, id: qualify(item.id) };
         registry.chromeItems = [...registry.chromeItems, qualified];
-        return () => {
+        return track(() => {
           registry.chromeItems = registry.chromeItems.filter(
             (c) => c.id !== qualified.id,
           );
-        };
+        });
       },
       addContextMenuItem: (item) => {
         const qualified = { ...item, id: qualify(item.id) };
         registry.contextMenuItems = [...registry.contextMenuItems, qualified];
-        return () => {
+        return track(() => {
           registry.contextMenuItems = registry.contextMenuItems.filter(
             (c) => c.id !== qualified.id,
           );
-        };
+        });
       },
       onPointerEvent: (type, observer) => {
         if (!registry.pointerObservers.has(type)) {
           registry.pointerObservers.set(type, new Set());
         }
         registry.pointerObservers.get(type)!.add(observer);
-        return () => {
+        return track(() => {
           registry.pointerObservers.get(type)?.delete(observer);
-        };
+        });
       },
       addMutationFilter: (filter) => {
         registry.mutationFilters.push(filter);
-        return () => {
+        return track(() => {
           const i = registry.mutationFilters.indexOf(filter);
           if (i >= 0) registry.mutationFilters.splice(i, 1);
-        };
+        });
       },
       onEditorReady: (cb) => {
         // Fire-or-queue. When the editor is already ready (plugin
@@ -628,7 +730,7 @@ export class PluginRegistry {
           });
         }
         observers.add(observer);
-        return () => {
+        return track(() => {
           const set = registry.windowObservers.get(type);
           if (!set) return;
           set.delete(observer);
@@ -639,13 +741,13 @@ export class PluginRegistry {
             registry.windowAttached.get(type)?.();
             registry.windowAttached.delete(type);
           }
-        };
+        });
       },
       onElementChange: <T>(observer: ElementChangeObserver<T>) => {
         registry.elementObservers.add(observer as ElementChangeObserver);
-        return () => {
+        return track(() => {
           registry.elementObservers.delete(observer as ElementChangeObserver);
-        };
+        });
       },
       registerTool: (def) => {
         if (registry.toolPlugins.has(def.name)) {
@@ -654,18 +756,29 @@ export class PluginRegistry {
           );
         }
         registry.toolPlugins.set(def.name, def);
-        return () => {
-          // If the tool being removed is currently active, fire
-          // onDeactivate before unregistering so the plugin gets
-          // a chance to clean up transient state.
+        return track(() => {
+          // If the tool is currently the editor's active tool — read
+          // from the api, since "active tool" and "gesture in flight"
+          // are different concepts (you can have the tool selected
+          // with no pointerdown). Fire onDeactivate first so the
+          // plugin can tear down transient state, then drop any
+          // gesture claim, then unregister.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const liveAppState = api.getAppState() as any;
+          const activeName = liveAppState?.activeTool?.type ?? null;
+          if (activeName === def.name) {
+            try { def.onDeactivate?.(); } catch (err) {
+              // eslint-disable-next-line no-console
+              console.error(`[plugin:tool:${def.name}] onDeactivate threw on dispose`, err);
+            }
+          }
           if (registry.activeToolGesture?.name === def.name) {
-            try { def.onDeactivate?.(); } catch { /* swallow */ }
             registry.activeToolGesture = null;
           }
           if (registry.toolPlugins.get(def.name) === def) {
             registry.toolPlugins.delete(def.name);
           }
-        };
+        });
       },
       onSceneChange: api.onChange.bind(api),
       onSelectionChange: api.onSelectionChange.bind(api),

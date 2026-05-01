@@ -497,6 +497,21 @@
     pluginRegistry.markEditorReady();
   });
 
+  // Editor-unmount cleanup, separated from the install $effect so
+  // re-runs of the install effect (e.g. plugin prop changes) don't
+  // teardown all plugins. Only the editor's actual unmount fires
+  // this teardown — when onDestroy / component-effect-root
+  // disposes. Without this, plugins' window listeners (paste/drop),
+  // timers, websockets, and $effect.root closures stay alive across
+  // HMR re-mounts.
+  $effect(() => {
+    return () => {
+      for (const id of [...pluginRegistry.installedIds]) {
+        pluginRegistry.uninstall(id);
+      }
+    };
+  });
+
   // ── Canvas refs ────────────────────────────────────────────────────────
   const staticCanvas =
     typeof document !== "undefined"
@@ -1206,8 +1221,13 @@
     // A8: locked elements survive bulk delete. Only unlocked IDs are
     // stripped; selection is cleared regardless so the locked ones aren't
     // left looking partially-selected.
+    // Plugin mutation gate also filters out elements blocked by any
+    // installed mutation filter (e.g. collab role-zone enforcement).
     const selectedSet = new Set(
-      selected.filter((el: any) => !el.locked).map((el) => el.id),
+      selected
+        .filter((el: any) => !el.locked)
+        .filter((el: any) => pluginRegistry.canMutate({ elementId: el.id, intent: "delete" }))
+        .map((el) => el.id),
     );
     if (selectedSet.size === 0) return;
     // B1: if any deleted element is a frame, clear frameId on its
@@ -2803,6 +2823,9 @@
     const selected = getSelectedElements();
     if (selected.length === 0) return;
     for (const el of selected) {
+      // Plugin mutation gate. Skip nudge for elements any plugin
+      // blocked (e.g. student tries to nudge teacher-zoned shapes).
+      if (!pluginRegistry.canMutate({ elementId: el.id, intent: "move" })) continue;
       scene.mutateElement(
         el,
         { x: el.x + dx, y: el.y + dy },
@@ -3011,20 +3034,60 @@
     // Action — not as a branch here.
   };
 
+  // Per-element snapshot for the plugin element-change observer. Map
+  // is held by ref; we replace entries inline on each diff so the
+  // hot path doesn't allocate a new Map per bump.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lastElementSnapshot = new Map<string, any>();
+
   // Scene-nonce bump — forces the static-render $effect to repaint even
   // when no appState field changed (e.g. after scene.replaceAllElements).
   // The $effect tracks sceneReady; we reuse it as a generic "something
   // scene-level happened" ticker.
   //
-  // Also calls scene.triggerUpdate() to bump `sceneNonce`, the ONLY cache-bust
-  // signal for `Renderer.getRenderableElements`. Call sites that mutate with
-  // `{ informMutation: false }` skip Scene's internal triggerUpdate, so without
-  // this the canvas paints stale elements. Also fires imperativeAPI.notifyChange()
-  // so all callers reach onChange subscribers without per-call wiring.
+  // Also:
+  //   - calls scene.triggerUpdate() to bump `sceneNonce`, the ONLY
+  //     cache-bust signal for Renderer.getRenderableElements. Call
+  //     sites that mutate with `{ informMutation: false }` skip
+  //     Scene's internal triggerUpdate, so without this the canvas
+  //     paints stale elements.
+  //   - fires imperativeAPI.notifyChange() so coarse api.onChange
+  //     subscribers (collab broadcast, autosave) get notified.
+  //   - dispatches plugin element-change observers per affected id by
+  //     diffing the live element list against `lastElementSnapshot`.
+  //     Reference-equality check is enough — Excalidraw mutators
+  //     return new objects on change. Cost is O(M+N) over scene
+  //     element count, dominated by the static-canvas paint that's
+  //     about to run anyway.
   const bumpSceneRepaint = () => {
     scene?.triggerUpdate();
     sceneReady++;
     imperativeAPI.notifyChange();
+    // Diff vs snapshot, dispatch per change. No-op when nothing
+    // changed (every ref-equal entry skipped).
+    if (scene) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const live = scene.getElementsIncludingDeleted() as any[];
+      const seen = new Set<string>();
+      for (const el of live) {
+        if (!el?.id) continue;
+        seen.add(el.id);
+        const prev = lastElementSnapshot.get(el.id);
+        if (prev === el) continue;
+        pluginRegistry.dispatchElementChange({
+          id: el.id,
+          current: el,
+          previous: prev ?? null,
+        });
+        lastElementSnapshot.set(el.id, el);
+      }
+      // Removed ids: in snapshot but not in live.
+      for (const [id, prev] of lastElementSnapshot) {
+        if (seen.has(id)) continue;
+        pluginRegistry.dispatchElementChange({ id, current: null, previous: prev });
+        lastElementSnapshot.delete(id);
+      }
+    }
   };
 
   // Build the AppState slice needed by `viewportCoordsToSceneCoords`.
@@ -3887,6 +3950,11 @@
         (appState as any).newElement = null;
         resizeGesture = null;
         rotateGesture = null;
+        // Drop any tool-plugin gesture claim too — without this, a
+        // tool plugin that claimed the first finger's pointerdown
+        // would keep receiving move events and could preventDefault
+        // away the native pinch-zoom.
+        pluginRegistry.cancelActiveToolGesture();
         event.preventDefault();
         return;
       }
@@ -4160,6 +4228,11 @@
         .map((id: string) => {
           const el = map.get(id);
           if (!el || (el as any).locked) return null;
+          // Plugin mutation gate. Filters return false → element
+          // can't be dragged (e.g. collab plugin's role-zone check).
+          // The element stays pinned; the rest of the selection
+          // drags around it. Same UX as locked elements.
+          if (!pluginRegistry.canMutate({ elementId: id, intent: "move" })) return null;
           return { id, x: el.x, y: el.y, el };
         })
         .filter(Boolean) as typeof dragOrigins;
@@ -4877,8 +4950,51 @@
   // Double-click on empty canvas → open a new text editor at that point
   // (matches Sveltedraw's UX: double-click is a quick way to add text
   // without first switching to the text tool).
+  /**
+   * Pointer-cancel handler. Browser fires this when the OS reclaims
+   * a gesture (incoming call, OS gesture override, scroll capture,
+   * etc.). Distinct from pointerup because we should NOT commit
+   * whatever the user was drawing — just abandon. Routes the cancel
+   * through plugin observers + tool plugin's onPointerCancel, then
+   * tears down editor-side gesture state.
+   */
+  const onInteractivePointerCancel = (event: PointerEvent) => {
+    const sceneCoords = toSceneCoords(event.clientX, event.clientY);
+    pluginRegistry.dispatchPointerEvent("cancel", event, sceneCoords);
+    {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const hit = hitTestAt(sceneCoords.x, sceneCoords.y) as any;
+      pluginRegistry.dispatchToolPointerCancel((passthrough) => ({
+        event,
+        sceneX: sceneCoords.x,
+        sceneY: sceneCoords.y,
+        hitElement: hit,
+        passthrough,
+        pushHistory: () => pushHistory(),
+        bumpSceneRepaint: () => bumpSceneRepaint(),
+      }));
+    }
+    // Drop editor-side gesture state — same teardown as pinch-start
+    // does when it preempts a single-touch gesture.
+    dragStart = null;
+    dragOrigins = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (appState as any).newElement = null;
+    resizeGesture = null;
+    rotateGesture = null;
+    tryRelease(event.currentTarget as HTMLElement | null, event.pointerId);
+  };
+
   const onInteractiveDoubleClick = (event: MouseEvent) => {
     if (!scene) return;
+    // Plugin observer: dblclick is a MouseEvent (not PointerEvent),
+    // and the host emits it through the same dispatch surface so
+    // plugins can observe both with one type union.
+    pluginRegistry.dispatchPointerEvent(
+      "dblclick",
+      event,
+      toSceneCoords(event.clientX, event.clientY),
+    );
     // Polyline mode: dblclick commits the current polyline. The second
     // pointerdown of the dblclick already anchored a duplicate vertex —
     // commitPolyline trims trailing duplicates automatically.
@@ -5638,7 +5754,7 @@
     onclick={noop}
     onpointermove={onInteractivePointerMove}
     onpointerup={onInteractivePointerUp}
-    onpointercancel={onInteractivePointerUp}
+    onpointercancel={onInteractivePointerCancel}
     ontouchmove={noop}
     onpointerdown={onInteractivePointerDown}
     ondblclick={onInteractiveDoubleClick}
@@ -5785,6 +5901,20 @@
       onSendBackward={() => reorderSelected("backward")}
       onSendToBack={() => reorderSelected("back")}
       onDelete={deleteSelected}
+      pluginItems={
+        // Filter through each plugin's predicate at menu-open time
+        // (predicate is allowed to read the live appState reactively).
+        // Sorted by `order` (default 0) then registration index for
+        // a stable visual order.
+        pluginRegistry.contextMenuItems
+          .filter((item) => !item.predicate || item.predicate(appState))
+          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+          .map((item) => ({
+            id: item.id,
+            label: item.label,
+            onSelect: item.onSelect,
+          }))
+      }
     />
   {/if}
 

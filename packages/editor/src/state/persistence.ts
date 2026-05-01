@@ -41,7 +41,13 @@ export function createPersistence(opts: {
     scrollY: appState.scrollY,
     viewBackgroundColor: appState.viewBackgroundColor,
     theme: appState.theme,
-    activeTool: appState.activeTool,
+    // activeTool is intentionally NOT persisted: restoring it via
+    // shallow merge bypasses setActiveTool → plugin tools never get
+    // their onActivate fired, and a plugin tool that's been
+    // uninstalled since the save would leave the editor in an
+    // inactive-tool dead state. Defaulting to the editor's
+    // initial-state activeTool (selection) on every reload is also
+    // the more useful UX.
     selectedElementIds: appState.selectedElementIds,
     gridModeEnabled: appState.gridModeEnabled,
   });
@@ -80,8 +86,13 @@ export function createPersistence(opts: {
       scene.replaceAllElements(parsed.elements, { skipValidation: true });
       // Shallow-merge appState subset. Any missing field falls back to
       // whatever is already there (e.g. width/height come from the live
-      // container measure, not the saved snapshot).
+      // container measure, not the saved snapshot). activeTool is
+      // skipped explicitly: older saves persisted it, but restoring
+      // it here would bypass setActiveTool → plugin tools never get
+      // their onActivate fired (and a plugin since uninstalled would
+      // leave the editor in an unreachable tool state).
       for (const [k, v] of Object.entries(parsed.appState ?? {})) {
+        if (k === "activeTool") continue;
         appState[k] = v;
       }
       return true;

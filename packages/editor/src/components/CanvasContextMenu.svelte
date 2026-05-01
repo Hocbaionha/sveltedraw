@@ -14,6 +14,17 @@
     hasSelection: boolean;
   };
 
+  /**
+   * Plugin-contributed menu item descriptor. Mirrors the registry's
+   * ContextMenuItemDef but with the predicate already evaluated by
+   * the host (so this component just renders what's passed in).
+   */
+  type PluginContextMenuItem = {
+    id: string;
+    label: string;
+    onSelect: () => void;
+  };
+
   type Props = {
     menu: ContextMenuData;
     clipboardEmpty: boolean;
@@ -33,6 +44,10 @@
     onSendBackward: () => void;
     onSendToBack: () => void;
     onDelete: () => void;
+    /** Plugin-contributed entries — already filtered through their
+     *  predicate by the caller, sorted by `order`. Rendered below
+     *  the built-in entries in a separate group. */
+    pluginItems?: PluginContextMenuItem[];
   };
 
   let {
@@ -54,6 +69,7 @@
     onSendBackward,
     onSendToBack,
     onDelete,
+    pluginItems = [],
   }: Props = $props();
 
   const run = (fn: () => void) => () => {
@@ -99,6 +115,14 @@
     <button type="button" class="ctx-item" onclick={run(onSendToBack)}>{t("labels.sendToBack")}</button>
     <div class="ctx-sep"></div>
     <button type="button" class="ctx-item ctx-item--danger" onclick={run(onDelete)}>{t("labels.delete")}</button>
+  {/if}
+  {#if pluginItems.length > 0}
+    <div class="ctx-sep"></div>
+    {#each pluginItems as item (item.id)}
+      <button type="button" class="ctx-item" onclick={run(item.onSelect)}>
+        {item.label}
+      </button>
+    {/each}
   {/if}
 </div>
 
