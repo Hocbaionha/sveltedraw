@@ -444,12 +444,14 @@ export function registerCoreActions(
     },
 
     // ── Hyperlink dialog ─────────────────────────────────────────────
+    // No predicate: openLinkDialog already no-ops when selection size
+    // != 1, and we want to consume Ctrl+K regardless so the browser
+    // doesn't focus the URL bar. The legacy code worked the same way.
     {
       id: "edit.editLink",
       label: "Edit link",
       category: "edit",
       hotkey: "CmdOrCtrl+K",
-      predicate: () => hasSel(),
       perform: () => {
         ops.openLinkDialog();
         return { consumed: true };
