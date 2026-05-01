@@ -77,9 +77,21 @@ export const persistencePlugin: SveltedrawPlugin = {
     // scheduleSave() calls are kept for appState-only changes (zoom,
     // theme, background) that don't fire api.onChange — those route
     // through the published store.
-    const removeChangeObs = ctx.onSceneChange(() => {
+    const rawRemoveChangeObs = ctx.onSceneChange(() => {
       persistence.scheduleSave();
     });
+    // Make the disposer idempotent so we can safely call it from
+    // both the editorReady-teardown (early, to detach BEFORE the
+    // post-teardown flush sees a peer-plugin-mutation save) and the
+    // install-return (the install-throw-rescue path, in case
+    // onEditorReady never fired). api.onChange's disposer isn't
+    // documented as idempotent.
+    let changeObsRemoved = false;
+    const removeChangeObs = () => {
+      if (changeObsRemoved) return;
+      changeObsRemoved = true;
+      rawRemoveChangeObs();
+    };
 
     // beforeunload → flush pending save. Without this, the trailing-
     // edge debounce can lose the last 500ms of edits when the user
@@ -91,32 +103,30 @@ export const persistencePlugin: SveltedrawPlugin = {
       removeBeforeUnload = ctx.onWindowEvent("beforeunload", () => {
         persistence.flushPendingSave();
       });
-      // Teardown: flush + detach beforeunload before plugin uninstall.
+      // editorReady-teardown runs BEFORE the install-return
+      // teardown. We detach the change-observer here as the FIRST
+      // action so any peer-plugin teardown that runs AFTER us in
+      // the same uninstall sweep can mutate scene without scheduling
+      // a save against the editor that's tearing down. Then we
+      // flush whatever was queued up to this point, then drop the
+      // beforeunload listener.
       return () => {
+        removeChangeObs();
         persistence.flushPendingSave();
         removeBeforeUnload?.();
       };
     });
 
     return () => {
-      // Order matters here. removeChangeObs MUST run first: a peer
-      // plugin's teardown can mutate the scene (e.g. collab plugin
-      // dropping cursor overlays via replaceAllElements during its
-      // own dispose). If our onSceneChange listener is still
-      // attached when that happens, it schedules a save that races
-      // with our subsequent flush+dispose. Detach the listener
-      // synchronously, THEN flush any pending save accumulated
-      // before this point, THEN dispose to slam the door on any
-      // in-flight timer (saveNow checks `disposed` and bails).
-      //
       // Plugin-level cleanup runs AFTER the onEditorReady teardown
-      // (registry orders them so), so pendingSave is normally
-      // already flushed by the onEditorReady-return callback above.
-      // The flush here is the install-throw-rescue path: if the
-      // installer threw before onEditorReady queued its callback,
-      // there's no onEditorReady-return to run, but we still need
-      // to flush whatever the change-observer accumulated up to the
-      // throw.
+      // (registry orders them so) — pendingSave is already flushed
+      // and the change-observer is already detached. This is the
+      // install-throw-rescue path: if the installer threw before
+      // onEditorReady queued its callback, there's no
+      // editorReady-teardown to run, so we re-do the same cleanup
+      // here. Both paths converge on the same end state via the
+      // idempotent removeChangeObs + the disposed flag inside
+      // persistence.
       removeChangeObs();
       persistence.flushPendingSave();
       persistence.dispose();

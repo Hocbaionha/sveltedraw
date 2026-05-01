@@ -1588,10 +1588,15 @@
   //
   // The DEV warn covers the "host disabled the link-dialog plugin
   // but a host-side caller still tries to open it" case — silent
-  // no-op would hide the wiring bug, the warn surfaces it.
+  // no-op would hide the wiring bug, the warn surfaces it. Deduped
+  // per-caller so a polling consumer (e.g. dev probe checking
+  // isLinkDialogOpen in a loop) doesn't spam the console; the
+  // first warn is what tells us the plugin is missing.
+  const linkDialogWarnedCallers = new Set<string>();
   const getLinkDialogStore = (caller: string): LinkDialogStore | null => {
     const s = pluginRegistry.getStore<LinkDialogStore>(LINK_DIALOG_STORE_KEY);
-    if (!s && import.meta.env?.DEV) {
+    if (!s && import.meta.env?.DEV && !linkDialogWarnedCallers.has(caller)) {
+      linkDialogWarnedCallers.add(caller);
       // eslint-disable-next-line no-console
       console.warn(
         `[sveltedraw] ${caller}() called but the builtin/link-dialog plugin is not installed — call is a no-op. If this is intentional, ignore. If not, restore the plugin to the editor's plugins prop.`,
@@ -1603,8 +1608,13 @@
   const confirmLinkDialog = (nextLink: string | null) =>
     getLinkDialogStore("confirmLinkDialog")?.confirm(nextLink);
   const closeLinkDialog = () => getLinkDialogStore("closeLinkDialog")?.close();
+  // isLinkDialogOpen is a read-only probe with `false` as a valid
+  // "no plugin = nothing open" answer — skip the warn so polling
+  // probes (e.g. "wait until dialog open") don't tag the plugin as
+  // missing on every poll iteration. Open/Close/Confirm callers
+  // still warn because for them, no plugin = no-op = wiring bug.
   const isLinkDialogOpen = () =>
-    getLinkDialogStore("isLinkDialogOpen")?.isOpen() ?? false;
+    pluginRegistry.getStore<LinkDialogStore>(LINK_DIALOG_STORE_KEY)?.isOpen() ?? false;
 
   // A1: chips are derived from selection + sceneReady nonce so they re-run
   // when mutateElement changes an element's .link (see the $derived body's
