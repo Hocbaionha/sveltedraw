@@ -67,28 +67,23 @@ vi.mock("@sveltedraw/element", () => ({
   deepCopyElement: <T>(el: T): T => JSON.parse(JSON.stringify(el)),
 }));
 
-// Type stub for the editor API the store consumes. Mirrors the surface
-// area touched by createCollabStore (getElements / updateScene /
-// onChange / notifyChange).
-type StubApi = {
-  getElements: () => unknown[];
-  updateScene: (patch: { elements?: unknown[] }) => void;
-  onChange: (cb: () => void) => () => void;
-  notifyChange: () => void;
-  onSelectionChange: () => () => void;
-  onToolChange: () => () => void;
-};
-
+// Type stub for the editor API the store consumes. The full
+// SveltedrawAPI has ~12 methods; createCollabStore only touches a
+// handful (getElements / updateScene / onChange / notifyChange /
+// onSelectionChange / onToolChange). The unknown-cast on return keeps
+// the test ergonomic without listing 6+ unused stubs.
 function makeStubApi() {
   let elements: unknown[] = [];
   const onChangeCbs = new Set<() => void>();
-  const api: StubApi = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const api: any = {
     getElements: () => elements,
-    updateScene: (patch) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    updateScene: (patch: any) => {
       if (patch.elements) elements = patch.elements;
       api.notifyChange();
     },
-    onChange: (cb) => {
+    onChange: (cb: () => void) => {
       onChangeCbs.add(cb);
       return () => onChangeCbs.delete(cb);
     },
@@ -251,8 +246,10 @@ describe("collab store / Yjs protocol", () => {
     await wait(PUSH_DEBOUNCE_MS + 50);
 
     const afterStateVector = Y.encodeStateVector(doc);
-    // No new ops → state vector unchanged.
-    expect(Buffer.from(afterStateVector).equals(Buffer.from(beforeStateVector))).toBe(true);
+    // No new ops → state vector unchanged. Compare via Array.from so
+    // the assertion works regardless of @types/node version (Buffer's
+    // .equals isn't always present in svelte-check's resolved types).
+    expect(Array.from(afterStateVector)).toEqual(Array.from(beforeStateVector));
   });
 
   it("two docs converge on different-element edits (the actual CRDT case)", async () => {

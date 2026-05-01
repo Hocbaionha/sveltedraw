@@ -494,6 +494,13 @@
         pluginRegistry.install(plugin, buildCtx(plugin.id));
       }
     }
+
+    // After the first plugin-install pass completes, the editor is
+    // fully wired (onMount has already constructed scene + bumped
+    // sceneReady, plugins are installed, ActionManager is populated).
+    // Fire onEditorReady callbacks now. markEditorReady is idempotent —
+    // safe to call on every $effect re-run; only the first does work.
+    pluginRegistry.markEditorReady();
   });
 
   // ── Canvas refs ────────────────────────────────────────────────────────
@@ -4136,6 +4143,15 @@
   };
 
   const onInteractivePointerDown = (event: PointerEvent) => {
+    // Plugin pointer-observer dispatch (down). Fires before any of
+    // our own handler logic so observers see the event regardless of
+    // whether we end up consuming it.
+    pluginRegistry.dispatchPointerEvent(
+      "down",
+      event,
+      toSceneCoords(event.clientX, event.clientY),
+    );
+
     // ── Touch tracking (for pinch-zoom + two-finger pan) ─────────────
     // Record every active touch. When a second finger lands, engage
     // pinch-mode and drop any in-flight single-touch gesture so we
@@ -4564,6 +4580,12 @@
     // it never gates the rest of this hot path.
     broadcastCursor(event);
 
+    // Plugin pointer-observer dispatch. Read-only — observers can't
+    // intercept this event. Compute scene coords once and hand them
+    // to every observer so each plugin doesn't redo the math.
+    const sceneCoords = toSceneCoords(event.clientX, event.clientY);
+    pluginRegistry.dispatchPointerEvent("move", event, sceneCoords);
+
     // B2: eraser drag. Each hit is soft-deleted and tracked in the drag
     // set so the same element isn't hit twice + history lands once.
     if (eraserDragActive) {
@@ -4891,6 +4913,13 @@
   };
 
   const onInteractivePointerUp = (event: PointerEvent) => {
+    // Plugin pointer-observer dispatch (up).
+    pluginRegistry.dispatchPointerEvent(
+      "up",
+      event,
+      toSceneCoords(event.clientX, event.clientY),
+    );
+
     // Touch bookkeeping: drop the finger and, if we fall below 2
     // simultaneous touches, end the pinch gesture.
     if (event.pointerType === "touch") {
@@ -5526,6 +5555,30 @@
     <div class="sveltedraw-plugin-side-panel" data-panel-id={panel.id}>
       <PanelComponent />
     </div>
+  {/each}
+
+  <!-- Plugin chrome slots. Four well-known mount points for UI that
+       lives outside the canvas/sidebar/toolbar surfaces:
+         - top-bar / bottom-bar: full-width strips
+         - toast-layer: stacked transient notifications (bottom-center)
+         - dialog-layer: full-screen modal overlays
+       Items per slot are sorted by zIndex (default 0). The plugin's
+       component is parameter-less and closes over its own state via
+       module-level bindings (PanelHost pattern). -->
+  {#each (["top-bar", "bottom-bar", "toast-layer", "dialog-layer"] as const) as slot}
+    {@const itemsInSlot = pluginRegistry.chromeItems
+      .filter((c) => c.slot === slot)
+      .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0))}
+    {#if itemsInSlot.length > 0}
+      <div class="sveltedraw-plugin-chrome" data-chrome-slot={slot}>
+        {#each itemsInSlot as item (item.id)}
+          {@const C = item.component}
+          <div class="sveltedraw-plugin-chrome-item" data-chrome-id={item.id}>
+            <C />
+          </div>
+        {/each}
+      </div>
+    {/if}
   {/each}
 
   <!-- Style panel. Shown whenever the editor is mounted; changes apply
@@ -6667,5 +6720,47 @@
   .sveltedraw-plugin-canvas-overlay {
     position: absolute;
     inset: 0;
+  }
+
+  /* Plugin chrome slots — UI outside the canvas/sidebar/toolbar. Each
+     slot is positioned absolutely relative to the editor container.
+     Items inside a slot stack along the slot's natural axis. */
+  .sveltedraw-plugin-chrome {
+    position: absolute;
+    pointer-events: none; /* slot is a layout container, not a hit target */
+    z-index: 50;
+  }
+  .sveltedraw-plugin-chrome > :global(*) {
+    pointer-events: auto; /* contents opt back in */
+  }
+  [data-chrome-slot="top-bar"] {
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  [data-chrome-slot="bottom-bar"] {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  [data-chrome-slot="toast-layer"] {
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 8px;
+    align-items: center;
+    z-index: 100;
+  }
+  [data-chrome-slot="dialog-layer"] {
+    inset: 0;
+    z-index: 200;
   }
 </style>
