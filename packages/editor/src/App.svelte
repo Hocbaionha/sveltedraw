@@ -1214,6 +1214,35 @@
   // call sites unchanged while moving the debounce-timer ownership +
   // beforeunload flush + scene-change subscription into the plugin.
   const tryLoad = () => loadPersistedScene({ getScene: () => scene, appState });
+
+  // ── Plugin shim DEV-warn helper ─────────────────────────────────
+  // Unified "plugin missing → warn once per caller" surface used by
+  // every host-side shim that routes through a builtin plugin store.
+  // Replaces three near-identical inline implementations (Wave A.2
+  // link-dialog, Wave B.1 z-order, Wave B.2 group). The plugin/key
+  // argument exists so the helper can also fetch the store in one
+  // call — the shim signature collapses to `withPluginStore(...)?.method()`.
+  //
+  // The dedupe key is per-caller (e.g. "scheduleSave",
+  // "reorderSelected:forward") so each unique caller warns once
+  // per editor-instance lifetime. Multi-edition / HMR re-mounts
+  // get a fresh Set via the per-component-instance script body.
+  const pluginWarnedCallers = new Set<string>();
+  const withPluginStore = <T,>(
+    key: symbol,
+    pluginId: string,
+    caller: string,
+  ): T | null => {
+    const s = pluginRegistry.getStore<T>(key);
+    if (!s && import.meta.env?.DEV && !pluginWarnedCallers.has(caller)) {
+      pluginWarnedCallers.add(caller);
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[sveltedraw] ${caller}() called but the ${pluginId} plugin is not installed — call is a no-op. If this is intentional, ignore. If not, restore the plugin to the editor's plugins prop.`,
+      );
+    }
+    return s ?? null;
+  };
   // Bridge for the persistence plugin — it can't access the local
   // `scene` variable directly, and the api surface doesn't expose
   // soft-deleted elements. Registered in the same context map other
@@ -1348,19 +1377,22 @@
 
   // Thin shims that route through the plugin store. The store
   // appears once the plugin install $effect runs (right after
-  // onMount); calls before that point — only possible if scheduleSave
-  // gets invoked synchronously during init — silently no-op via the
-  // optional chaining. Bootstrap tryLoad doesn't trigger any
-  // scheduleSave so this is safe.
+  // onMount); calls before that point silently no-op via the
+  // unified DEV-warn helper (warns once per caller in DEV when
+  // the plugin is missing — silent fall-through hides the
+  // wiring bug). Persistence is the most consequential silent-
+  // no-op of all the shims: a host that filters out
+  // builtin/persistence and uses one of these shims would
+  // silently lose autosave for the user.
   const scheduleSave = () =>
-    pluginRegistry.getStore<PersistenceStore>(PERSISTENCE_STORE_KEY)?.requestSave();
+    withPluginStore<PersistenceStore>(PERSISTENCE_STORE_KEY, "builtin/persistence", "scheduleSave")?.requestSave();
   const saveNow = () =>
     // saveNow is rarely called and exists only for explicit "save
     // right now" UX (Ctrl+S). Route through flush — equivalent
     // semantics: cancel debounce + write immediately.
-    pluginRegistry.getStore<PersistenceStore>(PERSISTENCE_STORE_KEY)?.flush();
+    withPluginStore<PersistenceStore>(PERSISTENCE_STORE_KEY, "builtin/persistence", "saveNow")?.flush();
   const flushPendingSave = () =>
-    pluginRegistry.getStore<PersistenceStore>(PERSISTENCE_STORE_KEY)?.flush();
+    withPluginStore<PersistenceStore>(PERSISTENCE_STORE_KEY, "builtin/persistence", "flushPendingSave")?.flush();
 
   // ── History (undo/redo) ──────────────────────────────────────────────
   // Implementation lives in ./history/store.ts. App.svelte owns the reactive
@@ -1535,29 +1567,10 @@
   // logic (expandSelectionToGroup below) — that lives in the
   // pointerdown flow because it's part of the selection state
   // machine, not a group-mutation op.
-  const groupWarnedCallers = new Set<string>();
-  const groupSelected = () => {
-    const s = pluginRegistry.getStore<GroupStore>(GROUP_STORE_KEY);
-    if (!s && import.meta.env?.DEV && !groupWarnedCallers.has("groupSelected")) {
-      groupWarnedCallers.add("groupSelected");
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[sveltedraw] groupSelected() called but the builtin/group plugin is not installed — call is a no-op. Restore the plugin to the editor's plugins prop.`,
-      );
-    }
-    s?.group();
-  };
-  const ungroupSelected = () => {
-    const s = pluginRegistry.getStore<GroupStore>(GROUP_STORE_KEY);
-    if (!s && import.meta.env?.DEV && !groupWarnedCallers.has("ungroupSelected")) {
-      groupWarnedCallers.add("ungroupSelected");
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[sveltedraw] ungroupSelected() called but the builtin/group plugin is not installed — call is a no-op. Restore the plugin to the editor's plugins prop.`,
-      );
-    }
-    s?.ungroup();
-  };
+  const groupSelected = () =>
+    withPluginStore<GroupStore>(GROUP_STORE_KEY, "builtin/group", "groupSelected")?.group();
+  const ungroupSelected = () =>
+    withPluginStore<GroupStore>(GROUP_STORE_KEY, "builtin/group", "ungroupSelected")?.ungroup();
 
   // Expand selection to include every element sharing the outermost
   // group of `el`. Called from pointerdown's selection branch when the
@@ -1645,33 +1658,17 @@
   // store. Auto-close on element delete is handled by the plugin
   // via onElementChange — App.svelte no longer carries that effect.
   //
-  // The DEV warn covers the "host disabled the link-dialog plugin
-  // but a host-side caller still tries to open it" case — silent
-  // no-op would hide the wiring bug, the warn surfaces it. Deduped
-  // per-caller so a polling consumer (e.g. dev probe checking
-  // isLinkDialogOpen in a loop) doesn't spam the console; the
-  // first warn is what tells us the plugin is missing.
-  const linkDialogWarnedCallers = new Set<string>();
-  const getLinkDialogStore = (caller: string): LinkDialogStore | null => {
-    const s = pluginRegistry.getStore<LinkDialogStore>(LINK_DIALOG_STORE_KEY);
-    if (!s && import.meta.env?.DEV && !linkDialogWarnedCallers.has(caller)) {
-      linkDialogWarnedCallers.add(caller);
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[sveltedraw] ${caller}() called but the builtin/link-dialog plugin is not installed — call is a no-op. If this is intentional, ignore. If not, restore the plugin to the editor's plugins prop.`,
-      );
-    }
-    return s ?? null;
-  };
-  const openLinkDialog = () => getLinkDialogStore("openLinkDialog")?.open();
+  // Link-dialog probe-surface shims. Open/Close/Confirm warn-on-
+  // missing via the unified helper; isLinkDialogOpen skips the warn
+  // because `false` is a semantically-correct fall-through (a
+  // polling consumer doesn't have a wiring bug — no plugin =
+  // nothing open).
+  const openLinkDialog = () =>
+    withPluginStore<LinkDialogStore>(LINK_DIALOG_STORE_KEY, "builtin/link-dialog", "openLinkDialog")?.open();
   const confirmLinkDialog = (nextLink: string | null) =>
-    getLinkDialogStore("confirmLinkDialog")?.confirm(nextLink);
-  const closeLinkDialog = () => getLinkDialogStore("closeLinkDialog")?.close();
-  // isLinkDialogOpen is a read-only probe with `false` as a valid
-  // "no plugin = nothing open" answer — skip the warn so polling
-  // probes (e.g. "wait until dialog open") don't tag the plugin as
-  // missing on every poll iteration. Open/Close/Confirm callers
-  // still warn because for them, no plugin = no-op = wiring bug.
+    withPluginStore<LinkDialogStore>(LINK_DIALOG_STORE_KEY, "builtin/link-dialog", "confirmLinkDialog")?.confirm(nextLink);
+  const closeLinkDialog = () =>
+    withPluginStore<LinkDialogStore>(LINK_DIALOG_STORE_KEY, "builtin/link-dialog", "closeLinkDialog")?.close();
   const isLinkDialogOpen = () =>
     pluginRegistry.getStore<LinkDialogStore>(LINK_DIALOG_STORE_KEY)?.isOpen() ?? false;
 
@@ -2253,18 +2250,12 @@
   // no-ops via optional chaining — but DEV warns once per caller
   // so a wiring bug surfaces during early-init (mirrors the
   // link-dialog probe-shim warn from Wave A pass-3).
-  const zOrderWarnedCallers = new Set<string>();
-  const reorderSelected = (direction: ZOrderDirection) => {
-    const s = pluginRegistry.getStore<ZOrderStore>(Z_ORDER_STORE_KEY);
-    if (!s && import.meta.env?.DEV && !zOrderWarnedCallers.has(direction)) {
-      zOrderWarnedCallers.add(direction);
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[sveltedraw] reorderSelected("${direction}") called but the builtin/z-order plugin is not installed — call is a no-op. Restore the plugin to the editor's plugins prop.`,
-      );
-    }
-    s?.reorder(direction);
-  };
+  const reorderSelected = (direction: ZOrderDirection) =>
+    withPluginStore<ZOrderStore>(
+      Z_ORDER_STORE_KEY,
+      "builtin/z-order",
+      `reorderSelected:${direction}`,
+    )?.reorder(direction);
 
   // ── Export ───────────────────────────────────────────────────────────
   // Thin wrappers over original `@sveltedraw/utils/export`. Those helpers

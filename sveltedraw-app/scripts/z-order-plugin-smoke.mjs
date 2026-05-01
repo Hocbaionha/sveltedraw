@@ -141,20 +141,26 @@ const tests = await ev(`
   // console, future stringy callers). Re-establish a single-element
   // selection so the empty-selection short-circuit doesn't preempt
   // the unknown-direction branch, then call with a garbage string.
-  // Order must not change.
+  // Order must not change AND history length must not change —
+  // verifies the default branch returns BEFORE pushHistory, not
+  // after. Without the histLen check a refactor could move the
+  // default arm below pushHistory and the smoke would still pass.
   p.appState.selectedElementIds = { [A]: true };
   p.bumpSceneRepaint();
   await new Promise(r => setTimeout(r, 50));
   const before6 = idsInOrder();
+  const histBefore6 = window.__sveltedrawHistoryLen();
   if (typeof p.reorderSelected === 'function') {
     p.reorderSelected('sideways');
   }
   await new Promise(r => setTimeout(r, 50));
   const after6 = idsInOrder();
+  const histAfter6 = window.__sveltedrawHistoryLen();
   tests.push({
-    name: 'plugin reorder no-ops on unknown direction string',
-    ok: before6.join(',') === after6.join(','),
-    detail: 'order unchanged=' + (before6.join(',') === after6.join(',')),
+    name: 'plugin reorder no-ops on unknown direction string (no history pollution)',
+    ok: before6.join(',') === after6.join(',') && histAfter6 === histBefore6,
+    detail: 'orderUnchanged=' + (before6.join(',') === after6.join(','))
+      + ' histBefore=' + histBefore6 + ' histAfter=' + histAfter6,
   });
 
   return tests;
