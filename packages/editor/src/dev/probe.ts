@@ -4,6 +4,7 @@
 
 // @ts-ignore
 import { exportToBlob } from "@sveltedraw/utils/export";
+import type { ZOrderDirection } from "../plugins/builtin/z-order/index.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyEl = any;
@@ -78,7 +79,7 @@ export type ProbeBindings = {
   // Wave B.1 — z-order. Bypasses the action predicate (which gates
   // on selection size) so smokes can exercise the plugin's own
   // defense-in-depth guards.
-  reorderSelected: (direction: "forward" | "backward" | "front" | "back") => void;
+  reorderSelected: (direction: ZOrderDirection) => void;
   // Wave B.2 — group / ungroup. Same probe-bypass rationale.
   groupSelected: () => void;
   ungroupSelected: () => void;
