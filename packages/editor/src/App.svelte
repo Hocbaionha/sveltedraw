@@ -1311,15 +1311,22 @@
   // bumpSceneRepaint (host-owned). Plugin's reorder() runs lazily
   // when the user invokes a reorder action — by that time pushHistory
   // is destructured from historyStore further below in this script.
-  // pushHistory is destructured from historyStore further down in
-  // this script (TDZ-strict const, not hoisted), so referencing it
-  // by bare name here would crash at bridge-object construction.
-  // We could thunk via `() => pushHistory()` but the recursive-name
-  // shadow is fragile to refactor (rename, scope move, change the
-  // destructure → silent infinite recursion since the inner
-  // pushHistory resolves to the bridge member itself). Source the
-  // thunk from `historyStore.pushHistory` instead — same TDZ-
-  // deferring behavior, source unambiguous.
+  // pushHistory and bumpSceneRepaint are declared further down in
+  // this script (TDZ-strict consts, not hoisted), so referencing
+  // them by bare name in the bridge object's value position would
+  // crash at construction. The arrow-thunk wrappers defer the
+  // lookup to call time (post-onMount, when the plugin invokes
+  // them).
+  //
+  // For pushHistory we deliberately source from
+  // historyStore.pushHistory (rather than a bare `() => pushHistory()`
+  // that relies on the destructure further below). The destructure
+  // shadow worked, but renaming or moving it would silently turn
+  // the inner `pushHistory()` into a recursive call to the bridge
+  // member itself. `historyStore.pushHistory` is unambiguous.
+  //
+  // bumpSceneRepaint can stay as `() => bumpSceneRepaint()` — the
+  // left side is an object-key, not a binding, so no shadow risk.
   const zOrderBridge: ZOrderBridge = {
     getScene: () => scene,
     pushHistory: () => historyStore.pushHistory(),

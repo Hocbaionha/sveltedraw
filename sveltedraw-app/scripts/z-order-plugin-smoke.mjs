@@ -135,6 +135,28 @@ const tests = await ev(`
     detail: 'order unchanged=' + (before5.join(',') === after5.join(',')),
   });
 
+  // ── 6. plugin default-branch covers unknown directions
+  // The plugin has a defensive default-return for direction strings
+  // outside the typed union (reachable from probe code, devtools
+  // console, future stringy callers). Re-establish a single-element
+  // selection so the empty-selection short-circuit doesn't preempt
+  // the unknown-direction branch, then call with a garbage string.
+  // Order must not change.
+  p.appState.selectedElementIds = { [A]: true };
+  p.bumpSceneRepaint();
+  await new Promise(r => setTimeout(r, 50));
+  const before6 = idsInOrder();
+  if (typeof p.reorderSelected === 'function') {
+    p.reorderSelected('sideways');
+  }
+  await new Promise(r => setTimeout(r, 50));
+  const after6 = idsInOrder();
+  tests.push({
+    name: 'plugin reorder no-ops on unknown direction string',
+    ok: before6.join(',') === after6.join(','),
+    detail: 'order unchanged=' + (before6.join(',') === after6.join(',')),
+  });
+
   return tests;
 `);
 
