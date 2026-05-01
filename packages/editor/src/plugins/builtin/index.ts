@@ -20,6 +20,7 @@ import { exportPanelPlugin } from "./export-panel/index.js";
 import { commandPalettePlugin } from "./command-palette/index.js";
 import { collabPlugin } from "./collab/index.svelte.js";
 import { persistencePlugin } from "./persistence/index.js";
+import { linkDialogPlugin } from "./link-dialog/index.js";
 import type { SveltedrawPlugin } from "../types.js";
 
 /**
@@ -45,4 +46,5 @@ export const builtinPlugins: readonly SveltedrawPlugin[] = [
   commandPalettePlugin,
   collabPlugin,
   persistencePlugin,
+  linkDialogPlugin,
 ];

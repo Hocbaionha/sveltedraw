@@ -101,6 +101,12 @@
     type PersistenceSceneBridge,
   } from "./plugins/builtin/persistence/index.js";
   import {
+    LINK_DIALOG_STORE_KEY,
+    LINK_DIALOG_BRIDGE_KEY,
+    type LinkDialogStore,
+    type LinkDialogBridge,
+  } from "./plugins/builtin/link-dialog/index.js";
+  import {
     t,
     setLanguage,
     getCurrentLangCode,
@@ -128,7 +134,8 @@
   import StaticCanvas from "./components/canvases/StaticCanvas.svelte";
   import InteractiveCanvas from "./components/canvases/InteractiveCanvas.svelte";
   import NewElementCanvas from "./components/canvases/NewElementCanvas.svelte";
-  import ElementLinkDialog from "./components/ElementLinkDialog.svelte";
+  // ElementLinkDialog mounted by builtin/link-dialog plugin's
+  // DialogHost — no inline import here anymore.
   import GridRenderer from "./components/GridRenderer.svelte";
   import SnapGuideRenderer from "./components/SnapGuideRenderer.svelte";
   import MeasurementOverlay from "./components/MeasurementOverlay.svelte";
@@ -925,7 +932,7 @@
         openLinkDialog: () => openLinkDialog(),
         closeLinkDialog: () => closeLinkDialog(),
         confirmLinkDialog: (v) => confirmLinkDialog(v),
-        isLinkDialogOpen: () => linkDialogOpen,
+        isLinkDialogOpen: () => isLinkDialogOpen(),
         toggleLaser: () => toggleLaser(),
         isLaserActive: () => pluginRegistry.getStore<LaserStore>(LASER_STORE_KEY)?.isActive() ?? false,
         getLaserTrailLen: () => pluginRegistry.getStore<LaserStore>(LASER_STORE_KEY)?.trailLength() ?? 0,
@@ -1191,6 +1198,37 @@
     getScene: () => scene,
   };
   registerCtx(PERSISTENCE_SCENE_BRIDGE_KEY, persistenceSceneBridge);
+
+  // Bridge for the link-dialog plugin — it needs scene access to
+  // read/write element.link + check existence (api surface is
+  // element-centric and doesn't expose mutateElement / getElement).
+  const linkDialogBridge: LinkDialogBridge = {
+    getLink: (id) => {
+      if (!scene) return null;
+      const el = scene.getElement(id);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (!el || (el as any).isDeleted) return null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return ((el as any).link as string | null) ?? null;
+    },
+    setLink: (id, nextLink) => {
+      if (!scene) return;
+      const el = scene.getElement(id);
+      if (!el) return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      scene.mutateElement(el, { link: nextLink } as any,
+        { informMutation: false, isDragging: false });
+      pushHistory();
+      bumpSceneRepaint();
+    },
+    isAlive: (id) => {
+      if (!scene) return false;
+      const el = scene.getElement(id);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return !!el && !(el as any).isDeleted;
+    },
+  };
+  registerCtx(LINK_DIALOG_BRIDGE_KEY, linkDialogBridge);
   // Thin shims that route through the plugin store. The store
   // appears once the plugin install $effect runs (right after
   // onMount); calls before that point — only possible if scheduleSave
@@ -1459,10 +1497,12 @@
   let libraryItems = $state<LibraryItem[]>([]);
   let libraryPanelOpen = $state(false);
 
-  // A1: element-link dialog. Opens via Ctrl+K or context-menu on a single
-  // selected element. `targetId` points at the element whose link we edit.
-  let linkDialogOpen = $state(false);
-  let linkDialogTargetId = $state<string | null>(null);
+  // A1: element-link dialog migrated to builtin/link-dialog plugin.
+  // App.svelte keeps the linked-selection chip overlay (rendered
+  // above selected elements with a link), but the dialog itself —
+  // open/close state, modal markup, target-element bridging,
+  // auto-close on element delete — all live in the plugin. Probe
+  // surface delegates to the plugin store via thin shims below.
 
   // B2: eraser tool. `eraserDragActive` is the drag-in-progress flag;
   // `eraserDraggedIds` collects elements deleted during one drag so we
@@ -1495,48 +1535,18 @@
     pluginRegistry.getStore<LaserStore>(LASER_STORE_KEY)?.toggle();
   };
 
-  const openLinkDialog = () => {
-    const sel = getSelectedElements();
-    if (sel.length !== 1) return;
-    linkDialogTargetId = sel[0].id;
-    linkDialogOpen = true;
-  };
-
-  const confirmLinkDialog = (nextLink: string | null) => {
-    if (!scene || !linkDialogTargetId) return;
-    const el = scene.getElement(linkDialogTargetId);
-    if (!el) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    scene.mutateElement(el, { link: nextLink } as any,
-      { informMutation: false, isDragging: false });
-    pushHistory();
-    bumpSceneRepaint();
-  };
-
-  const closeLinkDialog = () => {
-    linkDialogOpen = false;
-    linkDialogTargetId = null;
-  };
-
-  // Returns the live link for the dialog + chip renderer. Reads sceneReady
-  // so mutateElement-driven bumps (including isDeleted flips) are tracked.
-  const getLinkedElement = $derived.by(() => {
-    void sceneReady;
-    if (!linkDialogTargetId || !scene) return null;
-    const el = scene.getElement(linkDialogTargetId);
-    if (!el || (el as any).isDeleted) return null;
-    return el;
-  });
-
-  // A1 robustness: auto-close the dialog when its target element is removed
-  // or soft-deleted under our feet (e.g. erased while dialog is open).
-  // Prevents a ghost modal that blocks pointer events on the rest of the UI.
-  $effect(() => {
-    if (linkDialogOpen && !getLinkedElement) {
-      linkDialogOpen = false;
-      linkDialogTargetId = null;
-    }
-  });
+  // Link-dialog probe-surface shims. The plugin owns the actual
+  // open/close/confirm logic; these route through the published
+  // store. Auto-close on element delete is handled by the plugin
+  // via onElementChange — App.svelte no longer carries that effect.
+  const openLinkDialog = () =>
+    pluginRegistry.getStore<LinkDialogStore>(LINK_DIALOG_STORE_KEY)?.open();
+  const confirmLinkDialog = (nextLink: string | null) =>
+    pluginRegistry.getStore<LinkDialogStore>(LINK_DIALOG_STORE_KEY)?.confirm(nextLink);
+  const closeLinkDialog = () =>
+    pluginRegistry.getStore<LinkDialogStore>(LINK_DIALOG_STORE_KEY)?.close();
+  const isLinkDialogOpen = () =>
+    pluginRegistry.getStore<LinkDialogStore>(LINK_DIALOG_STORE_KEY)?.isOpen() ?? false;
 
   // A1: chips are derived from selection + sceneReady nonce so they re-run
   // when mutateElement changes an element's .link (see the $derived body's
@@ -5378,36 +5388,9 @@
     />
   {/if}
 
-  <!-- Template selector — modal for choosing pre-made templates. -->
-  <!-- A1: element-link dialog. Modal overlay; Ctrl+K, context menu, and the
-       hover chip all flow through openLinkDialog(). The overlay is just a
-       backdrop — click closes; keyboard Esc also closes via the dialog's
-       own listener. stopPropagation on the modal prevents backdrop clicks
-       from reaching it and closing accidentally. -->
-  {#if linkDialogOpen && getLinkedElement}
-    <div
-      class="sveltedraw-link-overlay"
-      role="presentation"
-      onclick={closeLinkDialog}
-    >
-      <div
-        class="sveltedraw-link-modal"
-        role="dialog"
-        aria-modal="true"
-        tabindex="-1"
-        onclick={(e) => e.stopPropagation()}
-        onkeydown={(e) => { if (e.key === "Escape") closeLinkDialog(); }}
-      >
-        <ElementLinkDialog
-          link={(getLinkedElement as any).link ?? null}
-          originalLink={(getLinkedElement as any).link ?? null}
-          onConfirm={confirmLinkDialog}
-          onClose={closeLinkDialog}
-          enabled={linkDialogOpen}
-        />
-      </div>
-    </div>
-  {/if}
+  <!-- A1 element-link dialog mounts via builtin/link-dialog plugin's
+       chrome dialog-layer slot. Modal markup + state + auto-close
+       on element-delete now live in the plugin. -->
 
   <!-- Settings panel — user preferences. -->
   <!-- Help panel — comprehensive documentation. -->
@@ -6039,27 +6022,8 @@
 </div>
 
 <style>
-  /* A1: element-link dialog modal. */
-  .sveltedraw-link-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(12, 13, 19, 0.55);
-    z-index: 2000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .sveltedraw-link-modal {
-    background: #fff;
-    border-radius: 8px;
-    padding: 16px 18px;
-    width: min(480px, 92vw);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
-  }
-  :global(.sveltedraw.theme--dark) .sveltedraw-link-modal {
-    background: #1a1a1e;
-    color: #e5e7ea;
-  }
+  /* A1 element-link dialog modal CSS moved into the
+     builtin/link-dialog plugin's DialogHost.svelte scoped style. */
 
   /* A1: link chip — shown over a selected linked element so the user can
      jump to the URL without opening the dialog. */
