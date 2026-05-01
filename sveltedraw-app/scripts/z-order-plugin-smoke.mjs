@@ -114,16 +114,21 @@ const tests = await ev(`
     detail: 'order=' + after4.join(','),
   });
 
-  // ── 5. reorder no-ops on empty selection
+  // ── 5. plugin empty-selection guard, bypassing the action
+  // predicate. The arrange.bringForward action gates on hasSel(),
+  // so ActionManager dispatch never reaches the plugin guard. Call
+  // the plugin store via the host shim that the probe exposes.
   p.appState.selectedElementIds = {};
   p.bumpSceneRepaint();
   await new Promise(r => setTimeout(r, 50));
   const before5 = idsInOrder();
-  am.execute("arrange.bringForward");
+  if (typeof p.reorderSelected === 'function') {
+    p.reorderSelected('forward');
+  }
   await new Promise(r => setTimeout(r, 50));
   const after5 = idsInOrder();
   tests.push({
-    name: 'reorder no-ops with empty selection',
+    name: 'plugin reorder no-ops on empty selection (bypasses action predicate)',
     ok: before5.join(',') === after5.join(','),
     detail: 'order unchanged=' + (before5.join(',') === after5.join(',')),
   });

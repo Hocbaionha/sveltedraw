@@ -112,19 +112,21 @@ const tests = await ev(`
 
   // ── 4. ungroup no-ops when no element has any groupId
   // After (3), A and B both should have groupIds.length === 0.
+  // Verify BOTH that state is unchanged AND history length is
+  // unchanged — the plugin if-changed-pushHistory branch is the
+  // load-bearing semantic that prevents undo-stack pollution.
   const noGroupsAreEmpty = p.scene.getElement(A).groupIds.length === 0
     && p.scene.getElement(B).groupIds.length === 0;
+  const histLenBefore = window.__sveltedrawHistoryLen();
   am.execute("arrange.ungroup");
   await new Promise(r => setTimeout(r, 80));
-  // History entries shouldn't increase because nothing changed.
-  // (We can't easily peek the history length here without the
-  // probe — assert state is still all-empty groupIds, which is
-  // sufficient evidence.)
+  const histLenAfter = window.__sveltedrawHistoryLen();
   const stillEmpty = p.scene.getElement(A).groupIds.length === 0
     && p.scene.getElement(B).groupIds.length === 0;
   tests.push({
-    name: 'ungroup no-ops when no element has groupIds',
-    ok: noGroupsAreEmpty && stillEmpty,
+    name: 'ungroup no-ops when no element has groupIds (no history pollution)',
+    ok: noGroupsAreEmpty && stillEmpty && histLenAfter === histLenBefore,
+    detail: 'histBefore=' + histLenBefore + ' histAfter=' + histLenAfter,
   });
 
   // ── 5. nested grouping: group → group again → 2 entries deep

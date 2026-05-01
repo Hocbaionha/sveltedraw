@@ -955,6 +955,9 @@
         closeLinkDialog: () => closeLinkDialog(),
         confirmLinkDialog: (v) => confirmLinkDialog(v),
         isLinkDialogOpen: () => isLinkDialogOpen(),
+        reorderSelected: (dir) => reorderSelected(dir),
+        groupSelected: () => groupSelected(),
+        ungroupSelected: () => ungroupSelected(),
         toggleLaser: () => toggleLaser(),
         isLaserActive: () => pluginRegistry.getStore<LaserStore>(LASER_STORE_KEY)?.isActive() ?? false,
         getLaserTrailLen: () => pluginRegistry.getStore<LaserStore>(LASER_STORE_KEY)?.trailLength() ?? 0,
@@ -1308,6 +1311,13 @@
   // bumpSceneRepaint (host-owned). Plugin's reorder() runs lazily
   // when the user invokes a reorder action — by that time pushHistory
   // is destructured from historyStore further below in this script.
+  // The `pushHistory: () => pushHistory()` thunk is load-bearing:
+  // `pushHistory` is destructured from `historyStore` further down
+  // in this script, so referencing it directly here would TDZ at
+  // bridge-object construction time. The thunk defers the lookup
+  // until the plugin invokes pushHistory (which is post-onMount,
+  // long after the destructure has run). Don't "simplify" to
+  // `pushHistory: pushHistory` — it'll throw at module init.
   const zOrderBridge: ZOrderBridge = {
     getScene: () => scene,
     pushHistory: () => pushHistory(),
@@ -1509,17 +1519,32 @@
   // shims route the existing call sites (core actions ops, UtilityBar
   // onGroup/onUngroup) through the published store. If the plugin
   // is uninstalled the call silently no-ops via optional chaining —
-  // same fall-through pattern as scheduleSave / openLinkDialog /
-  // reorderSelected.
+  // DEV warn once per caller surfaces wiring bugs during early-
+  // init (mirrors link-dialog probe-shim + reorderSelected pattern).
   //
   // What stays in App.svelte: the click-to-expand-group selection
   // logic (expandSelectionToGroup below) — that lives in the
   // pointerdown flow because it's part of the selection state
   // machine, not a group-mutation op.
-  const groupSelected = () =>
-    pluginRegistry.getStore<GroupStore>(GROUP_STORE_KEY)?.group();
-  const ungroupSelected = () =>
-    pluginRegistry.getStore<GroupStore>(GROUP_STORE_KEY)?.ungroup();
+  const groupWarnedCallers = new Set<string>();
+  const warnGroupMissing = (caller: string) => {
+    if (!import.meta.env?.DEV || groupWarnedCallers.has(caller)) return;
+    groupWarnedCallers.add(caller);
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[sveltedraw] ${caller}() called but the builtin/group plugin is not installed — call is a no-op. Restore the plugin to the editor's plugins prop.`,
+    );
+  };
+  const groupSelected = () => {
+    const s = pluginRegistry.getStore<GroupStore>(GROUP_STORE_KEY);
+    if (!s) warnGroupMissing("groupSelected");
+    s?.group();
+  };
+  const ungroupSelected = () => {
+    const s = pluginRegistry.getStore<GroupStore>(GROUP_STORE_KEY);
+    if (!s) warnGroupMissing("ungroupSelected");
+    s?.ungroup();
+  };
 
   // Expand selection to include every element sharing the outermost
   // group of `el`. Called from pointerdown's selection branch when the
@@ -2212,10 +2237,21 @@
   // existing call sites (core actions, UtilityBar buttons, context-
   // menu) through the published store. If the plugin is uninstalled
   // (host filters it out of the plugins prop), the call silently
-  // no-ops via optional chaining — same fall-through pattern as
-  // scheduleSave / openLinkDialog.
-  const reorderSelected = (direction: ZOrderDirection) =>
-    pluginRegistry.getStore<ZOrderStore>(Z_ORDER_STORE_KEY)?.reorder(direction);
+  // no-ops via optional chaining — but DEV warns once per caller
+  // so a wiring bug surfaces during early-init (mirrors the
+  // link-dialog probe-shim warn from Wave A pass-3).
+  const zOrderWarnedCallers = new Set<string>();
+  const reorderSelected = (direction: ZOrderDirection) => {
+    const s = pluginRegistry.getStore<ZOrderStore>(Z_ORDER_STORE_KEY);
+    if (!s && import.meta.env?.DEV && !zOrderWarnedCallers.has(direction)) {
+      zOrderWarnedCallers.add(direction);
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[sveltedraw] reorderSelected("${direction}") called but the builtin/z-order plugin is not installed — call is a no-op. Restore the plugin to the editor's plugins prop.`,
+      );
+    }
+    s?.reorder(direction);
+  };
 
   // ── Export ───────────────────────────────────────────────────────────
   // Thin wrappers over original `@sveltedraw/utils/export`. Those helpers

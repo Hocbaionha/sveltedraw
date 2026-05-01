@@ -75,6 +75,14 @@ export type ProbeBindings = {
   confirmLinkDialog: (v: string | null) => void;
   isLinkDialogOpen: () => boolean;
 
+  // Wave B.1 — z-order. Bypasses the action predicate (which gates
+  // on selection size) so smokes can exercise the plugin's own
+  // defense-in-depth guards.
+  reorderSelected: (direction: "forward" | "backward" | "front" | "back") => void;
+  // Wave B.2 — group / ungroup. Same probe-bypass rationale.
+  groupSelected: () => void;
+  ungroupSelected: () => void;
+
   // A2 laser.
   toggleLaser: () => void;
   isLaserActive: () => boolean;
@@ -200,6 +208,9 @@ export function installSveltedrawProbe(b: ProbeBindings): void {
     closeLinkDialog: b.closeLinkDialog,
     confirmLinkDialog: b.confirmLinkDialog,
     isLinkDialogOpen: b.isLinkDialogOpen,
+    reorderSelected: b.reorderSelected,
+    groupSelected: b.groupSelected,
+    ungroupSelected: b.ungroupSelected,
     toggleLaser: b.toggleLaser,
     isLaserActive: b.isLaserActive,
     getLaserTrailLen: b.getLaserTrailLen,
