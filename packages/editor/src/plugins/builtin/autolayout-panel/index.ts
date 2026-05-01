@@ -57,10 +57,22 @@ export const autoLayoutPanelPlugin: SveltedrawPlugin = {
       },
     });
 
+    const removeAction = ctx.addAction({
+      id: "toggle",
+      label: "Toggle auto-layout panel",
+      category: "plugin",
+      hotkey: "CmdOrCtrl+L",
+      perform: () => {
+        store.toggle();
+        return { consumed: true };
+      },
+    });
+
     return () => {
       releaseStore();
       removeToolbarItem();
       removeSidePanel();
+      removeAction();
     };
   },
 };

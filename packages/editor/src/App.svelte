@@ -169,10 +169,7 @@
     registerCoreActions,
     type ActionContext,
   } from "./actions/index.js";
-  import { recentFilesPlugin, RECENT_FILES_STORE_KEY } from "./plugins/builtin/recent-files/index.js";
-  import { SETTINGS_STORE_KEY } from "./plugins/builtin/settings/index.js";
-  import { HELP_STORE_KEY } from "./plugins/builtin/help/index.js";
-  import { TEMPLATES_STORE_KEY } from "./plugins/builtin/templates/index.js";
+  import { recentFilesPlugin } from "./plugins/builtin/recent-files/index.js";
   import {
     HISTORY_PANEL_STORE_KEY,
     HISTORY_UI_BRIDGE_KEY,
@@ -184,12 +181,10 @@
   } from "./plugins/builtin/alignment-panel/index.js";
   import {
     AUTOLAYOUT_BRIDGE_KEY,
-    AUTOLAYOUT_PANEL_STORE_KEY,
     type AutoLayoutBridge,
   } from "./plugins/builtin/autolayout-panel/index.js";
   import {
     MEASUREMENT_BRIDGE_KEY,
-    MEASUREMENT_PANEL_STORE_KEY,
     type MeasurementBridge,
   } from "./plugins/builtin/measurement-panel/index.js";
   import {
@@ -455,6 +450,10 @@
     pushHistory: () => pushHistory(),
   }));
   registerCtx(ACTION_MANAGER_KEY, actionManager);
+  // Attach to the registry BEFORE the plugin-install $effect runs.
+  // Plugins call ctx.addAction synchronously inside their install; the
+  // registry needs the manager to qualify and forward those calls.
+  pluginRegistry.attachActionManager(actionManager);
 
   // Stable-sorted view of canvas overlays. Re-derives only when the
   // registry array mutates; the sort is by ascending zIndex so plugins
@@ -1097,42 +1096,10 @@
   // pointerdown → create newElement, pointermove → extend, pointerup → commit.
   // Subsequent batches copy-paste for other shapes and add selection/drag.
 
-  // Map keyboard keys to tool types. Approximates original `findShapeByKey`
-  // (packages/engine/components/shapes.tsx). Numeric keys are the
-  // primary hotkeys; letter aliases match original where applicable.
-  const TOOL_HOTKEYS: Record<string, string> = {
-    "1": "selection",
-    v: "selection",
-    V: "selection",
-    s: "selection",
-    S: "selection",
-    "2": "rectangle",
-    r: "rectangle",
-    R: "rectangle",
-    "3": "diamond",
-    d: "diamond",
-    D: "diamond",
-    "4": "ellipse",
-    o: "ellipse",
-    O: "ellipse",
-    "5": "arrow",
-    a: "arrow",
-    A: "arrow",
-    "6": "line",
-    l: "line",
-    L: "line",
-    "7": "freedraw",
-    p: "freedraw",
-    P: "freedraw",
-    x: "freedraw",
-    X: "freedraw",
-    "8": "text",
-    t: "text",
-    T: "text",
-    // B2: eraser tool — 'e' hotkey matches original.
-    e: "eraser",
-    E: "eraser",
-  };
+  // Tool hotkeys (V, R, D, O, A, L, P, T, E + numeric variants 1-9)
+  // are now declared in actions/core.ts and dispatched via
+  // ActionManager. Single keypresses go through executeKey at the top
+  // of onContainerKeyDown — no separate switch here.
 
   const setActiveTool = (type: string) => {
     // Commit any in-progress polyline before switching tool — otherwise
@@ -3314,376 +3281,21 @@
       return;
     }
 
-    const mod = event.ctrlKey || event.metaKey;
-
-    // ── Ctrl/Cmd + (Shift) shortcuts ──────────────────────────────────
-    if (mod && !event.altKey) {
-      // Group / ungroup: Ctrl+G adds a shared groupId to all selected
-      // elements; Ctrl+Shift+G pops the outermost group from each.
-      // Matches original keybindings.
-      if (event.key === "g" || event.key === "G") {
-        if (event.shiftKey) ungroupSelected();
-        else groupSelected();
-        event.preventDefault();
-        return;
-      }
-
-      // Template selector: Ctrl+N — delegated to the templates plugin.
-      if (!event.shiftKey && (event.key === "n" || event.key === "N")) {
-        const store = pluginRegistry.getStore<{ open(): void }>(
-          TEMPLATES_STORE_KEY,
-        );
-        if (store) {
-          store.open();
-          event.preventDefault();
-        }
-        return;
-      }
-
-      // Recent files: Ctrl+R — delegated to the recent-files plugin via
-      // its published store. If the plugin is disabled the hotkey
-      // becomes a no-op.
-      if (!event.shiftKey && (event.key === "r" || event.key === "R")) {
-        const store = pluginRegistry.getStore<{ open(): void }>(
-          RECENT_FILES_STORE_KEY,
-        );
-        if (store) {
-          store.open();
-          event.preventDefault();
-        }
-        return;
-      }
-
-      // Settings: Ctrl+, — delegated to the settings plugin.
-      if (!event.shiftKey && event.key === ",") {
-        const store = pluginRegistry.getStore<{ open(): void }>(
-          SETTINGS_STORE_KEY,
-        );
-        if (store) {
-          store.open();
-          event.preventDefault();
-        }
-        return;
-      }
-
-      // Connector tool: Ctrl+Shift+C — delegated to plugin store.
-      if (event.shiftKey && (event.key === "c" || event.key === "C")) {
-        const store = pluginRegistry.getStore<ConnectorStore>(CONNECTOR_STORE_KEY);
-        if (store) {
-          store.toggle();
-          event.preventDefault();
-        }
-        return;
-      }
-
-      // Measurement panel: Ctrl+M — delegated to plugin store.
-      if (!event.shiftKey && (event.key === "m" || event.key === "M")) {
-        const store = pluginRegistry.getStore<{ toggle(): void }>(
-          MEASUREMENT_PANEL_STORE_KEY,
-        );
-        if (store) {
-          store.toggle();
-          event.preventDefault();
-        }
-        return;
-      }
-
-      // Auto-Layout panel: Ctrl+L — delegated to plugin store.
-      if (!event.shiftKey && (event.key === "l" || event.key === "L")) {
-        const store = pluginRegistry.getStore<{ toggle(): void }>(
-          AUTOLAYOUT_PANEL_STORE_KEY,
-        );
-        if (store) {
-          store.toggle();
-          event.preventDefault();
-        }
-        return;
-      }
-
-      // A1: Edit-link dialog: Ctrl+K (original keybinding). Only opens when
-      // exactly one element is selected.
-      if (!event.shiftKey && (event.key === "k" || event.key === "K")) {
-        openLinkDialog();
-        event.preventDefault();
-        return;
-      }
-
-      // Z-order: Ctrl+] / Ctrl+[ (one step), Ctrl+Shift+] / Ctrl+Shift+[
-      // (to front / to back). Matches original keybindings.
-      if (event.key === "]") {
-        reorderSelected(event.shiftKey ? "front" : "forward");
-        event.preventDefault();
-        return;
-      }
-      if (event.key === "[") {
-        reorderSelected(event.shiftKey ? "back" : "backward");
-        event.preventDefault();
-        return;
-      }
-
-      // Lock / unlock selected: Ctrl+Shift+L.
-      if (event.shiftKey && (event.key === "l" || event.key === "L")) {
-        toggleLockSelected();
-        event.preventDefault();
-        return;
-      }
-
-      // Clear canvas: Ctrl+Shift+Delete (or Backspace). Destructive but
-      // undoable via Ctrl+Z since `clearCanvas` pushes history.
-      if (
-        event.shiftKey &&
-        (event.key === "Delete" || event.key === "Backspace")
-      ) {
-        clearCanvas();
-        event.preventDefault();
-        return;
-      }
-
-      // Export shortcuts.
-      //   Ctrl/Cmd + S       → download PNG
-      //   Ctrl/Cmd + Shift+S → download SVG
-      // Both block the browser's "Save Page" prompt.
-      if (event.key === "s" || event.key === "S") {
-        if (event.shiftKey) {
-          downloadSvg();
-        } else {
-          downloadPng();
-        }
-        event.preventDefault();
-        return;
-      }
-
-      // Undo: Ctrl/Cmd + Z
-      // Redo: Ctrl/Cmd + Shift + Z (primary) OR Ctrl + Y (Windows alt)
-      if ((event.key === "z" || event.key === "Z") && !event.shiftKey) {
-        undo();
-        event.preventDefault();
-        return;
-      }
-      if (
-        ((event.key === "z" || event.key === "Z") && event.shiftKey) ||
-        ((event.key === "y" || event.key === "Y") && !event.shiftKey)
-      ) {
-        redo();
-        event.preventDefault();
-        return;
-      }
-
-      if (!event.shiftKey) {
-        if (event.key === "a" || event.key === "A") {
-          selectAll();
-          event.preventDefault();
-          return;
-        }
-        if (event.key === "d" || event.key === "D") {
-          duplicateSelected();
-          event.preventDefault();
-          return;
-        }
-        // Zoom controls: Ctrl+0 / Ctrl+= (+) / Ctrl+- (−). The "+" char on
-        // many layouts requires Shift, but browsers fire the "=" key without
-        // shift for Ctrl+=, so check both. `NumpadAdd` and `NumpadSubtract`
-        // for numeric-pad parity.
-        if (event.key === "0") {
-          resetZoom();
-          event.preventDefault();
-          return;
-        }
-        if (event.key === "=" || event.key === "+") {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          zoomCentered((appState.zoom as any).value + ZOOM_STEP);
-          event.preventDefault();
-          return;
-        }
-        if (event.key === "-") {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          zoomCentered((appState.zoom as any).value - ZOOM_STEP);
-          event.preventDefault();
-          return;
-        }
-      }
-    }
-
-    // ── Ctrl+Alt: Alignment & Distribution shortcuts ─────────────────
-    if ((event.ctrlKey || event.metaKey) && event.altKey) {
-      const key = event.key.toLowerCase();
-
-      // Alignment shortcuts
-      if (key === "l") {
-        handleAlign("left");
-        event.preventDefault();
-        return;
-      }
-      if (key === "c") {
-        handleAlign("centerH");
-        event.preventDefault();
-        return;
-      }
-      if (key === "r") {
-        handleAlign("right");
-        event.preventDefault();
-        return;
-      }
-      if (key === "t") {
-        handleAlign("top");
-        event.preventDefault();
-        return;
-      }
-      if (key === "m") {
-        handleAlign("centerV");
-        event.preventDefault();
-        return;
-      }
-      if (key === "b") {
-        handleAlign("bottom");
-        event.preventDefault();
-        return;
-      }
-    }
-
-    // ── Ctrl+Shift: Distribution shortcuts ───────────────────────────
-    if ((event.ctrlKey || event.metaKey) && event.shiftKey && !event.altKey) {
-      const key = event.key.toLowerCase();
-
-      if (key === "h") {
-        handleDistribute("distributeEvenlyH");
-        event.preventDefault();
-        return;
-      }
-      if (key === "v") {
-        handleDistribute("distributeEvenlyV");
-        event.preventDefault();
-        return;
-      }
-    }
-
-    // A2: L key toggles laser when no modifier and no text input focused.
-    // Active in presentation and normal editing alike. Avoids conflict with
-    // Ctrl+L (autolayout panel) by requiring no ctrl/meta.
-    if (
-      (event.key === "l" || event.key === "L") &&
-      !event.ctrlKey &&
-      !event.metaKey &&
-      !event.altKey &&
-      !event.shiftKey
-    ) {
-      const t = event.target as HTMLElement | null;
-      const tag = t?.tagName?.toLowerCase();
-      if (tag !== "input" && tag !== "textarea" && !t?.isContentEditable) {
-        toggleLaser();
-        event.preventDefault();
-        return;
-      }
-    }
-
     // ── Space → temporary pan mode ────────────────────────────────────
-    // Pressing space toggles a "grab" cursor and makes pointerdown pan
-    // instead of doing its tool-specific action.
+    // Special case: doesn't fit the action model because it's a HOLD
+    // gesture (the keyup handler clears spaceHeld). Stays as a direct
+    // branch. Note `event.code === "Space"` covers Numpad space too.
     if (event.key === " " || event.code === "Space") {
-      if (!spaceHeld) {
-        spaceHeld = true;
-      }
+      if (!spaceHeld) spaceHeld = true;
       event.preventDefault();
       return;
     }
 
-    // ── Delete / Backspace ────────────────────────────────────────────
-    if (event.key === "Delete" || event.key === "Backspace") {
-      if (getSelectedElements().length > 0) {
-        deleteSelected();
-        event.preventDefault();
-      }
-      return;
-    }
-
-    // ── Arrow-key nudge (only when selection exists) ──────────────────
-    if (
-      event.key === "ArrowLeft" ||
-      event.key === "ArrowRight" ||
-      event.key === "ArrowUp" ||
-      event.key === "ArrowDown"
-    ) {
-      if (getSelectedElements().length === 0) return;
-      const step = event.shiftKey
-        ? ELEMENT_SHIFT_TRANSLATE_AMOUNT
-        : ELEMENT_TRANSLATE_AMOUNT;
-      const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
-      const dy = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
-      nudgeSelected(dx, dy);
-      event.preventDefault();
-      return;
-    }
-
-    // Enter (no modifiers) → commit in-progress polyline if any.
-    if (event.key === "Enter" && polylineActive && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
-      commitPolyline();
-      setActiveTool("selection");
-      event.preventDefault();
-      return;
-    }
-
-    // Escape → clear in-progress element + selection + back to selection tool.
-    if (event.key === "Escape") {
-      // Esc cancels the laser pointer if active (delegated to plugin).
-      pluginRegistry.getStore<LaserStore>(LASER_STORE_KEY)?.cancel();
-      // Esc also cancels the connector tool. Without this, an Esc after
-      // a first pick would leave the plugin in active=true / firstPickId
-      // set, and the very next click on any shape would silently fire
-      // off an unwanted arrow. The plugin's cancel is selection-aware
-      // (only clears the highlight when one was applied).
-      pluginRegistry.getStore<ConnectorStore>(CONNECTOR_STORE_KEY)?.cancel();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (appState as any).newElement = null;
-      polylineActive = false;
-      clearSelection();
-      setActiveTool("selection");
-      bumpSceneRepaint();
-      return;
-    }
-
-    // Tool lock toggle (Q). When on, the active drawing tool stays
-    // active after each draw instead of auto-switching to selection.
-    if (event.key === "q" || event.key === "Q") {
-      toggleToolLock();
-      event.preventDefault();
-      return;
-    }
-
-    // Show help dialog on `?`.
-    if (event.key === "?" || (event.key === "/" && event.shiftKey)) {
-      helpDialogOpen = true;
-      event.preventDefault();
-      return;
-    }
-
-    // Show comprehensive help on F1 — delegated to the help plugin.
-    if (event.key === "F1") {
-      const store = pluginRegistry.getStore<{ open(): void }>(HELP_STORE_KEY);
-      if (store) {
-        store.open();
-        event.preventDefault();
-      }
-      return;
-    }
-
-    // Bare F (no modifiers) — insert a frame at viewport center.
-    // Matches the engine single-key `F` shortcut convention;
-    // sveltedraw currently dispatches "insert at center" rather than
-    // original's drag-to-draw frame tool (we don't have a frame factory
-    // in the pointerdown handler yet). Follow-up: wire `f` into
-    // TOOL_HOTKEYS + add a frame branch to the tool factory so users
-    // can drag out frames at arbitrary positions/sizes.
-    if (event.key === "f" || event.key === "F") {
-      createFrameAtCenter();
-      event.preventDefault();
-      return;
-    }
-
-    const nextTool = TOOL_HOTKEYS[event.key];
-    if (nextTool) {
-      setActiveTool(nextTool);
-      event.preventDefault();
-    }
+    // Everything else flows through ActionManager. The dispatcher at
+    // the top of this function (line ~3315) handles it; predicates
+    // gate disabled actions naturally. If the smoke / honest-tests
+    // need a reachable hotkey that isn't registered, add it as an
+    // Action — not as a branch here.
   };
 
   // Scene-nonce bump — forces the static-render $effect to repaint even
@@ -5572,24 +5184,55 @@
   registerCoreActions(actionManager, {
     hasSelection: () => getSelectedElements().length > 0,
     hasMultipleSelection: () => getSelectedElements().length > 1,
+    isPolylineActive: () => polylineActive,
     deleteSelected,
     duplicateSelected,
     selectAll,
     clearSelection,
     undo: historyStore.undo,
     redo: historyStore.redo,
+    toggleLockSelected,
+    clearCanvas,
+    nudgeSelected,
     zoomIn: () => zoomCentered(((appState.zoom as { value: number }).value || 1) + ZOOM_STEP),
     zoomOut: () => zoomCentered(((appState.zoom as { value: number }).value || 1) - ZOOM_STEP),
     resetZoom,
     toggleGrid,
     toggleTheme,
+    toggleToolLock,
+    showHelpDialog: () => { helpDialogOpen = true; },
     bringForward: () => reorderSelected("forward"),
     sendBackward: () => reorderSelected("backward"),
     bringToFront: () => reorderSelected("front"),
     sendToBack: () => reorderSelected("back"),
     groupSelected,
     ungroupSelected,
+    align: handleAlign,
+    distribute: handleDistribute,
     setActiveTool,
+    downloadPng,
+    downloadSvg,
+    createFrameAtCenter,
+    openLinkDialog,
+    commitPolyline,
+    // Esc cancels: laser, connector, in-progress new element, polyline,
+    // selection, and switches back to the selection tool. Keeps the
+    // exact semantics the legacy keydown handler had so the action
+    // is a true drop-in for the Escape branch.
+    cancelInProgress: () => {
+      pluginRegistry.getStore<LaserStore>(LASER_STORE_KEY)?.cancel();
+      pluginRegistry.getStore<ConnectorStore>(CONNECTOR_STORE_KEY)?.cancel();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (appState as any).newElement = null;
+      polylineActive = false;
+      clearSelection();
+      setActiveTool("selection");
+      bumpSceneRepaint();
+    },
+    nudgeStep: {
+      normal: ELEMENT_TRANSLATE_AMOUNT,
+      shift: ELEMENT_SHIFT_TRANSLATE_AMOUNT,
+    },
   });
 </script>
 

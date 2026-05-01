@@ -84,11 +84,23 @@ export const recentFilesPlugin: SveltedrawPlugin = {
       },
     });
 
+    const removeAction = ctx.addAction({
+      id: "open",
+      label: "Recent files",
+      category: "plugin",
+      hotkey: "CmdOrCtrl+R",
+      perform: () => {
+        state.open = true;
+        return { consumed: true };
+      },
+    });
+
     return () => {
       releaseStore();
       removeToolbarItem();
       removeSidePanel();
       removeMenuItem();
+      removeAction();
     };
   },
 };

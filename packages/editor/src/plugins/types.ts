@@ -4,6 +4,7 @@
 import type { Component, Snippet } from "svelte";
 import type { SveltedrawAPI } from "../api/types.js";
 import type { TunnelsContext } from "../state/tunnels.svelte.js";
+import type { Action } from "../actions/types.js";
 
 export interface ToolbarItemDef {
   id: string;
@@ -64,6 +65,17 @@ export interface SveltedrawPluginContext {
   addSidePanel(panel: SidePanelDef): () => void;
   addCanvasOverlay(overlay: CanvasOverlayDef): () => void;
   addMainMenuItem(item: MainMenuItemDef): () => void;
+
+  /**
+   * Register an Action with the editor's ActionManager. The plugin's
+   * id is auto-prefixed onto action.id (so a plugin's "toggle" action
+   * becomes `<plugin-id>/toggle`) — same convention as toolbar/panel
+   * items. The dispose closure unregisters the action; uninstall
+   * cleans it up automatically. See actions/types.ts for the Action
+   * shape: id, label, optional hotkey/predicate/category/icon, and
+   * the perform function.
+   */
+  addAction(action: Action): () => void;
 
   /**
    * Publish a typed store under a Symbol key. Other plugins (or built-in

@@ -147,6 +147,28 @@ const tests = await ev(`
     detail: 'hotkeys=' + JSON.stringify(hotkeys),
   });
 
+  // Plugin-contributed action: laser-pointer registers toggle as
+  // \`builtin/laser-pointer/toggle\` with hotkey K. Verifies the
+  // ctx.addAction integration end-to-end.
+  const laserAction = am.list().find(a => a.id === 'builtin/laser-pointer/toggle');
+  tests.push({
+    name: 'plugin-contributed action registered (laser-pointer)',
+    ok: laserAction != null && laserAction.hotkey === 'K',
+    detail: 'found=' + !!laserAction + ' hotkey=' + JSON.stringify(laserAction?.hotkey),
+  });
+
+  // Dispatch the plugin action via hotkey — should toggle laser
+  const beforeLaser = p.isLaserActive();
+  container?.focus();
+  container?.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', bubbles: true, cancelable: true }));
+  await new Promise(r => setTimeout(r, 100));
+  const afterLaser = p.isLaserActive();
+  tests.push({
+    name: 'K keydown dispatches plugin action (toggle laser)',
+    ok: beforeLaser === false && afterLaser === true,
+    detail: 'before=' + beforeLaser + ' after=' + afterLaser,
+  });
+
   return tests;
 `);
 

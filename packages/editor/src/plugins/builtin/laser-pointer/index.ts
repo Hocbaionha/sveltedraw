@@ -127,6 +127,22 @@ export const laserPointerPlugin: SveltedrawPlugin = {
       onActivate: () => store.toggle(),
     });
 
+    // Expose the toggle as an editor Action so the keyboard handler
+    // and command palette pick it up uniformly. Hotkey `K` (matching
+    // the toolbar tooltip). The action is auto-qualified to
+    // `builtin/laser-pointer/toggle`. No predicate — laser is always
+    // togglable.
+    const removeAction = ctx.addAction({
+      id: "toggle",
+      label: "Toggle laser pointer",
+      category: "tool",
+      hotkey: "K",
+      perform: () => {
+        store.toggle();
+        return { consumed: true };
+      },
+    });
+
     const removeCanvasOverlay = ctx.addCanvasOverlay({
       id: "overlay",
       component: Overlay,
@@ -145,6 +161,7 @@ export const laserPointerPlugin: SveltedrawPlugin = {
       releaseStore();
       removeToolbarItem();
       removeCanvasOverlay();
+      removeAction();
     };
   },
 };

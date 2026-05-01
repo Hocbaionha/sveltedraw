@@ -138,10 +138,22 @@ export const connectorToolPlugin: SveltedrawPlugin = {
       // open exclusive side panel without visual conflict.
     });
 
+    const removeAction = ctx.addAction({
+      id: "toggle",
+      label: "Toggle connector tool",
+      category: "tool",
+      hotkey: "CmdOrCtrl+Shift+C",
+      perform: () => {
+        store.toggle();
+        return { consumed: true };
+      },
+    });
+
     return () => {
       releaseStore();
       removeToolbarItem();
       removeSidePanel();
+      removeAction();
     };
   },
 };

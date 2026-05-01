@@ -166,12 +166,15 @@ export class ActionManager {
    * Resolve a KeyboardEvent to an action and dispatch. Returns the
    * action result on hit (so the caller can preventDefault), or
    * undefined when no action claimed the combo (caller falls through
-   * to its existing keydown handling).
+   * to its existing keydown handling). The event is forwarded as
+   * `payload.event` so actions that care about modifier state (e.g.
+   * arrow-key nudge with Shift = larger step) can read it without
+   * needing a separate dispatch path.
    */
   executeKey(event: KeyboardEvent): ActionResult | undefined {
     const combo = normalizeKey(event);
     const id = this.hotkeyIndex.get(combo);
     if (!id) return undefined;
-    return this.execute(id);
+    return this.execute(id, { event });
   }
 }

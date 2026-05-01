@@ -51,11 +51,23 @@ export const helpPlugin: SveltedrawPlugin = {
       onSelect: () => (state.open = true),
     });
 
+    const removeAction = ctx.addAction({
+      id: "open",
+      label: "Help",
+      category: "plugin",
+      hotkey: "F1",
+      perform: () => {
+        state.open = true;
+        return { consumed: true };
+      },
+    });
+
     return () => {
       releaseStore();
       removeToolbarItem();
       removeSidePanel();
       removeMenuItem();
+      removeAction();
     };
   },
 };

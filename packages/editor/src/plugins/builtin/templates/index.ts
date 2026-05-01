@@ -92,11 +92,23 @@ export const templatesPlugin: SveltedrawPlugin = {
       onSelect: () => (state.open = true),
     });
 
+    const removeAction = ctx.addAction({
+      id: "open",
+      label: "New from template",
+      category: "plugin",
+      hotkey: "CmdOrCtrl+N",
+      perform: () => {
+        state.open = true;
+        return { consumed: true };
+      },
+    });
+
     return () => {
       releaseStore();
       removeToolbarItem();
       removeSidePanel();
       removeMenuItem();
+      removeAction();
     };
   },
 };

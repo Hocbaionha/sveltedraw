@@ -10,6 +10,7 @@ import type {
   SveltedrawPlugin,
   SveltedrawPluginContext,
 } from "./types.js";
+import type { ActionManager } from "../actions/manager.svelte.js";
 
 export const PLUGIN_REGISTRY_KEY: unique symbol = Symbol("pluginRegistry");
 
@@ -37,6 +38,20 @@ export class PluginRegistry {
    * fail to re-evaluate once the store appears.
    */
   private storesVersion = $state(0);
+
+  /**
+   * ActionManager handle. Set once at editor construction via
+   * `attachActionManager`. Plugins reach it through `ctx.addAction`,
+   * which auto-qualifies the action id with the plugin prefix
+   * (matching toolbar / panel / overlay item-id convention). When
+   * unset, addAction calls fail loudly so missing wiring surfaces
+   * during plugin install rather than silently dropping commands.
+   */
+  private actionManager: ActionManager | null = null;
+
+  attachActionManager(am: ActionManager): void {
+    this.actionManager = am;
+  }
 
   private cleanups = new Map<string, () => void>();
 
@@ -225,6 +240,15 @@ export class PluginRegistry {
         return () => {
           registry.menuItems = registry.menuItems.filter((m) => m.id !== qualified.id);
         };
+      },
+      addAction: (action) => {
+        if (!registry.actionManager) {
+          throw new Error(
+            `[plugin:${pluginId}] addAction called before attachActionManager — host must wire the ActionManager before plugin install`,
+          );
+        }
+        const qualified = { ...action, id: qualify(action.id) };
+        return registry.actionManager.register(qualified);
       },
       onSceneChange: api.onChange.bind(api),
       onSelectionChange: api.onSelectionChange.bind(api),

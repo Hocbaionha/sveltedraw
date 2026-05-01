@@ -94,11 +94,25 @@ export const settingsPlugin: SveltedrawPlugin = {
       onSelect: () => (state.open = true),
     });
 
+    // Hotkey + command-palette entry: Ctrl+, opens the panel. Replaces
+    // the hardcoded branch in App.svelte's keydown switch.
+    const removeAction = ctx.addAction({
+      id: "open",
+      label: "Open settings",
+      category: "plugin",
+      hotkey: "CmdOrCtrl+,",
+      perform: () => {
+        state.open = true;
+        return { consumed: true };
+      },
+    });
+
     return () => {
       releaseStore();
       removeToolbarItem();
       removeSidePanel();
       removeMenuItem();
+      removeAction();
     };
   },
 };

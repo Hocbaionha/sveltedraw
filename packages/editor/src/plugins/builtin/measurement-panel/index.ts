@@ -66,10 +66,22 @@ export const measurementPanelPlugin: SveltedrawPlugin = {
       },
     });
 
+    const removeAction = ctx.addAction({
+      id: "toggle",
+      label: "Toggle measurement panel",
+      category: "plugin",
+      hotkey: "CmdOrCtrl+M",
+      perform: () => {
+        store.toggle();
+        return { consumed: true };
+      },
+    });
+
     return () => {
       releaseStore();
       removeToolbarItem();
       removeSidePanel();
+      removeAction();
     };
   },
 };
