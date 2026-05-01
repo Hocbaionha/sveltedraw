@@ -37,6 +37,9 @@
     "dist",
     "types",
     "tests",
-    "packages/editor"
+    "packages/editor",
+    "sveltedraw-app/dist",
+    "**/dist",
+    "**/node_modules"
   ]
 }
