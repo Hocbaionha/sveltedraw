@@ -1259,10 +1259,23 @@
       // undo confusing (one click = one no-op step on the stack).
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const current: string | null = ((el as any).link as string | null) ?? null;
+      // No-op short-circuit. The dialog's confirm() always closes
+      // the modal AFTER calling setLink (link-dialog/index.ts), so
+      // returning here doesn't strand the dialog open — the close
+      // is independent of the bridge's fast path.
       if (current === normalized) return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       scene.mutateElement(el, { link: normalized } as any,
         { informMutation: false, isDragging: false });
+      // pushHistory schedules a save (history/store.ts) AND
+      // bumpSceneRepaint fires notifyChange which the persistence
+      // plugin's onSceneChange listener observes → schedules
+      // ANOTHER save. Both hit the same debounce timer
+      // (clearTimeout + setTimeout) so they coalesce into one
+      // localStorage write — harmless. Don't "fix" this by removing
+      // one path: the two persistence sources cover different
+      // mutation entry points, removing either silently breaks
+      // saves on a code path you didn't think about.
       pushHistory();
       bumpSceneRepaint();
     },
@@ -3211,8 +3224,23 @@
     // has installed. With observers present, ref-equality skips
     // unchanged entries cheaply.
     if (scene && pluginRegistry.hasElementObservers) {
+      // Snapshot live BEFORE the dispatch loop. Scene.elements is
+      // returned by reference (not cloned), so an observer that
+      // synchronously mutates the scene (replaceAllElements,
+      // mutateElement, deleteElements) would either reassign the
+      // backing array under our feet or shift indices mid-iteration.
+      // Today no observer mutates scene during dispatch, but this
+      // makes the loop re-entrancy-safe for the next plugin author
+      // (text-editor / snap-guides) who will inevitably try.
+      //
+      // CAVEAT: an observer that mutates the SAME element it's being
+      // notified about will leak the post-mutation state into
+      // lastElementSnapshot — next bump may then skip a real
+      // mutation that happens to land on that fingerprint. If a
+      // future plugin needs that pattern, add an explicit
+      // "post-dispatch fingerprint refresh" pass.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const live = scene.getElementsIncludingDeleted() as any[];
+      const live = [...(scene.getElementsIncludingDeleted() as any[])];
       const seen = new Set<string>();
       for (const el of live) {
         if (!el?.id) continue;
@@ -3227,9 +3255,13 @@
         });
         lastElementSnapshot.set(el.id, { ref: el, fp });
       }
-      // Removed ids: in snapshot but not in live.
-      for (const [id, prev] of lastElementSnapshot) {
+      // Removed ids: in snapshot but not in live. Snapshot the keys
+      // first since dispatch could trigger an observer that touches
+      // lastElementSnapshot.
+      for (const id of [...lastElementSnapshot.keys()]) {
         if (seen.has(id)) continue;
+        const prev = lastElementSnapshot.get(id);
+        if (!prev) continue;
         pluginRegistry.dispatchElementChange({ id, current: null, previous: prev.ref });
         lastElementSnapshot.delete(id);
       }

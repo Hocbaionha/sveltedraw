@@ -65,7 +65,22 @@ export function loadPersistedScene(opts: {
       // tools never get their onActivate fired (and a plugin since
       // uninstalled would leave the editor in an unreachable tool
       // state).
-      if (k === "activeTool") continue;
+      //
+      // __proto__ / constructor / prototype: defensive skip for
+      // prototype-pollution. The attacker would need to have
+      // already written attacker-controlled JSON into the user's
+      // own localStorage (low surface), but the engine's $state
+      // proxy doesn't gate these, and overwriting `constructor`
+      // breaks instanceof checks downstream. One-line skip is
+      // cheaper than auditing every consumer.
+      if (
+        k === "activeTool" ||
+        k === "__proto__" ||
+        k === "constructor" ||
+        k === "prototype"
+      ) {
+        continue;
+      }
       appState[k] = v;
     }
     return true;

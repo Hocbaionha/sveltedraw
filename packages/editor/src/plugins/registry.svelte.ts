@@ -374,7 +374,13 @@ export class PluginRegistry {
    * mutated entries.
    */
   dispatchElementChange(ctx: ElementChangeContext): void {
-    for (const obs of this.elementObservers) {
+    // Snapshot the observer set before iteration — an observer that
+    // self-disposes (e.g. one-shot listeners) or registers a peer
+    // observer mid-callback would mutate the live Set during
+    // iteration. JS Set deletion-during-iteration is spec-defined
+    // but additions ARE visited, surprising callers. Spreading
+    // freezes the iteration order to entry-time.
+    for (const obs of [...this.elementObservers]) {
       try {
         obs(ctx);
       } catch (err) {
