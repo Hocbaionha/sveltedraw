@@ -200,71 +200,91 @@ export function createCollabStore(api: SveltedrawAPI) {
       };
       zonesMap.observe(onZonesChange);
 
-      // ── Echo prevention ───────────────────────────────────────────────
-      // Two replication paths must be guarded:
-      //   1. Local outbound (ymap.set) fires our own ymap observer in the
-      //      same tick. txn.origin === LOCAL_ORIGIN identifies the round-
-      //      trip and we skip it.
-      //   2. Remote inbound calls api.updateScene → bumpSceneRepaint →
-      //      notifyChange → fires our api.onChange synchronously, which
-      //      would push the just-applied remote state straight back. The
+      // ── Replication protocol ─────────────────────────────────────────
+      // The Y.Map is keyed by element.id, value = element JSON. This is
+      // the difference between using Yjs as a CRDT vs a dumb broadcast
+      // channel:
+      //
+      //   - Per-element granularity: ymap.set(id, json) on each changed
+      //     element. Yjs transmits only the deltas, not the whole scene.
+      //   - Concurrent edits on different elements merge automatically
+      //     (Y.Map gives us per-key LWW; different keys never collide).
+      //   - Bandwidth scales with change size, not scene size. Editing
+      //     one element in a 5k-element doc sends ~1KB instead of ~500KB.
+      //   - Yjs internal doc deltas stay small; reconnect catches up
+      //     via standard Yjs sync without a full snapshot.
+      //
+      // Same-element concurrent edits still last-writer-wins (per-key,
+      // not per-field) — acceptable for shapes where conflict resolution
+      // is fundamentally ambiguous (which X coord wins when both peers
+      // drag?). Field-level merging would require Y.Map<id, Y.Map<field>>
+      // — a Phase-2 refactor; this commit fixes the obviously-broken
+      // wire protocol first.
+      //
+      // Two echo-suppression paths still apply:
+      //   1. Local outbound writes are wrapped in a transact() with
+      //      LOCAL_ORIGIN; observer skips matching txns.
+      //   2. Remote inbound calls api.updateScene → fires api.onChange
+      //      synchronously, which would re-broadcast. The
       //      `isApplyingRemote` flag suppresses outbound for that
       //      synchronous window.
       //
-      // No-op redelivery suppression uses a fast content-fingerprint —
-      // a hash of (id, type, x, y, w, h, version) per element. We do
-      // NOT JSON-stringify the entire scene per tick: with a few
-      // thousand elements that's multi-MB strings allocated 12×/sec,
-      // which would peg the main thread well before Yjs becomes the
-      // bottleneck. The fingerprint catches the round-trip case (we
-      // pushed X, peer's broadcast comes back identical) where the
-      // critical fields are byte-identical; minor non-tracked drift
-      // (e.g. updatedAt) just means a single redundant ymap.set, not
-      // a feedback loop, because our LOCAL_ORIGIN guard catches that.
+      // No more whole-scene fingerprinting: per-key changes naturally
+      // dedupe via the LOCAL_ORIGIN guard (round-trip echoes hit the
+      // guard before reaching the apply path). The localSnapshot map
+      // tracks per-element fingerprints so pushLocalNow knows what
+      // actually changed since the last push.
       let isApplyingRemote = false;
-      let lastSyncedFingerprint: string | null = null;
       let pendingPushTimer: ReturnType<typeof setTimeout> | null = null;
 
+      // Per-element fingerprint of the last-known shared state. After a
+      // local push or a remote receive we update this so the next push
+      // computes a minimal diff. The fingerprint covers the fields that
+      // actually drive rendering — version + versionNonce make any non-
+      // trivial mutation flip the digest, since Excalidraw's mutation
+      // helpers bump those on every change.
+      const localSnapshot = new Map<string, string>();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const fingerprint = (els: any[]): string => {
-        // Compact, allocation-light digest — concatenation rather than
-        // JSON.stringify. Each element contributes ~70 bytes; for 5k
-        // elements that's ~350KB instead of multiple MB.
-        let s = "";
-        for (let i = 0; i < els.length; i++) {
-          const e = els[i];
-          if (!e) continue;
-          s += e.id + "|" + e.type + "|" + e.x + "," + e.y + "|"
-            + e.width + "x" + e.height + "|" + e.angle + "|" + e.version + ";";
-        }
-        return s;
-      };
+      const fingerprintEl = (e: any): string =>
+        e.type + "|" + e.x + "," + e.y + "|" + e.width + "x" + e.height
+        + "|" + e.angle + "|" + e.version + "|" + e.versionNonce
+        + "|" + (e.isDeleted ? 1 : 0);
 
       const pushLocalNow = (): void => {
         if (pendingPushTimer !== null) {
           clearTimeout(pendingPushTimer);
           pendingPushTimer = null;
         }
-        // Stale-session guard: the debounce fired after leaveRoom() or
-        // a fresh joinRoom replaced this session. Both checks are
-        // belt-and-suspenders: provider !== ws catches identity drift,
-        // isStaleSession catches the brief window where provider may
-        // already be the new session's ws.
         if (isStaleSession() || provider !== ws) return;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const live = api.getElements() as any[];
-        const fp = fingerprint(live);
-        if (fp === lastSyncedFingerprint) return;
-        lastSyncedFingerprint = fp;
-        // Plain JSON-safe copies — yjs cannot serialize Svelte $state
-        // proxies, and any retained ref into the ymap would mutate the
-        // shared map under our feet on the next scene tick. The clone
-        // happens once per push (debounced), not once per scene tick.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const payload = live.map((el: any) => JSON.parse(JSON.stringify(el)));
+        // Compute the diff in a single pass: ids that changed need
+        // ymap.set, ids that disappeared need ymap.delete.
+        const liveIds = new Set<string>();
+        const toSet: { id: string; payload: unknown; fp: string }[] = [];
+        for (const el of live) {
+          liveIds.add(el.id);
+          const fp = fingerprintEl(el);
+          if (localSnapshot.get(el.id) === fp) continue;
+          // Plain JSON-safe copies — Yjs can't serialize Svelte $state
+          // proxies, and a live ref aliased into the ymap would mutate
+          // the shared map under our feet on the next scene tick.
+          toSet.push({ id: el.id, payload: JSON.parse(JSON.stringify(el)), fp });
+        }
+        const toDelete: string[] = [];
+        for (const id of localSnapshot.keys()) {
+          if (!liveIds.has(id)) toDelete.push(id);
+        }
+        if (toSet.length === 0 && toDelete.length === 0) return;
         ydoc.transact(() => {
-          ymap.set("elements", payload);
+          for (const { id, payload } of toSet) ymap.set(id, payload);
+          for (const id of toDelete) ymap.delete(id);
         }, LOCAL_ORIGIN);
+        // Update the snapshot AFTER the successful transact so a thrown
+        // serialization (e.g. cyclic ref) doesn't leave the snapshot
+        // claiming we synced state we didn't actually push.
+        for (const { id, fp } of toSet) localSnapshot.set(id, fp);
+        for (const id of toDelete) localSnapshot.delete(id);
       };
 
       const scheduleLocalPush = (): void => {
@@ -277,28 +297,59 @@ export function createCollabStore(api: SveltedrawAPI) {
         }, PUSH_DEBOUNCE_MS);
       };
 
-      // Remote elements → update local scene. Skip our own writes,
-      // skip no-op redeliveries, and clone refs so the ymap payload
-      // isn't aliased into the live scene.
+      // Apply per-key remote changes. Y.Map's `event.changes.keys` is
+      // a Map<key, { action: "add" | "update" | "delete", oldValue }>
+      // — the surgical alternative to "diff the entire array".
       const onYmapChange = (
         event: Y.YMapEvent<unknown>,
         txn: Y.Transaction,
       ): void => {
         if (txn.origin === LOCAL_ORIGIN) return;
-        if (!event.changes.keys.has("elements")) return;
-        const remote = ymap.get("elements");
-        if (!Array.isArray(remote)) return;
+        if (event.changes.keys.size === 0) return;
+
+        // Build the new local element set. We rebuild from the full
+        // ymap (not just the delta) so element ordering by `index`
+        // stays consistent — the scene's getElements is order-
+        // sensitive (z-order) and applying a partial delta would
+        // require us to re-derive the order ourselves.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const fp = fingerprint(remote as any[]);
-        if (fp === lastSyncedFingerprint) return;
-        lastSyncedFingerprint = fp;
+        const all: any[] = [];
+        ymap.forEach((value) => {
+          if (value && typeof value === "object") {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            all.push(deepCopyElement(value as any));
+          }
+        });
+        // Excalidraw uses fractional indexing on .index for stable
+        // z-order. Sort here so the local scene matches the canonical
+        // ordering across peers.
+        all.sort((a, b) => {
+          const ai = a.index ?? "";
+          const bi = b.index ?? "";
+          return ai < bi ? -1 : ai > bi ? 1 : 0;
+        });
+
         isApplyingRemote = true;
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const cloned = (remote as any[]).map((el) => deepCopyElement(el));
-          api.updateScene({ elements: cloned });
+          api.updateScene({ elements: all });
         } finally {
           isApplyingRemote = false;
+        }
+
+        // Re-sync localSnapshot from the LOCAL scene post-apply.
+        // updateScene may bump version/versionNonce on the way through
+        // restoreElements; if we synced from the ymap entry instead
+        // we'd see a phantom "local diff" on the next push and re-
+        // broadcast our own normalized version — an echo loop.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const livePost = api.getElements() as any[];
+        const liveIds = new Set<string>();
+        for (const el of livePost) {
+          liveIds.add(el.id);
+          localSnapshot.set(el.id, fingerprintEl(el));
+        }
+        for (const id of localSnapshot.keys()) {
+          if (!liveIds.has(id)) localSnapshot.delete(id);
         }
       };
       ymap.observe(onYmapChange);
@@ -314,6 +365,10 @@ export function createCollabStore(api: SveltedrawAPI) {
         zonesMap.unobserve(onZonesChange);
         ymap.unobserve(onYmapChange);
         ws.awareness.off("change", onAwarenessChange);
+        // Drop the per-element snapshot — the next session has a
+        // different doc identity and a stale snapshot would suppress
+        // legitimate first-pushes after rejoin.
+        localSnapshot.clear();
       };
 
       // Local changes → debounced broadcast inside a LOCAL_ORIGIN

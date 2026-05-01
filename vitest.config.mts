@@ -1,8 +1,14 @@
 import path from "path";
 
 import { defineConfig } from "vitest/config";
+import { svelte } from "@sveltejs/vite-plugin-svelte";
 
 export default defineConfig({
+  // Svelte 5 runes require the vite-plugin-svelte preprocessor; without
+  // it `.svelte.ts` files crash on `$state is not defined` at test time.
+  // The plugin is already a dev dep via sveltedraw-app's vite config —
+  // we just wire it into the vitest pipeline here.
+  plugins: [svelte()],
   resolve: {
     alias: [
       {
