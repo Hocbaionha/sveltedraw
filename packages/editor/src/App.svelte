@@ -142,14 +142,10 @@
   import UtilityBar from "./components/UtilityBar.svelte";
   import ZoomControls from "./components/ZoomControls.svelte";
   import FloatingLibraryPanel from "./components/FloatingLibraryPanel.svelte";
-  import LiveCollaborationTrigger from "./components/LiveCollaborationTrigger.svelte";
-  import CollabIdentityDialog, {
-    type IdentityResult,
-  } from "./components/CollabIdentityDialog.svelte";
-  import CollabCursors from "./components/CollabCursors.svelte";
-  import Toast from "./components/Toast.svelte";
+  // Collab integration migrated to builtin/collab plugin. App.svelte
+  // keeps the COLLAB_STORE_KEY symbol import so the probe surface can
+  // reach the plugin-owned store via pluginRegistry.getStore.
   import {
-    createCollabStore,
     COLLAB_STORE_KEY,
     type CollabStore,
   } from "./collab/store.svelte.js";
@@ -424,17 +420,15 @@
   );
   registerCtx(SVELTEDRAW_API_KEY, imperativeAPI);
 
-  // ── Collab store (Phase 17) ─────────────────────────────────────────
-  // Lifecycle: created with the editor, never destroyed (its `leaveRoom`
-  // is idempotent and called from onMount cleanup). UI components read
-  // it via getContext(COLLAB_STORE_KEY); honest-tests reach it through
-  // the probe surface below. The store is dormant until `joinRoom` is
-  // called — no socket, no observers — so creating it eagerly is free.
-  const collabStore: CollabStore = createCollabStore(imperativeAPI);
-  registerCtx(COLLAB_STORE_KEY, collabStore);
-
   const pluginRegistry = new PluginRegistry();
   registerCtx(PLUGIN_REGISTRY_KEY, pluginRegistry);
+
+  // Collab store is owned by the builtin/collab plugin (created in its
+  // install + provided via COLLAB_STORE_KEY). This shim lets the probe
+  // surface and any other internal code that needs it reach the store
+  // through one helper rather than scattered getStore calls.
+  const getCollabStore = (): CollabStore | undefined =>
+    pluginRegistry.getStore<CollabStore>(COLLAB_STORE_KEY);
 
   // ActionManager — single dispatcher for keyboard / command-palette /
   // toolbar / context-menu commands. The contextProvider closure is
@@ -932,12 +926,15 @@
         // Phase 17 — collab session inspector for honest-tests. Returns a
         // plain JSON-safe snapshot rather than the live store getters so
         // the test can pass it across CDP without serialization issues.
-        getCollabState: () => ({
-          status: collabStore.status,
-          userCount: collabStore.users.size,
-          myUserId: collabStore.myUserId,
-          roomId: collabStore.roomId,
-        }),
+        getCollabState: () => {
+          const cs = getCollabStore();
+          return {
+            status: cs?.status ?? "idle",
+            userCount: cs?.users.size ?? 0,
+            myUserId: cs?.myUserId ?? null,
+            roomId: cs?.roomId ?? null,
+          };
+        },
         // Expose the ActionManager so honest-tests can introspect the
         // registered action set, dispatch by id, and verify hotkey
         // routing end-to-end.
@@ -1046,18 +1043,9 @@
     // Notify host app that the API is ready (one-time callback).
     onmount?.(imperativeAPI);
 
-    // Phase 17: auto-start collab if a server URL is configured. Runs
-    // after `onmount?.()` so a host app embedding sveltedraw has a chance
-    // to set its own collab policy before we connect on its behalf. Errors
-    // are swallowed inside startCollabSession; the status indicator will
-    // surface failure once Commit 4 lands.
-    {
-      const autoServerUrl = resolveCollabServerUrl();
-      if (autoServerUrl) {
-        const identity = loadStoredIdentity() ?? makeAnonIdentity();
-        void startCollabSession(autoServerUrl, identity);
-      }
-    }
+    // Collab auto-start moved to builtin/collab plugin's onEditorReady
+    // hook — runs after the install $effect completes, with a teardown
+    // closure that calls leaveRoom on plugin uninstall.
 
     // Flush any pending save on page unload so nothing is lost.
     const onBeforeUnload = () => {
@@ -1083,9 +1071,9 @@
       // each plugin's cleanup fires).
       // Flush the pending save synchronously on unmount too.
       flushPendingSave();
-      // Phase 17: tear down any active collab session. leaveRoom is
-      // idempotent — safe to call regardless of whether joinRoom ran.
-      collabStore.leaveRoom();
+      // Collab teardown lives in the plugin's onEditorReady-returned
+      // closure — runs at uninstall (which fires when this onMount
+      // cleanup tears down the editor).
       AnimationController.cancel(INTERACTIVE_SCENE_ANIMATION_KEY);
       renderer?.destroy?.();
     };
@@ -1188,294 +1176,6 @@
   };
   registerCtx(HISTORY_UI_BRIDGE_KEY, historyUIBridge);
 
-  // ── Collab wiring (Phase 17) ─────────────────────────────────────────
-  // Identity is persisted across sessions in localStorage; the dialog
-  // (Commit 2) updates it. For now, anon-fallback covers auto-start +
-  // direct button click flows.
-  const COLLAB_IDENTITY_KEY = "sveltedraw-collab-identity";
-  const COLLAB_PALETTE = [
-    "#1971c2", // blue
-    "#2f9e44", // green
-    "#e67700", // amber
-    "#c92a2a", // red
-    "#9c36b5", // purple
-    "#0c8599", // teal
-    "#e8590c", // orange
-    "#5f3dc4", // indigo
-  ];
-
-  type StoredIdentity = { id: string; name: string; color: string };
-
-  /**
-   * Read persisted identity from localStorage. Returns null on first
-   * run / corrupted JSON / SSR. Caller must handle the null path
-   * (either fall back to anon-default or prompt the dialog).
-   */
-  const loadStoredIdentity = (): StoredIdentity | null => {
-    try {
-      const raw = window.localStorage.getItem(COLLAB_IDENTITY_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (
-        typeof parsed?.id === "string" &&
-        typeof parsed?.name === "string" &&
-        typeof parsed?.color === "string"
-      ) {
-        return parsed as StoredIdentity;
-      }
-    } catch { /* swallow */ }
-    return null;
-  };
-
-  /**
-   * Generate an ephemeral anonymous identity for users who join without
-   * having gone through the identity dialog (e.g. auto-start via URL).
-   * Uses crypto.randomUUID() for id uniqueness — the previous 4-hex
-   * slug had a 16-bit space and hit the birthday bound at ~256 users,
-   * causing awareness-key collisions where one peer's cursor rendered
-   * over another's. The display label still uses the short slug so the
-   * "Guest XXXX" label stays readable.
-   */
-  const makeAnonIdentity = (): StoredIdentity => {
-    const uuid =
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      typeof crypto !== "undefined" && (crypto as any).randomUUID
-        ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (crypto as any).randomUUID()
-        : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2, 10)}`;
-    const slug = uuid.slice(0, 4).toUpperCase();
-    const color = COLLAB_PALETTE[Math.floor(Math.random() * COLLAB_PALETTE.length)];
-    return {
-      id: `anon-${uuid}`,
-      name: `Guest ${slug}`,
-      color,
-    };
-  };
-
-  /**
-   * Read collab params from the URL. Sveltedraw runs under a hash
-   * router (#app), so query params usually live inside the hash
-   * fragment (`#app?collab=ws://...`). We check both top-level
-   * `URL.searchParams` and the hash fragment so either form works.
-   */
-  const readCollabUrlParam = (name: string): string | null => {
-    try {
-      const url = new URL(window.location.href);
-      const top = url.searchParams.get(name);
-      if (top) return top;
-      const hash = url.hash || "";
-      const qIdx = hash.indexOf("?");
-      if (qIdx === -1) return null;
-      return new URLSearchParams(hash.slice(qIdx + 1)).get(name);
-    } catch { return null; }
-  };
-
-  /**
-   * Resolve the collab server URL. Priority:
-   *   1. `?collab=ws://...` query param (per-session override)
-   *   2. `VITE_COLLAB_SERVER` env var (deployment default)
-   *   3. null → no auto-start
-   */
-  const resolveCollabServerUrl = (): string | null => {
-    const fromUrl = readCollabUrlParam("collab");
-    if (fromUrl) return fromUrl;
-    const fromEnv = import.meta.env.VITE_COLLAB_SERVER as string | undefined;
-    return fromEnv || null;
-  };
-
-  /**
-   * Resolve the room id. `?room=foo` overrides; default room name lets
-   * two tabs of the same browser converge without any URL params.
-   */
-  const resolveCollabRoomId = (): string =>
-    readCollabUrlParam("room") ?? "sveltedraw-default";
-
-  /**
-   * Start a collab session with the given identity. Wraps `joinRoom` so
-   * the button handler and auto-start share the same call site.
-   */
-  const startCollabSession = async (
-    serverUrl: string,
-    identity: StoredIdentity,
-  ): Promise<void> => {
-    if (collabStore.status !== "idle") return; // already active
-    try {
-      await collabStore.joinRoom({
-        serverUrl,
-        roomId: resolveCollabRoomId(),
-        // Phase 17 / A1: role is hardcoded teacher until A3 ships role
-        // selection. canEdit() returns true for teachers regardless of
-        // zone, which is what we want for a generic 2-tab demo.
-        role: "teacher",
-        user: { id: identity.id, name: identity.name, color: identity.color },
-      });
-    } catch (err) {
-      console.warn("[collab] joinRoom failed:", err);
-    }
-  };
-
-  // ── Identity dialog state (Phase 17 / A3) ───────────────────────────
-  // The dialog is opened only on explicit button-click flows when no
-  // identity has been persisted. Auto-start (URL/env) bypasses it and
-  // uses anon-fallback so embedded scenarios stay silent.
-  let collabDialogOpen = $state(false);
-  // Server URL captured at click time; remembered across the dialog's
-  // lifetime so submit knows where to connect. Reset on close.
-  let pendingCollabServerUrl: string | null = $state(null);
-  // Stable id offered to the dialog as the default (so re-opening the
-  // dialog after a cancel keeps the same anon id). Regenerated only
-  // when the dialog actually opens with no prior identity.
-  let pendingAnonId: string | null = $state(null);
-
-  /**
-   * Toggle handler for the LiveCollaborationTrigger button.
-   * - If already in a session: leave.
-   * - Otherwise: resolve server, then either join with persisted
-   *   identity (fast path) or open the identity dialog.
-   * - If no server URL is configured: warn (Commit 4 will surface a toast).
-   */
-  const handleCollabButtonClick = (): void => {
-    if (collabStore.status !== "idle") {
-      collabStore.leaveRoom();
-      return;
-    }
-    const serverUrl = resolveCollabServerUrl();
-    if (!serverUrl) {
-      console.warn(
-        "[collab] No collab server configured. Set VITE_COLLAB_SERVER " +
-          "or use ?collab=ws://host:port",
-      );
-      return;
-    }
-    const stored = loadStoredIdentity();
-    if (stored) {
-      // Fast path: known identity, skip dialog.
-      void startCollabSession(serverUrl, stored);
-      return;
-    }
-    // First-time user: prompt for name + color before joining. We
-    // generate a stable anon id up front so canceling and reopening
-    // the dialog doesn't churn awareness ids on retry.
-    pendingCollabServerUrl = serverUrl;
-    pendingAnonId = makeAnonIdentity().id;
-    collabDialogOpen = true;
-  };
-
-  /**
-   * Identity dialog submit handler. Persists if requested, then joins.
-   * Persisted form omits the volatile `persist` flag — only the
-   * identity triple is durable.
-   */
-  const onCollabIdentitySubmit = (result: IdentityResult): void => {
-    const identity: StoredIdentity = {
-      id: result.id,
-      name: result.name,
-      color: result.color,
-    };
-    if (result.persist) {
-      try {
-        window.localStorage.setItem(
-          COLLAB_IDENTITY_KEY,
-          JSON.stringify(identity),
-        );
-      } catch (err) {
-        console.warn("[collab] Failed to persist identity:", err);
-      }
-    }
-    const serverUrl = pendingCollabServerUrl;
-    collabDialogOpen = false;
-    pendingCollabServerUrl = null;
-    pendingAnonId = null;
-    if (serverUrl) void startCollabSession(serverUrl, identity);
-  };
-
-  const onCollabIdentityCancel = (): void => {
-    collabDialogOpen = false;
-    pendingCollabServerUrl = null;
-    pendingAnonId = null;
-  };
-
-  // ── Connection status toast (Phase 17 / A4) ─────────────────────────
-  // We track the previous status so we can fire toasts only on actual
-  // transitions (mid-session drop, reconnect). The initial idle →
-  // connecting → connected sequence is already conveyed by the button's
-  // own state and would just be noise as a toast.
-  let collabToast: { message: string; tone: "info" | "warn" | "ok" } | null =
-    $state(null);
-  let collabToastTimer: ReturnType<typeof setTimeout> | null = null;
-  // prevCollabStatus is intentionally NOT $state — it's a back-channel
-  // memo for the effect's transition detection, not a UI signal. The
-  // effect tracks only collabStore.status; reading the previous value
-  // and writing the new one happens after that read so it's a plain
-  // mutation, not a reactive dep.
-  let prevCollabStatus: typeof collabStore.status = "idle";
-  /** Show a toast and auto-clear it after `ms` unless replaced. */
-  const showCollabToast = (toast: NonNullable<typeof collabToast>, ms = 5000) => {
-    collabToast = toast;
-    if (collabToastTimer !== null) clearTimeout(collabToastTimer);
-    collabToastTimer = setTimeout(() => {
-      // Capture the toast we set so a later transition that replaced
-      // collabToast doesn't get prematurely cleared by this stale
-      // timer.
-      if (collabToast === toast) collabToast = null;
-      collabToastTimer = null;
-    }, ms);
-  };
-  $effect(() => {
-    const cur = collabStore.status;
-    const prev = prevCollabStatus;
-    prevCollabStatus = cur;
-    if (prev === "connected" && cur === "disconnected") {
-      // Mid-session drop. y-websocket auto-reconnects so we promise
-      // the user it's coming back; the connected→toast confirms.
-      showCollabToast({
-        message: "Connection lost. Reconnecting…",
-        tone: "warn",
-      });
-    } else if (prev === "disconnected" && cur === "connected") {
-      showCollabToast({ message: "Reconnected", tone: "ok" });
-    }
-    // All other transitions (idle ↔ connecting, connecting → connected
-    // initial join, leaveRoom) are silent.
-  });
-
-  // ── Cursor broadcast (Phase 17 / A2) ────────────────────────────────
-  // Throttled to ~20fps. Native pointermove can fire at 60-1000Hz on
-  // high-rate input devices; awareness gossip every tick would melt
-  // both the socket and the peers' renderers. 50ms is smooth enough
-  // that motion looks continuous and cheap enough that a 4-peer room
-  // sends ~80 messages/sec total.
-  const CURSOR_BROADCAST_THROTTLE_MS = 50;
-  // Slice of appState that CollabCursors needs for its scene→viewport
-  // conversion. Building it in a $derived avoids recomputing the slice
-  // on every read at the call-site (the previous inline {{...}} object
-  // literal in the template re-allocated identity on every host re-
-  // render). A new object IS still produced when zoom/scroll change —
-  // that's correct, the cursors derivation needs to recompute then.
-  // Side-effect of this hoist: the prop reference stays referentially
-  // stable across reactive ticks that don't touch zoom or scroll, so
-  // any future memoization on the consumer side actually pays off.
-  const collabCursorsAppState = $derived({
-    zoom: appState.zoom as { value: number },
-    offsetLeft: appState.offsetLeft as number,
-    offsetTop: appState.offsetTop as number,
-    scrollX: appState.scrollX as number,
-    scrollY: appState.scrollY as number,
-  });
-
-  let lastCursorBroadcastAt = 0;
-  const broadcastCursor = (event: PointerEvent): void => {
-    if (collabStore.status !== "connected") return;
-    const now = performance.now();
-    if (now - lastCursorBroadcastAt < CURSOR_BROADCAST_THROTTLE_MS) return;
-    lastCursorBroadcastAt = now;
-    const { x: sceneX, y: sceneY } = toSceneCoords(event.clientX, event.clientY);
-    // x/y are kept as raw clientX/clientY in case future on-screen
-    // indicators want screen-space without redoing the scene-coord
-    // conversion. Peers ignore them today and use sceneX/sceneY for
-    // pan/zoom-stable rendering (see CollabCursors.svelte).
-    collabStore.updateCursor(event.clientX, event.clientY, sceneX, sceneY);
-  };
 
   // Phase 11 frames Map (read by handleStartPresentation + createFrameAtCenter
   // for slide segmentation + new-frame naming) is populated by createFrameAtCenter
@@ -4575,14 +4275,10 @@
   };
 
   const onInteractivePointerMove = (event: PointerEvent) => {
-    // Phase 17 / A2: piggyback on native pointermove for cursor gossip.
-    // Cheap (early-returns when collab is off; throttled when on) so
-    // it never gates the rest of this hot path.
-    broadcastCursor(event);
-
     // Plugin pointer-observer dispatch. Read-only — observers can't
-    // intercept this event. Compute scene coords once and hand them
-    // to every observer so each plugin doesn't redo the math.
+    // intercept this event. The collab plugin's cursor broadcast hooks
+    // in here via ctx.onPointerEvent("move", ...) — no inline call
+    // needed in the host hot path anymore.
     const sceneCoords = toSceneCoords(event.clientX, event.clientY);
     pluginRegistry.dispatchPointerEvent("move", event, sceneCoords);
 
@@ -5384,80 +5080,17 @@
     onSetLanguage={setLanguage}
   />
 
-  <!-- Phase 17: Live collaboration trigger. Tucked under the utility bar
-       on the top-right. Click toggles join/leave; if no collab server is
-       configured (VITE_COLLAB_SERVER or ?collab=ws://...) the button
-       logs a warning and otherwise does nothing — Commit 4 will surface
-       the misconfig as a toast. The collaborator badge mirrors the
-       awareness Map size, populated from store.users (built via the
-       awareness "change" listener inside joinRoom). -->
-  <div class="sveltedraw-collab-trigger">
-    <LiveCollaborationTrigger
-      isCollaborating={collabStore.status === "connected"}
-      onSelect={handleCollabButtonClick}
-      width={appState.width}
-      collaboratorCount={collabStore.users.size}
-    />
-    <!-- Phase 17 / A4: status pill. Shown only for transient/error
-         states; idle hides it (no session) and connected hides it
-         (the button itself already reads as active via its .active
-         class). Putting the dot color in CSS rather than inline keeps
-         theme overrides simple. -->
-    {#if collabStore.status === "connecting"}
-      <div class="sveltedraw-collab-status sveltedraw-collab-status--connecting">
-        <span class="sveltedraw-collab-status__dot"></span>
-        Connecting…
-      </div>
-    {:else if collabStore.status === "disconnected"}
-      <div class="sveltedraw-collab-status sveltedraw-collab-status--disconnected">
-        <span class="sveltedraw-collab-status__dot"></span>
-        Disconnected
-      </div>
-    {/if}
-  </div>
-
-  <!-- Phase 17 / A3: identity capture dialog. Mounted only while open
-       (avoids paying the Modal/portal cost when collab is dormant).
-       pendingAnonId is always set when the dialog opens (see
-       handleCollabButtonClick), so the empty-string fallback is
-       defensive — never expected to fire. The previous version called
-       makeAnonIdentity() inline, which generated a fresh UUID on every
-       reactive re-render of the host. -->
-  {#if collabDialogOpen}
-    <CollabIdentityDialog
-      palette={COLLAB_PALETTE}
-      suggestedId={pendingAnonId ?? ""}
-      onSubmit={onCollabIdentitySubmit}
-      onCancel={onCollabIdentityCancel}
-    />
-  {/if}
-
-  <!-- Phase 17 / A2: peer cursor overlay. Reads collab users from
-       context; renders nothing when no peers have a cursor. We pass
-       the appState slice the conversion needs as a prop so $derived
-       tracks pan/zoom without round-tripping through context. The
-       slice is built in a $derived above so an inline object literal
-       doesn't change identity on every unrelated reactive tick (which
-       would defeat Svelte's prop-equality and force the
-       CollabCursors-internal $derived.by(users) to re-run). -->
-  <CollabCursors appState={collabCursorsAppState} />
-
-  <!-- Phase 17 / A4: connection status toast. Appears bottom-center
-       on mid-session drop / reconnect; auto-dismisses on default 5s.
-       Tone classes pick the background color via CSS. -->
-  {#if collabToast}
-    <div
-      class="sveltedraw-collab-toast"
-      class:sveltedraw-collab-toast--warn={collabToast.tone === "warn"}
-      class:sveltedraw-collab-toast--ok={collabToast.tone === "ok"}
-    >
-      <Toast
-        message={collabToast.message}
-        onClose={() => (collabToast = null)}
-        closable
-      />
-    </div>
-  {/if}
+  <!-- Phase 17 collab UI (live-collaboration trigger, identity dialog,
+       cursor overlay, connection toast) is now contributed entirely by
+       the builtin/collab plugin via:
+         - addChromeItem("top-bar")     → LiveCollaborationTrigger + status pill
+         - addChromeItem("dialog-layer") → CollabIdentityDialog
+         - addChromeItem("toast-layer")  → connection toast
+         - addCanvasOverlay              → peer cursor overlay
+         - onPointerEvent("move")        → cursor broadcast (throttled)
+         - onEditorReady                 → auto-start session if URL/env configured
+       Mount points come from the registry's chrome-slot + canvas-overlay
+       loops elsewhere in this template — nothing inline here. -->
 
   <!-- Connector tool indicator now lives in builtin/connector-tool
        plugin's PanelHost. Pointerdown handler routes through the
@@ -6498,85 +6131,10 @@
 
   /* FloatingLibraryPanel styles live with components/FloatingLibraryPanel.svelte. */
 
-  /* Phase 17: LiveCollaborationTrigger placement. Sits below the utility
-     bar (top: 56px ≈ utility bar bottom + 8px gap) so it doesn't overlap
-     the language/theme controls. Button visuals come from the component's
-     own SCSS sidecar; this rule is purely about position + z-index. */
-  .sveltedraw-collab-trigger {
-    position: absolute;
-    top: 56px;
-    right: 20px;
-    z-index: 30;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    /* Pill follows the button to its left so the row reads:
-       [ status pill ] [ button ]. flex-direction reverse keeps the
-       button anchored to the right edge of the trigger box. */
-    flex-direction: row-reverse;
-  }
-
-  /* Phase 17 / A4: connection status pill. Sits next to the collab
-     button while the session is in a non-steady state. The dot color
-     is the only difference between connecting/disconnected; the rest
-     of the box is theme-driven. */
-  .sveltedraw-collab-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.3rem 0.6rem;
-    border-radius: 999px;
-    font-size: 0.75rem;
-    font-weight: 500;
-    background: var(--island-bg-color, #fff);
-    border: 1px solid var(--border-color-medium, #d1d4da);
-    color: var(--text-primary-color, #1b1b1f);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-    white-space: nowrap;
-    user-select: none;
-  }
-
-  .sveltedraw-collab-status__dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  .sveltedraw-collab-status--connecting .sveltedraw-collab-status__dot {
-    background: #f59f00; /* amber */
-    /* Pulse so users can tell connecting from "stuck" at a glance. */
-    animation: sveltedraw-collab-pulse 1.2s ease-in-out infinite;
-  }
-
-  .sveltedraw-collab-status--disconnected .sveltedraw-collab-status__dot {
-    background: #e03131; /* red */
-  }
-
-  @keyframes sveltedraw-collab-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.35; }
-  }
-
-  /* Phase 17 / A4: collab status toast container. Bottom-center
-     placement matches typical app-level toast convention; the inner
-     Toast component handles its own padding/typography. We only own
-     positioning + the tone-driven background ring. */
-  .sveltedraw-collab-toast {
-    position: absolute;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1000;
-  }
-
-  .sveltedraw-collab-toast--warn :global(.Toast) {
-    border-left: 4px solid #f59f00;
-  }
-
-  .sveltedraw-collab-toast--ok :global(.Toast) {
-    border-left: 4px solid #2f9e44;
-  }
+  /* Collab UI styles moved into the builtin/collab plugin's host
+     components (TriggerHost.svelte / ToastHost.svelte). The trigger
+     positions itself absolutely from inside its own scoped CSS; the
+     toast inherits its position from the toast-layer chrome slot. */
 
   .sveltedraw-alignment-panel {
     position: absolute;

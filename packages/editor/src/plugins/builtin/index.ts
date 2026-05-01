@@ -18,6 +18,7 @@ import { connectorToolPlugin } from "./connector-tool/index.js";
 import { laserPointerPlugin } from "./laser-pointer/index.js";
 import { exportPanelPlugin } from "./export-panel/index.js";
 import { commandPalettePlugin } from "./command-palette/index.js";
+import { collabPlugin } from "./collab/index.svelte.js";
 import type { SveltedrawPlugin } from "../types.js";
 
 /**
@@ -41,4 +42,5 @@ export const builtinPlugins: readonly SveltedrawPlugin[] = [
   laserPointerPlugin,
   exportPanelPlugin,
   commandPalettePlugin,
+  collabPlugin,
 ];
