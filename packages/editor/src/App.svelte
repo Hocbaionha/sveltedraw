@@ -66,7 +66,7 @@
   // prettier-ignore
   import { getFormFactor, createUserAgentDescriptor, MQ_RIGHT_SIDEBAR_MIN_WIDTH, supportsResizeObserver, POINTER_EVENTS, randomId, viewportCoordsToSceneCoords, DEFAULT_ELEMENT_PROPS, DEFAULT_FONT_FAMILY, FONT_FAMILY } from "@sveltedraw/common";
   // @ts-ignore
-  import { newElement, newLinearElement, newArrowElement, newFreeDrawElement, newTextElement, newImageElement, hitElementItself, duplicateElements, deepCopyElement, moveOneLeft, moveOneRight, moveAllLeft, moveAllRight } from "@sveltedraw/element";
+  import { newElement, newLinearElement, newArrowElement, newFreeDrawElement, newTextElement, newImageElement, hitElementItself, duplicateElements, deepCopyElement } from "@sveltedraw/element";
   // @ts-ignore
   import { updateBoundElements } from "@sveltedraw/element";
   // @ts-ignore
@@ -106,6 +106,13 @@
     type LinkDialogStore,
     type LinkDialogBridge,
   } from "./plugins/builtin/link-dialog/index.js";
+  import {
+    Z_ORDER_STORE_KEY,
+    Z_ORDER_BRIDGE_KEY,
+    type ZOrderStore,
+    type ZOrderBridge,
+    type ZOrderDirection,
+  } from "./plugins/builtin/z-order/index.js";
   import {
     t,
     setLanguage,
@@ -1288,6 +1295,20 @@
     },
   };
   registerCtx(LINK_DIALOG_BRIDGE_KEY, linkDialogBridge);
+
+  // Bridge for the z-order plugin. The reorder helpers need
+  // replaceAllElements + getElementsIncludingDeleted (Scene-level,
+  // not on the SveltedrawAPI surface), plus pushHistory and
+  // bumpSceneRepaint (host-owned). Plugin's reorder() runs lazily
+  // when the user invokes a reorder action — by that time pushHistory
+  // is destructured from historyStore further below in this script.
+  const zOrderBridge: ZOrderBridge = {
+    getScene: () => scene,
+    pushHistory: () => pushHistory(),
+    bumpSceneRepaint: () => bumpSceneRepaint(),
+  };
+  registerCtx(Z_ORDER_BRIDGE_KEY, zOrderBridge);
+
   // Thin shims that route through the plugin store. The store
   // appears once the plugin install $effect runs (right after
   // onMount); calls before that point — only possible if scheduleSave
@@ -2198,27 +2219,16 @@
     });
 
   // ── Z-order: bring forward / send backward / to front / to back ─────
-  // Original's shiftElementsByOne returns the full reordered array;
-  // replaceAllElements with skipValidation bypasses fractional-index
-  // validation since original sync happens inside replaceAllElements.
-  const reorderSelected = (
-    direction: "forward" | "backward" | "front" | "back",
-  ) => {
-    if (!scene) return;
-    const selected = getSelectedElements();
-    if (selected.length === 0) return;
-    const elements = scene.getElementsIncludingDeleted();
-    let next;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const as = appState as any;
-    if (direction === "forward") next = moveOneRight(elements, as, scene);
-    else if (direction === "backward") next = moveOneLeft(elements, as, scene);
-    else if (direction === "front") next = moveAllRight(elements, as);
-    else next = moveAllLeft(elements, as);
-    scene.replaceAllElements(next, { skipValidation: true });
-    pushHistory();
-    bumpSceneRepaint();
-  };
+  // Migrated to builtin/z-order plugin (Wave B.1). The plugin owns
+  // the moveOne{Left,Right} + moveAll{Left,Right} call site and
+  // the pushHistory + bumpSceneRepaint cadence. This shim routes
+  // existing call sites (core actions, UtilityBar buttons, context-
+  // menu) through the published store. If the plugin is uninstalled
+  // (host filters it out of the plugins prop), the call silently
+  // no-ops via optional chaining — same fall-through pattern as
+  // scheduleSave / openLinkDialog.
+  const reorderSelected = (direction: ZOrderDirection) =>
+    pluginRegistry.getStore<ZOrderStore>(Z_ORDER_STORE_KEY)?.reorder(direction);
 
   // ── Export ───────────────────────────────────────────────────────────
   // Thin wrappers over original `@sveltedraw/utils/export`. Those helpers
