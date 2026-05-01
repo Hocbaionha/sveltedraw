@@ -124,12 +124,146 @@ export type MutationFilter = (
 ) => MutationFilterResult;
 
 /**
+ * Window-level events plugins commonly want to observe without owning
+ * a DOM listener themselves. The host attaches/detaches the underlying
+ * window listener; plugins just register a callback.
+ *
+ * - `paste`: ClipboardEvent — image / text pastes from the OS clipboard
+ * - `drop`: DragEvent — files dragged into the page
+ * - `dragover`: DragEvent — used to allow drop targets (preventDefault
+ *   inside the observer if you intend to handle drop)
+ * - `beforeunload`: BeforeUnloadEvent — flush autosave, warn dirty state
+ * - `visibilitychange`: Event — pause heavy work when tab hidden
+ * - `online` / `offline`: Event — network status changes
+ */
+export type WindowEventType =
+  | "paste"
+  | "drop"
+  | "dragover"
+  | "beforeunload"
+  | "visibilitychange"
+  | "online"
+  | "offline";
+
+/**
+ * Element-mutation observer types. These fire surgically per element
+ * change rather than the coarser api.onChange (which fires once per
+ * scene mutation regardless of what changed). Observers receive the
+ * affected element id + the relevant snapshot.
+ *
+ * Use cases:
+ * - text editor plugin reacting to its own element being edited
+ * - snap-guides plugin recomputing on insert/move
+ * - analytics / telemetry per element kind
+ * - AI co-pilot suggesting completions on text element insert
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type ElementChangeContext<T = any> = {
+  /** The element id involved. */
+  id: string;
+  /** Post-change element (null for delete). */
+  current: T | null;
+  /** Pre-change element (null for insert). */
+  previous: T | null;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type ElementChangeObserver<T = any> = (
+  ctx: ElementChangeContext<T>,
+) => void;
+
+/**
+ * Tool-plugin context — what the host hands to a plugin's pointer
+ * handlers when its tool is the active one. The plugin claims a
+ * gesture by NOT calling `passthrough()` from onPointerDown; once
+ * claimed, the host routes subsequent pointer events of the same
+ * gesture to this tool only.
+ *
+ * `passthrough()` is the explicit opt-out — call it to let the host's
+ * default selection/drag flow handle the rest of the gesture. The
+ * connector tool, for example, doesn't claim the gesture (it just
+ * does a hit-test on pointerdown and calls handlePick), so its
+ * onPointerDown would call passthrough().
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type ToolPointerContext<TElement = any> = {
+  /** The raw browser event. */
+  event: PointerEvent;
+  /** Pre-computed scene coords. */
+  sceneX: number;
+  sceneY: number;
+  /** Element under the cursor at event time, or null. */
+  hitElement: TElement | null;
+  /**
+   * Lift the gesture lock — let the host's default handler run for
+   * this and subsequent events of the gesture. Idempotent. Should be
+   * called from onPointerDown when the tool decides not to take the
+   * drag (e.g. "first-pick" tools that consume the click but not the
+   * drag).
+   */
+  passthrough: () => void;
+  /** Push a history snapshot. Call after committing a draw. */
+  pushHistory: () => void;
+  /** Force a static-canvas repaint. */
+  bumpSceneRepaint: () => void;
+};
+
+/**
+ * A tool plugin owns the pointer flow when its name is the active
+ * tool. The host coordinates which tool is active via
+ * `appState.activeTool.type` (existing convention) — when that
+ * matches `name`, pointerdown/move/up/cancel route to this tool's
+ * handlers BEFORE the host's built-in tool dispatch.
+ *
+ * Built-in tools (selection / rectangle / arrow / etc.) still live
+ * in App.svelte's pointer handlers; tool plugins coexist alongside
+ * them. The host falls through to its built-in dispatch for tool
+ * names with no plugin claim.
+ */
+export interface ToolPluginDef {
+  /** Tool identifier — must match the value the host writes to
+   *  `appState.activeTool.type` when the user activates this tool.
+   *  Plugin id is auto-prefixed in tool-action ids but NOT here —
+   *  tools live in a flat namespace because activeTool.type is a
+   *  flat string today (matches Excalidraw upstream). */
+  name: string;
+  /** Optional human-readable label for command-palette + tooltip. */
+  label?: string;
+  /** Called once when the tool becomes the active tool. Use to
+   *  initialize transient state (drag origin, multi-step machine
+   *  cursor, …). */
+  onActivate?: () => void;
+  /** Called once when the tool stops being active (user switched
+   *  to another tool, Esc cancel, programmatic setActiveTool).
+   *  Mirrors onActivate; both optional. */
+  onDeactivate?: () => void;
+  /**
+   * Called from the host's pointerdown handler. Returning nothing
+   * (or an explicit { claim: true }) claims the gesture — the host
+   * routes pointermove / up / cancel to this tool until release.
+   * Calling ctx.passthrough() inside the handler explicitly LIFTS
+   * the claim (host falls through to its default behavior).
+   */
+  onPointerDown?: (ctx: ToolPointerContext) => void;
+  onPointerMove?: (ctx: ToolPointerContext) => void;
+  onPointerUp?: (ctx: ToolPointerContext) => void;
+  onPointerCancel?: (ctx: ToolPointerContext) => void;
+}
+
+/**
  * Chrome slots — well-known mount points OUTSIDE the canvas so plugins
  * can contribute UI that isn't a toolbar / side panel / canvas overlay.
  *
  * - `top-bar`: full-width strip above the toolbar (banners, breadcrumbs).
  * - `bottom-bar`: full-width strip below the canvas (status indicators,
  *   element count, zoom %).
+ * - `left-rail`: vertical strip down the left edge of the editor. Used
+ *   for style panels and other persistent tool-context UI. Pointer-
+ *   events flow through (parent slot is pointer-events:none) so the
+ *   rail itself doesn't block clicks; child components opt in.
+ * - `right-rail`: mirror of left-rail along the right edge. Reserved
+ *   for inspector / properties panels that aren't side panels (which
+ *   are exclusive and animate in/out).
  * - `toast-layer`: stacked transient notifications, bottom-center.
  *   Plugins manage their own dismiss timing.
  * - `dialog-layer`: full-screen modal overlay. The plugin's component
@@ -138,6 +272,8 @@ export type MutationFilter = (
 export type ChromeSlot =
   | "top-bar"
   | "bottom-bar"
+  | "left-rail"
+  | "right-rail"
   | "toast-layer"
   | "dialog-layer";
 
@@ -251,6 +387,42 @@ export interface SveltedrawPluginContext {
    * and may race with scene initialization.
    */
   onEditorReady(cb: () => void | (() => void)): void;
+
+  /**
+   * Subscribe to a window-level event. The host owns the addEventListener
+   * lifecycle; the dispose closure unregisters this plugin's callback
+   * (the underlying window listener stays installed if other plugins
+   * still observe the same type). Throws inside the observer are
+   * caught + logged — one bad plugin can't break paste/drop for others.
+   */
+  onWindowEvent<T extends WindowEventType>(
+    type: T,
+    observer: (event: T extends "paste" ? ClipboardEvent
+      : T extends "drop" | "dragover" ? DragEvent
+      : T extends "beforeunload" ? BeforeUnloadEvent
+      : Event) => void,
+  ): () => void;
+
+  /**
+   * Per-element mutation observer. Fires once per affected element
+   * after every gated mutation (drag, transform, style apply, scene
+   * replace). Diff is computed by the host comparing snapshots before
+   * + after; cheap when nothing changed.
+   *
+   * Fires `current=null` for deletes and `previous=null` for inserts;
+   * both non-null for updates.
+   */
+  onElementChange<TElement = unknown>(
+    observer: ElementChangeObserver<TElement>,
+  ): () => void;
+
+  /**
+   * Register a tool plugin. The host routes pointerdown/move/up/cancel
+   * to this tool when `appState.activeTool.type === def.name`.
+   * Multiple registrations for the same name throw to surface
+   * collisions early. Returns dispose closure.
+   */
+  registerTool(def: ToolPluginDef): () => void;
 
   /**
    * Publish a typed store under a Symbol key. Other plugins (or built-in

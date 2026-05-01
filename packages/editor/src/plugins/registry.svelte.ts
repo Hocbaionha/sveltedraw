@@ -14,6 +14,11 @@ import type {
   MutationFilter,
   MutationFilterContext,
   MutationFilterResult,
+  WindowEventType,
+  ElementChangeObserver,
+  ElementChangeContext,
+  ToolPluginDef,
+  ToolPointerContext,
   SveltedrawPlugin,
   SveltedrawPluginContext,
 } from "./types.js";
@@ -49,6 +54,30 @@ export class PluginRegistry {
   private editorReady = false;
   private editorReadyCallbacks: (() => void | (() => void))[] = [];
   private editorReadyTeardowns = new Map<string, (() => void)[]>();
+
+  /**
+   * Window-event observers, keyed by type. The host attaches the
+   * underlying window listener lazily — only when the first observer
+   * for a given type registers — and detaches when the last unsubscribes.
+   * Saves a no-op listener cost for events no plugin cares about.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private windowObservers = new Map<WindowEventType, Set<(event: any) => void>>();
+  private windowAttached = new Map<WindowEventType, () => void>();
+
+  /** Element-mutation observers (registered via ctx.onElementChange). */
+  private elementObservers = new Set<ElementChangeObserver>();
+
+  /** Tool plugins, keyed by tool name. */
+  private toolPlugins = new Map<string, ToolPluginDef>();
+
+  /**
+   * Active tool gesture. When a tool plugin's onPointerDown claims
+   * the gesture (doesn't call passthrough), subsequent pointermove /
+   * up / cancel are routed to the same tool until release. The host
+   * checks this state before falling through to its built-in handlers.
+   */
+  private activeToolGesture: { name: string; pointerId: number | null } | null = null;
 
   /**
    * Plugin-published stores keyed by Symbol. Single-writer: a key can
@@ -251,6 +280,136 @@ export class PluginRegistry {
   }
 
   /**
+   * Dispatch element-change observers. Called by the host after gated
+   * mutation paths (replaceAllElements, mutateElement) compute the
+   * before/after snapshots. Skipping observers for unchanged elements
+   * is the host's responsibility — observers see only actually-
+   * mutated entries.
+   */
+  dispatchElementChange(ctx: ElementChangeContext): void {
+    for (const obs of this.elementObservers) {
+      try {
+        obs(ctx);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error("[plugin] element-change observer threw", err);
+      }
+    }
+  }
+
+  /**
+   * Tool-plugin pointer dispatch. Called by App.svelte's pointer
+   * handlers BEFORE the host's built-in tool dispatch. Returns true
+   * if a tool plugin handled the event AND claimed the gesture (the
+   * host should skip its default flow for the rest of this gesture).
+   * Returns false if no plugin claimed (host runs default).
+   */
+  dispatchToolPointerDown(
+    activeToolName: string,
+    ctxBuilder: (passthrough: () => void) => ToolPointerContext,
+  ): boolean {
+    const tool = this.toolPlugins.get(activeToolName);
+    if (!tool || !tool.onPointerDown) return false;
+    let claimed = true;
+    const passthrough = () => { claimed = false; };
+    const ctx = ctxBuilder(passthrough);
+    try {
+      tool.onPointerDown(ctx);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(`[plugin:tool:${activeToolName}] onPointerDown threw`, err);
+      claimed = false;
+    }
+    if (claimed) {
+      this.activeToolGesture = { name: activeToolName, pointerId: ctx.event.pointerId };
+    }
+    return claimed;
+  }
+
+  dispatchToolPointerMove(
+    ctxBuilder: (passthrough: () => void) => ToolPointerContext,
+  ): boolean {
+    const gesture = this.activeToolGesture;
+    if (!gesture) return false;
+    const tool = this.toolPlugins.get(gesture.name);
+    if (!tool || !tool.onPointerMove) return false;
+    const passthrough = () => {};
+    const ctx = ctxBuilder(passthrough);
+    try {
+      tool.onPointerMove(ctx);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(`[plugin:tool:${gesture.name}] onPointerMove threw`, err);
+    }
+    return true;
+  }
+
+  dispatchToolPointerUp(
+    ctxBuilder: (passthrough: () => void) => ToolPointerContext,
+  ): boolean {
+    const gesture = this.activeToolGesture;
+    if (!gesture) return false;
+    const tool = this.toolPlugins.get(gesture.name);
+    const passthrough = () => {};
+    const ctx = ctxBuilder(passthrough);
+    try {
+      tool?.onPointerUp?.(ctx);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(`[plugin:tool:${gesture.name}] onPointerUp threw`, err);
+    }
+    // Release the gesture claim regardless — pointerup ends the
+    // gesture by definition.
+    this.activeToolGesture = null;
+    return true;
+  }
+
+  dispatchToolPointerCancel(
+    ctxBuilder: (passthrough: () => void) => ToolPointerContext,
+  ): boolean {
+    const gesture = this.activeToolGesture;
+    if (!gesture) return false;
+    const tool = this.toolPlugins.get(gesture.name);
+    const passthrough = () => {};
+    const ctx = ctxBuilder(passthrough);
+    try {
+      tool?.onPointerCancel?.(ctx);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(`[plugin:tool:${gesture.name}] onPointerCancel threw`, err);
+    }
+    this.activeToolGesture = null;
+    return true;
+  }
+
+  /**
+   * Notify the registry that the active tool changed. Fires the
+   * outgoing tool's onDeactivate + the incoming tool's onActivate.
+   * Called by App.svelte's setActiveTool.
+   */
+  notifyToolChange(prev: string | null, next: string | null): void {
+    if (prev === next) return;
+    if (prev) {
+      try {
+        this.toolPlugins.get(prev)?.onDeactivate?.();
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error(`[plugin:tool:${prev}] onDeactivate threw`, err);
+      }
+    }
+    if (next) {
+      try {
+        this.toolPlugins.get(next)?.onActivate?.();
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error(`[plugin:tool:${next}] onActivate threw`, err);
+      }
+    }
+    // Drop any stale gesture claim — tool change kills the gesture.
+    this.activeToolGesture = null;
+  }
+
+  /**
    * Open one exclusive side panel and close every other exclusive one.
    * The registry walks `sidePanels`, calls `setOpen(false)` on each
    * exclusive panel that isn't the target, then `setOpen(true)` on the
@@ -440,6 +599,73 @@ export class PluginRegistry {
         };
         if (registry.editorReady) fire();
         else registry.editorReadyCallbacks.push(fire);
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      onWindowEvent: (type, observer: (event: any) => void) => {
+        let observers = registry.windowObservers.get(type);
+        if (!observers) {
+          observers = new Set();
+          registry.windowObservers.set(type, observers);
+          // Lazy attach: only the first observer for this type
+          // installs the underlying window listener. Subsequent
+          // registrations share it. This keeps idle plugins cheap.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const handler = (event: any) => {
+            const obs = registry.windowObservers.get(type);
+            if (!obs) return;
+            for (const cb of obs) {
+              try {
+                cb(event);
+              } catch (err) {
+                // eslint-disable-next-line no-console
+                console.error(`[plugin] window observer (${type}) threw`, err);
+              }
+            }
+          };
+          window.addEventListener(type, handler);
+          registry.windowAttached.set(type, () => {
+            window.removeEventListener(type, handler);
+          });
+        }
+        observers.add(observer);
+        return () => {
+          const set = registry.windowObservers.get(type);
+          if (!set) return;
+          set.delete(observer);
+          // Last observer left — detach the underlying window
+          // listener so the editor doesn't leak it across hot reload.
+          if (set.size === 0) {
+            registry.windowObservers.delete(type);
+            registry.windowAttached.get(type)?.();
+            registry.windowAttached.delete(type);
+          }
+        };
+      },
+      onElementChange: <T>(observer: ElementChangeObserver<T>) => {
+        registry.elementObservers.add(observer as ElementChangeObserver);
+        return () => {
+          registry.elementObservers.delete(observer as ElementChangeObserver);
+        };
+      },
+      registerTool: (def) => {
+        if (registry.toolPlugins.has(def.name)) {
+          throw new Error(
+            `[plugin:${pluginId}] tool name "${def.name}" already registered`,
+          );
+        }
+        registry.toolPlugins.set(def.name, def);
+        return () => {
+          // If the tool being removed is currently active, fire
+          // onDeactivate before unregistering so the plugin gets
+          // a chance to clean up transient state.
+          if (registry.activeToolGesture?.name === def.name) {
+            try { def.onDeactivate?.(); } catch { /* swallow */ }
+            registry.activeToolGesture = null;
+          }
+          if (registry.toolPlugins.get(def.name) === def) {
+            registry.toolPlugins.delete(def.name);
+          }
+        };
       },
       onSceneChange: api.onChange.bind(api),
       onSelectionChange: api.onSelectionChange.bind(api),

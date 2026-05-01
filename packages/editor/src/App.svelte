@@ -1116,6 +1116,8 @@
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const locked = !!(appState as any).activeTool?.locked;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const prevType = ((appState as any).activeTool?.type as string | undefined) ?? null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (appState as any).activeTool = {
       type,
       customType: null,
@@ -1127,6 +1129,10 @@
       lastActiveTool: (appState as any).activeTool ?? null,
     };
     imperativeAPI.notifyToolChange(type);
+    // Fire onActivate / onDeactivate on tool plugins. Done last so
+    // the hook sees the post-set appState.activeTool, not the
+    // intermediate state.
+    pluginRegistry.notifyToolChange(prevType, type);
   };
 
   // Toggle tool lock (Q in original). When on, the current drawing
@@ -3918,6 +3924,30 @@
     const tool = (appState.activeTool as any)?.type;
     const { x, y } = toSceneCoords(event.clientX, event.clientY);
 
+    // ── Tool plugin dispatch ─────────────────────────────────────────
+    // If a plugin has registered a tool by this name, route the
+    // pointerdown to it. The plugin claims the gesture by NOT calling
+    // ctx.passthrough() — when it claims, the host short-circuits and
+    // subsequent move/up will route to the same plugin.
+    if (tool) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const hit = hitTestAt(x, y) as any;
+      const claimed = pluginRegistry.dispatchToolPointerDown(tool, (passthrough) => ({
+        event,
+        sceneX: x,
+        sceneY: y,
+        hitElement: hit,
+        passthrough,
+        pushHistory: () => pushHistory(),
+        bumpSceneRepaint: () => bumpSceneRepaint(),
+      }));
+      if (claimed) {
+        tryCapture(event.currentTarget as HTMLElement | null, event.pointerId);
+        event.preventDefault();
+        return;
+      }
+    }
+
     // ── Selection tool: check resize handles first, then hit-test ─────
     if (tool === "selection") {
       // Resize handle hit-test takes precedence over element hit-test
@@ -4282,6 +4312,28 @@
     const sceneCoords = toSceneCoords(event.clientX, event.clientY);
     pluginRegistry.dispatchPointerEvent("move", event, sceneCoords);
 
+    // ── Tool plugin dispatch (move) ──────────────────────────────────
+    // If a tool plugin claimed the gesture in pointerdown, route the
+    // continuation to it. The host's built-in flow is bypassed for
+    // the duration of the claim.
+    {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const hit = hitTestAt(sceneCoords.x, sceneCoords.y) as any;
+      const handled = pluginRegistry.dispatchToolPointerMove((passthrough) => ({
+        event,
+        sceneX: sceneCoords.x,
+        sceneY: sceneCoords.y,
+        hitElement: hit,
+        passthrough,
+        pushHistory: () => pushHistory(),
+        bumpSceneRepaint: () => bumpSceneRepaint(),
+      }));
+      if (handled) {
+        event.preventDefault();
+        return;
+      }
+    }
+
     // B2: eraser drag. Each hit is soft-deleted and tracked in the drag
     // set so the same element isn't hit twice + history lands once.
     if (eraserDragActive) {
@@ -4609,12 +4661,32 @@
   };
 
   const onInteractivePointerUp = (event: PointerEvent) => {
+    const sceneCoords = toSceneCoords(event.clientX, event.clientY);
     // Plugin pointer-observer dispatch (up).
-    pluginRegistry.dispatchPointerEvent(
-      "up",
-      event,
-      toSceneCoords(event.clientX, event.clientY),
-    );
+    pluginRegistry.dispatchPointerEvent("up", event, sceneCoords);
+
+    // ── Tool plugin dispatch (up) ────────────────────────────────────
+    // Releases the gesture claim regardless — pointerup ends a gesture
+    // by definition. If this tool plugin claimed earlier, host's
+    // built-in flow stays skipped for this final event too.
+    {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const hit = hitTestAt(sceneCoords.x, sceneCoords.y) as any;
+      const handled = pluginRegistry.dispatchToolPointerUp((passthrough) => ({
+        event,
+        sceneX: sceneCoords.x,
+        sceneY: sceneCoords.y,
+        hitElement: hit,
+        passthrough,
+        pushHistory: () => pushHistory(),
+        bumpSceneRepaint: () => bumpSceneRepaint(),
+      }));
+      if (handled) {
+        tryRelease(event.currentTarget as HTMLElement | null, event.pointerId);
+        event.preventDefault();
+        return;
+      }
+    }
 
     // Touch bookkeeping: drop the finger and, if we fall below 2
     // simultaneous touches, end the pinch gesture.
@@ -5198,7 +5270,7 @@
        Items per slot are sorted by zIndex (default 0). The plugin's
        component is parameter-less and closes over its own state via
        module-level bindings (PanelHost pattern). -->
-  {#each (["top-bar", "bottom-bar", "toast-layer", "dialog-layer"] as const) as slot}
+  {#each (["top-bar", "bottom-bar", "left-rail", "right-rail", "toast-layer", "dialog-layer"] as const) as slot}
     {@const itemsInSlot = pluginRegistry.chromeItems
       .filter((c) => c.slot === slot)
       .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0))}
@@ -6306,6 +6378,24 @@
     display: flex;
     flex-direction: column-reverse;
     align-items: stretch;
+  }
+  [data-chrome-slot="left-rail"] {
+    top: 0;
+    left: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: max-content;
+  }
+  [data-chrome-slot="right-rail"] {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: max-content;
   }
   [data-chrome-slot="toast-layer"] {
     bottom: 16px;
