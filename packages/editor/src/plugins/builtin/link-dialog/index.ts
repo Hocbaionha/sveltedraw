@@ -26,7 +26,7 @@ import {
   LINK_DIALOG_BRIDGE_KEY,
   type LinkDialogBridge,
 } from "./bridge.js";
-import DialogHost, { bindDialogHost } from "./DialogHost.svelte";
+import DialogHost, { bindDialogHost, unbindDialogHost } from "./DialogHost.svelte";
 
 export const LINK_DIALOG_STORE_KEY: unique symbol = Symbol("linkDialogStore");
 
@@ -66,17 +66,26 @@ export const linkDialogPlugin: SveltedrawPlugin = {
         const sel = ctx.api.getSelectedElements();
         if (sel.length !== 1) return;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        state.targetId = (sel[0] as any).id;
+        const id = (sel[0] as any).id as string;
+        // Don't open against a soft-deleted element. Selection state
+        // can briefly reference an isDeleted=true id during undo
+        // shuffles; opening would render a dialog that auto-closes
+        // on the next bump (jarring) — better to no-op.
+        if (!bridge.isAlive(id)) return;
+        state.targetId = id;
+        state.originalLink = bridge.getLink(id);
         state.open = true;
       },
       openForElement: (elementId) => {
         if (!bridge.isAlive(elementId)) return;
         state.targetId = elementId;
+        state.originalLink = bridge.getLink(elementId);
         state.open = true;
       },
       close: () => {
         state.open = false;
         state.targetId = null;
+        state.originalLink = null;
       },
       isOpen: () => state.open,
       confirm: (nextLink) => {
@@ -84,6 +93,7 @@ export const linkDialogPlugin: SveltedrawPlugin = {
         bridge.setLink(state.targetId, nextLink);
         state.open = false;
         state.targetId = null;
+        state.originalLink = null;
       },
     };
     const releaseStore = ctx.provideStore(LINK_DIALOG_STORE_KEY, store);
@@ -122,19 +132,27 @@ export const linkDialogPlugin: SveltedrawPlugin = {
         // modal pointing at nothing.
         state.open = false;
         state.targetId = null;
+        state.originalLink = null;
         return;
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((change.current as any).isDeleted) {
         state.open = false;
         state.targetId = null;
+        state.originalLink = null;
       }
     });
 
     return () => {
+      // Order: stop observing first (so a teardown-time mutation
+      // can't re-trigger close logic), then unmount the chrome (so
+      // the dialog disappears before its bridge becomes unreachable),
+      // then release the published store, then drop the module-level
+      // bindings ref so the torn-down state/bridge can be GC'd.
       removeElementObs();
       removeChrome();
       releaseStore();
+      unbindDialogHost();
     };
   },
 };

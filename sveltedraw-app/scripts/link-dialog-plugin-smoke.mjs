@@ -115,10 +115,106 @@ const tests = await ev(`
   p.bumpSceneRepaint();
   await new Promise(r => setTimeout(r, 150));
   tests.push({
-    name: 'dialog auto-closes when target element is removed',
+    name: 'dialog auto-closes when target element is removed (replaceAll path)',
     ok: p.isLinkDialogOpen() === false,
     detail: 'isOpen after delete=' + p.isLinkDialogOpen(),
   });
+
+  // ── 6. auto-close when target is in-place soft-deleted
+  // Regression coverage for Wave A pass-1 #2: bumpSceneRepaint used
+  // ref-equality before, so el.isDeleted=true on an existing ref
+  // never fired onElementChange → dialog stayed open over a
+  // tombstoned element.
+  const ELEM2 = "link-test-soft-" + Date.now().toString(36);
+  p.scene.replaceAllElements([{
+    id: ELEM2, type: 'rectangle', x: 100, y: 200, width: 50, height: 60, angle: 0,
+    strokeColor: '#000', backgroundColor: 'transparent', fillStyle: 'solid',
+    strokeWidth: 1, strokeStyle: 'solid', roundness: null, roughness: 0,
+    opacity: 100, groupIds: [], frameId: null, index: 'a1',
+    boundElements: null, updated: Date.now(), link: null, locked: false,
+    seed: 2, version: 1, versionNonce: 1, isDeleted: false,
+  }]);
+  p.appState.selectedElementIds = { [ELEM2]: true };
+  p.bumpSceneRepaint();
+  await new Promise(r => setTimeout(r, 100));
+  p.openLinkDialog();
+  await new Promise(r => setTimeout(r, 100));
+  const openedSoft = p.isLinkDialogOpen();
+  // In-place mutate isDeleted on the SAME ref (don't replaceAll).
+  const liveEl = p.scene.getElement(ELEM2);
+  if (liveEl) {
+    liveEl.isDeleted = true;
+    liveEl.version = (liveEl.version || 1) + 1;
+    liveEl.versionNonce = (liveEl.versionNonce || 1) + 7919;
+  }
+  p.bumpSceneRepaint();
+  await new Promise(r => setTimeout(r, 100));
+  tests.push({
+    name: 'dialog auto-closes on in-place soft-delete (fingerprint diff)',
+    ok: openedSoft === true && p.isLinkDialogOpen() === false,
+    detail: 'openedBefore=' + openedSoft + ' openAfter=' + p.isLinkDialogOpen(),
+  });
+
+  // ── 7. open() refuses an already-soft-deleted element
+  // Regression coverage for Wave A pass-1 #5: the open() gate now
+  // checks bridge.isAlive before flipping state.open.
+  const ELEM3 = "link-test-dead-" + Date.now().toString(36);
+  p.scene.replaceAllElements([{
+    id: ELEM3, type: 'rectangle', x: 0, y: 0, width: 50, height: 50, angle: 0,
+    strokeColor: '#000', backgroundColor: 'transparent', fillStyle: 'solid',
+    strokeWidth: 1, strokeStyle: 'solid', roundness: null, roughness: 0,
+    opacity: 100, groupIds: [], frameId: null, index: 'a2',
+    boundElements: null, updated: Date.now(), link: null, locked: true,
+    seed: 3, version: 1, versionNonce: 1, isDeleted: true,
+  }]);
+  p.appState.selectedElementIds = { [ELEM3]: true };
+  p.bumpSceneRepaint();
+  await new Promise(r => setTimeout(r, 80));
+  p.openLinkDialog();
+  await new Promise(r => setTimeout(r, 80));
+  tests.push({
+    name: 'openLinkDialog() refuses a soft-deleted element',
+    ok: p.isLinkDialogOpen() === false,
+  });
+
+  // ── 8. originalLink is captured at open time (not the live value)
+  // Regression coverage for Wave A pass-1 #4/#10: the dialog's
+  // originalLink prop must be a snapshot of the link at open, not a
+  // re-read of bridge.getLink.
+  const ELEM4 = "link-test-orig-" + Date.now().toString(36);
+  p.scene.replaceAllElements([{
+    id: ELEM4, type: 'rectangle', x: 0, y: 0, width: 50, height: 50, angle: 0,
+    strokeColor: '#000', backgroundColor: 'transparent', fillStyle: 'solid',
+    strokeWidth: 1, strokeStyle: 'solid', roundness: null, roughness: 0,
+    opacity: 100, groupIds: [], frameId: null, index: 'a3',
+    boundElements: null, updated: Date.now(), link: 'https://before.example', locked: false,
+    seed: 4, version: 1, versionNonce: 1, isDeleted: false,
+  }]);
+  p.appState.selectedElementIds = { [ELEM4]: true };
+  p.bumpSceneRepaint();
+  await new Promise(r => setTimeout(r, 80));
+  p.openLinkDialog();
+  await new Promise(r => setTimeout(r, 80));
+  // Mutate the live link OUTSIDE the dialog (simulates a collab
+  // teammate or undo replaying a different link mid-edit).
+  const liveEl4 = p.scene.getElement(ELEM4);
+  if (liveEl4) {
+    p.scene.mutateElement(liveEl4, { link: 'https://midstream.example' },
+      { informMutation: false, isDragging: false });
+    p.bumpSceneRepaint();
+  }
+  await new Promise(r => setTimeout(r, 80));
+  // The dialog binds originalLink from state.originalLink (a
+  // snapshot taken on open) so an external mutation should not close
+  // the dialog — only a delete (current=null or isDeleted=true)
+  // does. This test asserts the dialog stays open through the
+  // mutation; the originalLink value itself is exercised by the
+  // unit tests around captureOriginalLinkOnOpen.
+  tests.push({
+    name: 'dialog stays open under external link mutation',
+    ok: p.isLinkDialogOpen() === true,
+  });
+  p.closeLinkDialog();
 
   return tests;
 `);

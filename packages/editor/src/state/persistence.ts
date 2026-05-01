@@ -13,6 +13,7 @@
 //   - LocalData IndexedDB store (images + library). Lives elsewhere.
 
 const SAVE_KEY = "sveltedraw:scene:v1";
+const SAVE_SCHEMA_VERSION = 1;
 const SAVE_DEBOUNCE_MS = 500;
 
 // Scene is reassigned in onMount, so callers pass a getter — not the value.
@@ -25,7 +26,55 @@ export type PersistenceApi = {
   tryLoad: () => boolean;
   /** Cancel any pending debounced save and flush synchronously. */
   flushPendingSave: () => void;
+  /** Cancel any pending debounced save WITHOUT flushing. Used by the
+   *  plugin teardown path so an uninstall doesn't fire one last save
+   *  against scene state the host might be tearing down concurrently. */
+  dispose: () => void;
 };
+
+/**
+ * Stand-alone load — used by the bootstrap path before the persistence
+ * plugin is installed. Extracted from createPersistence so the host
+ * doesn't have to spin up a full persistence instance just to read
+ * the saved snapshot once on mount.
+ */
+export function loadPersistedScene(opts: {
+  getScene: () => SceneLike | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  appState: any;
+}): boolean {
+  const { getScene, appState } = opts;
+  const scene = getScene();
+  if (!scene || typeof localStorage === "undefined") return false;
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.elements)) return false;
+    if (parsed.v !== SAVE_SCHEMA_VERSION) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `sveltedraw: persisted scene schema v${parsed.v} does not match expected v${SAVE_SCHEMA_VERSION} — skipping load. Old data is left in place; clear localStorage["${SAVE_KEY}"] to remove it.`,
+      );
+      return false;
+    }
+    scene.replaceAllElements(parsed.elements, { skipValidation: true });
+    for (const [k, v] of Object.entries(parsed.appState ?? {})) {
+      // activeTool is skipped explicitly: older saves persisted it,
+      // but restoring it here would bypass setActiveTool → plugin
+      // tools never get their onActivate fired (and a plugin since
+      // uninstalled would leave the editor in an unreachable tool
+      // state).
+      if (k === "activeTool") continue;
+      appState[k] = v;
+    }
+    return true;
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("sveltedraw: load failed", err);
+    return false;
+  }
+}
 
 export function createPersistence(opts: {
   getScene: () => SceneLike | null;
@@ -52,12 +101,15 @@ export function createPersistence(opts: {
     gridModeEnabled: appState.gridModeEnabled,
   });
 
+  let disposed = false;
+
   const saveNow = () => {
+    if (disposed) return;
     const scene = getScene();
     if (!scene || typeof localStorage === "undefined") return;
     try {
       const payload = {
-        v: 1,
+        v: SAVE_SCHEMA_VERSION,
         elements: scene.getElementsIncludingDeleted(),
         appState: pickPersistedAppState(),
       };
@@ -71,45 +123,28 @@ export function createPersistence(opts: {
   };
 
   const scheduleSave = () => {
+    if (disposed) return;
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(saveNow, SAVE_DEBOUNCE_MS);
   };
 
-  const tryLoad = (): boolean => {
-    const scene = getScene();
-    if (!scene || typeof localStorage === "undefined") return false;
-    try {
-      const raw = localStorage.getItem(SAVE_KEY);
-      if (!raw) return false;
-      const parsed = JSON.parse(raw);
-      if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.elements)) return false;
-      scene.replaceAllElements(parsed.elements, { skipValidation: true });
-      // Shallow-merge appState subset. Any missing field falls back to
-      // whatever is already there (e.g. width/height come from the live
-      // container measure, not the saved snapshot). activeTool is
-      // skipped explicitly: older saves persisted it, but restoring
-      // it here would bypass setActiveTool → plugin tools never get
-      // their onActivate fired (and a plugin since uninstalled would
-      // leave the editor in an unreachable tool state).
-      for (const [k, v] of Object.entries(parsed.appState ?? {})) {
-        if (k === "activeTool") continue;
-        appState[k] = v;
-      }
-      return true;
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.warn("sveltedraw: load failed", err);
-      return false;
-    }
-  };
+  const tryLoad = (): boolean => loadPersistedScene({ getScene, appState });
 
   const flushPendingSave = () => {
     if (saveTimer) {
       clearTimeout(saveTimer);
       saveTimer = null;
-      saveNow();
+      if (!disposed) saveNow();
     }
   };
 
-  return { saveNow, scheduleSave, tryLoad, flushPendingSave };
+  const dispose = () => {
+    disposed = true;
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+  };
+
+  return { saveNow, scheduleSave, tryLoad, flushPendingSave, dispose };
 }

@@ -18,6 +18,13 @@
   export function bindDialogHost(b: Bindings): void {
     bindings.value = b;
   }
+
+  /** Cleared on plugin teardown so a stale instance from a torn-down
+   *  registry can't keep the dialog open or hold references to a
+   *  vanished bridge. */
+  export function unbindDialogHost(): void {
+    bindings.value = null;
+  }
 </script>
 
 <script lang="ts">
@@ -54,7 +61,7 @@
     >
       <ElementLinkDialog
         link={liveLink}
-        originalLink={liveLink}
+        originalLink={safe.state.originalLink}
         onConfirm={safe.onConfirm}
         onClose={safe.onClose}
         enabled={safe.state.open}
@@ -64,24 +71,27 @@
 {/if}
 
 <style>
-  /* Overlay anchors the modal centred. dialog-layer slot already
-     spans the editor; we add the visual chrome (backdrop + card). */
+  /* Restored from the inline App.svelte modal — must use `position:
+     fixed` + a real z-index, otherwise the overlay is clipped by the
+     editor's transformed parent and renders behind the toolbar. */
   .sveltedraw-link-overlay {
-    position: absolute;
+    position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.4);
+    background: rgba(12, 13, 19, 0.55);
+    z-index: 2000;
     display: flex;
     align-items: center;
     justify-content: center;
-    pointer-events: auto;
   }
   .sveltedraw-link-modal {
-    background: var(--island-bg-color, #fff);
-    border: 1px solid var(--border-color-medium, #d1d4da);
+    background: #fff;
     border-radius: 8px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.16);
-    padding: 16px;
-    min-width: 320px;
-    max-width: 480px;
+    padding: 16px 18px;
+    width: min(480px, 92vw);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  }
+  :global(.sveltedraw.theme--dark) .sveltedraw-link-modal {
+    background: #1a1a1e;
+    color: #e5e7ea;
   }
 </style>

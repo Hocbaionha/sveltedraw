@@ -92,7 +92,7 @@
     createAppStore,
     createTunnelsContext,
     TUNNELS_KEY,
-    createPersistence,
+    loadPersistedScene,
   } from "./state/index.js";
   import {
     PERSISTENCE_STORE_KEY,
@@ -1175,21 +1175,20 @@
 
   // ── Persistence (localStorage) ───────────────────────────────────────
   // tryLoad runs ONCE in onMount before the first paint — has to come
-  // from a separate createPersistence instance because the
-  // builtin/persistence plugin install runs in a $effect AFTER
-  // onMount, so its store isn't published yet at bootstrap. Both
-  // instances target the same localStorage key (no conflict; the
-  // bootstrap only reads, the plugin only writes ongoing).
+  // from a stand-alone helper, because the builtin/persistence plugin
+  // install runs in a $effect AFTER onMount, so its store isn't
+  // published yet at bootstrap. We deliberately do NOT spin up a
+  // host-side createPersistence instance just for the load: that
+  // would pull a debounce timer + dispose lifecycle into App.svelte
+  // that has to be reconciled with the plugin's. The free
+  // loadPersistedScene reads localStorage and replays into scene+
+  // appState, no other state.
   //
   // Ongoing scheduleSave / saveNow / flushPendingSave delegate to the
   // builtin/persistence plugin's published store — keeps the existing
   // call sites unchanged while moving the debounce-timer ownership +
   // beforeunload flush + scene-change subscription into the plugin.
-  const bootstrapPersistence = createPersistence({
-    getScene: () => scene,
-    appState,
-  });
-  const tryLoad = bootstrapPersistence.tryLoad;
+  const tryLoad = () => loadPersistedScene({ getScene: () => scene, appState });
   // Bridge for the persistence plugin — it can't access the local
   // `scene` variable directly, and the api surface doesn't expose
   // soft-deleted elements. Registered in the same context map other
@@ -1202,8 +1201,15 @@
   // Bridge for the link-dialog plugin — it needs scene access to
   // read/write element.link + check existence (api surface is
   // element-centric and doesn't expose mutateElement / getElement).
+  //
+  // CRITICAL: getLink and isAlive both read `void sceneReady` so any
+  // $derived in the plugin's DialogHost that calls them re-runs when
+  // mutateElement bumps sceneReady. Without this, the modal shows
+  // stale link values after an external mutateElement (e.g. paste-
+  // over-link) — caught in the Wave A pass-1 review.
   const linkDialogBridge: LinkDialogBridge = {
     getLink: (id) => {
+      void sceneReady;
       if (!scene) return null;
       const el = scene.getElement(id);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1222,6 +1228,7 @@
       bumpSceneRepaint();
     },
     isAlive: (id) => {
+      void sceneReady;
       if (!scene) return false;
       const el = scene.getElement(id);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1539,14 +1546,26 @@
   // open/close/confirm logic; these route through the published
   // store. Auto-close on element delete is handled by the plugin
   // via onElementChange — App.svelte no longer carries that effect.
-  const openLinkDialog = () =>
-    pluginRegistry.getStore<LinkDialogStore>(LINK_DIALOG_STORE_KEY)?.open();
+  //
+  // The DEV warn covers the "host disabled the link-dialog plugin
+  // but a host-side caller still tries to open it" case — silent
+  // no-op would hide the wiring bug, the warn surfaces it.
+  const getLinkDialogStore = (caller: string): LinkDialogStore | null => {
+    const s = pluginRegistry.getStore<LinkDialogStore>(LINK_DIALOG_STORE_KEY);
+    if (!s && import.meta.env?.DEV) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[sveltedraw] ${caller}() called but the builtin/link-dialog plugin is not installed — call is a no-op. If this is intentional, ignore. If not, restore the plugin to the editor's plugins prop.`,
+      );
+    }
+    return s ?? null;
+  };
+  const openLinkDialog = () => getLinkDialogStore("openLinkDialog")?.open();
   const confirmLinkDialog = (nextLink: string | null) =>
-    pluginRegistry.getStore<LinkDialogStore>(LINK_DIALOG_STORE_KEY)?.confirm(nextLink);
-  const closeLinkDialog = () =>
-    pluginRegistry.getStore<LinkDialogStore>(LINK_DIALOG_STORE_KEY)?.close();
+    getLinkDialogStore("confirmLinkDialog")?.confirm(nextLink);
+  const closeLinkDialog = () => getLinkDialogStore("closeLinkDialog")?.close();
   const isLinkDialogOpen = () =>
-    pluginRegistry.getStore<LinkDialogStore>(LINK_DIALOG_STORE_KEY)?.isOpen() ?? false;
+    getLinkDialogStore("isLinkDialogOpen")?.isOpen() ?? false;
 
   // A1: chips are derived from selection + sceneReady nonce so they re-run
   // when mutateElement changes an element's .link (see the $derived body's
@@ -3083,11 +3102,19 @@
     // Action — not as a branch here.
   };
 
-  // Per-element snapshot for the plugin element-change observer. Map
-  // is held by ref; we replace entries inline on each diff so the
-  // hot path doesn't allocate a new Map per bump.
+  // Per-element snapshot for the plugin element-change observer. We
+  // store {ref, fp} per id: `ref` feeds `previous` in the dispatch
+  // payload, `fp` (version|versionNonce|isDeleted) is the change
+  // detector. Ref-equality alone misses in-place mutations like
+  // `el.isDeleted = true` (the deleteElements path) — version +
+  // versionNonce bump on every mutator, and isDeleted catches the
+  // delete-by-flag path even if a caller forgets to bump version.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const lastElementSnapshot = new Map<string, any>();
+  type ElementSnapshot = { ref: any; fp: string };
+  const lastElementSnapshot = new Map<string, ElementSnapshot>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const elementFingerprint = (el: any): string =>
+    `${el.version ?? 0}|${el.versionNonce ?? 0}|${el.isDeleted ? 1 : 0}`;
 
   // Scene-nonce bump — forces the static-render $effect to repaint even
   // when no appState field changed (e.g. after scene.replaceAllElements).
@@ -3104,10 +3131,11 @@
   //     subscribers (collab broadcast, autosave) get notified.
   //   - dispatches plugin element-change observers per affected id by
   //     diffing the live element list against `lastElementSnapshot`.
-  //     Reference-equality check is enough — Excalidraw mutators
-  //     return new objects on change. Cost is O(M+N) over scene
-  //     element count, dominated by the static-canvas paint that's
-  //     about to run anyway.
+  //     Diff key is the fingerprint (version|versionNonce|isDeleted),
+  //     not ref-equality — some mutator paths (notably deleteElements)
+  //     mutate the element in place and would slip past a ref check.
+  //     Cost is O(M+N) over scene element count, dominated by the
+  //     static-canvas paint that's about to run anyway.
   const bumpSceneRepaint = () => {
     scene?.triggerUpdate();
     sceneReady++;
@@ -3126,18 +3154,19 @@
         if (!el?.id) continue;
         seen.add(el.id);
         const prev = lastElementSnapshot.get(el.id);
-        if (prev === el) continue;
+        const fp = elementFingerprint(el);
+        if (prev && prev.fp === fp) continue;
         pluginRegistry.dispatchElementChange({
           id: el.id,
           current: el,
-          previous: prev ?? null,
+          previous: prev?.ref ?? null,
         });
-        lastElementSnapshot.set(el.id, el);
+        lastElementSnapshot.set(el.id, { ref: el, fp });
       }
       // Removed ids: in snapshot but not in live.
       for (const [id, prev] of lastElementSnapshot) {
         if (seen.has(id)) continue;
-        pluginRegistry.dispatchElementChange({ id, current: null, previous: prev });
+        pluginRegistry.dispatchElementChange({ id, current: null, previous: prev.ref });
         lastElementSnapshot.delete(id);
       }
     }

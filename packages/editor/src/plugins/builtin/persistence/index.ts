@@ -100,10 +100,19 @@ export const persistencePlugin: SveltedrawPlugin = {
 
     return () => {
       // Plugin-level cleanup runs AFTER the onEditorReady teardown
-      // (registry orders them so) — at this point pendingSave is
-      // already flushed; this is just dispose of the change listener
-      // + store release.
+      // (registry orders them so), so pendingSave is normally
+      // already flushed. Belt-and-suspenders: call flush again here
+      // in case the plugin is uninstalled before onEditorReady fires
+      // (rare but possible — installer throws → registry rescues
+      // disposers but the editor-ready callback was never queued).
+      // Then dispose() to cancel any timer + block further saves
+      // (defends against an in-flight scheduleSave from a hook that
+      // ran between our flush and the timer's cancel call — the
+      // disposed flag flips synchronously so the timer's saveNow
+      // becomes a no-op when it fires).
       removeChangeObs();
+      persistence.flushPendingSave();
+      persistence.dispose();
       releaseStore();
     };
   },
