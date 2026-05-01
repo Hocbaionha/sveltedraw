@@ -114,6 +114,12 @@
     type ZOrderDirection,
   } from "./plugins/builtin/z-order/index.js";
   import {
+    GROUP_STORE_KEY,
+    GROUP_BRIDGE_KEY,
+    type GroupStore,
+    type GroupBridge,
+  } from "./plugins/builtin/group/index.js";
+  import {
     t,
     setLanguage,
     getCurrentLangCode,
@@ -1309,6 +1315,18 @@
   };
   registerCtx(Z_ORDER_BRIDGE_KEY, zOrderBridge);
 
+  // Bridge for the group/ungroup plugin (Wave B.2). Same shape as
+  // the z-order bridge with the addition of randomId — the host
+  // owns the ID source so test/seed paths can swap a deterministic
+  // generator without forking the plugin.
+  const groupBridge: GroupBridge = {
+    getScene: () => scene,
+    pushHistory: () => pushHistory(),
+    bumpSceneRepaint: () => bumpSceneRepaint(),
+    randomId,
+  };
+  registerCtx(GROUP_BRIDGE_KEY, groupBridge);
+
   // Thin shims that route through the plugin store. The store
   // appears once the plugin install $effect runs (right after
   // onMount); calls before that point — only possible if scheduleSave
@@ -1485,54 +1503,23 @@
   };
 
   // ── Group / ungroup ────────────────────────────────────────────────
-  // Original stores group membership as `element.groupIds: string[]`
-  // where groups nest outward (groupIds[-1] is the outermost). Ctrl+G
-  // adds a fresh groupId to every selected element; Ctrl+Shift+G pops
-  // the outermost group from each selected element.
+  // Migrated to builtin/group plugin (Wave B.2). The plugin owns the
+  // mutateElement loop + the "≥2 elements to group" predicate +
+  // the "skip pushHistory when nothing changed" semantics. These
+  // shims route the existing call sites (core actions ops, UtilityBar
+  // onGroup/onUngroup) through the published store. If the plugin
+  // is uninstalled the call silently no-ops via optional chaining —
+  // same fall-through pattern as scheduleSave / openLinkDialog /
+  // reorderSelected.
   //
-  // Click-to-expand (selecting one element of a group auto-selects
-  // the whole group) is handled separately in the pointerdown flow.
-  const groupSelected = () => {
-    if (!scene) return;
-    const selected = getSelectedElements();
-    if (selected.length < 2) return; // need ≥2 elements to form a group
-    const newGroupId = randomId();
-    for (const el of selected) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const nextGroupIds = [...(el.groupIds as string[]), newGroupId];
-      scene.mutateElement(
-        el,
-        { groupIds: nextGroupIds },
-        { informMutation: false, isDragging: false },
-      );
-    }
-    pushHistory();
-    bumpSceneRepaint();
-  };
-
-  const ungroupSelected = () => {
-    if (!scene) return;
-    const selected = getSelectedElements();
-    if (selected.length === 0) return;
-    let changed = false;
-    for (const el of selected) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ids = (el.groupIds as string[]) ?? [];
-      if (ids.length === 0) continue;
-      // Pop the outermost group (index length-1).
-      const nextGroupIds = ids.slice(0, -1);
-      scene.mutateElement(
-        el,
-        { groupIds: nextGroupIds },
-        { informMutation: false, isDragging: false },
-      );
-      changed = true;
-    }
-    if (changed) {
-      pushHistory();
-      bumpSceneRepaint();
-    }
-  };
+  // What stays in App.svelte: the click-to-expand-group selection
+  // logic (expandSelectionToGroup below) — that lives in the
+  // pointerdown flow because it's part of the selection state
+  // machine, not a group-mutation op.
+  const groupSelected = () =>
+    pluginRegistry.getStore<GroupStore>(GROUP_STORE_KEY)?.group();
+  const ungroupSelected = () =>
+    pluginRegistry.getStore<GroupStore>(GROUP_STORE_KEY)?.ungroup();
 
   // Expand selection to include every element sharing the outermost
   // group of `el`. Called from pointerdown's selection branch when the
