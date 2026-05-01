@@ -262,8 +262,13 @@ const repairBinding = <T extends SveltedrawArrowElement>(
 };
 
 const restoreElementWithProperties = <
-  T extends Required<Omit<SveltedrawElement, "customData">> & {
+  // shadow is optional on SveltedrawElement (legacy elements don't carry it),
+  // so we Omit it from the Required<> wrap and re-declare as optional. Without
+  // this, every variant type (Text, FreeDraw, Image, Linear, Arrow, etc.)
+  // fails the constraint because they all inherit shadow as optional.
+  T extends Required<Omit<SveltedrawElement, "customData" | "shadow">> & {
     customData?: SveltedrawElement["customData"];
+    shadow?: SveltedrawElement["shadow"];
     /** @deprecated */
     boundElementIds?: readonly SveltedrawElement["id"][];
     /** @deprecated */
@@ -323,6 +328,13 @@ const restoreElementWithProperties = <
     updated: element.updated ?? getUpdatedTimestamp(),
     link: element.link ? normalizeLink(element.link) : null,
     locked: element.locked ?? false,
+    // C1: Drop shadow. Optional on the source type but the
+    // restoreElementWithProperties generic requires it non-optionally
+    // (via Required<Omit<SveltedrawElement, "customData">>) — carry
+    // through the existing value or default to null. Storage may
+    // contain elements without the field (legacy export), so we
+    // normalize to null on the way back in.
+    shadow: element.shadow ?? null,
   };
 
   if ("customData" in element || "customData" in extra) {

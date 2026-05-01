@@ -150,9 +150,9 @@ const renderElementToSvg = (
       if (!id) {
         id = `shadow-${cache.size + 1}`;
         cache.set(key, id);
-        let defs = svgRoot.querySelector("defs");
+        let defs = svgRoot.querySelector("defs") as SVGDefsElement | null;
         if (!defs) {
-          defs = doc.createElementNS(SVG_NS, "defs") as unknown as Element;
+          defs = doc.createElementNS(SVG_NS, "defs") as SVGDefsElement;
           svgRoot.insertBefore(defs, svgRoot.firstChild);
         }
         const filter = doc.createElementNS(SVG_NS, "filter");

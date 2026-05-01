@@ -15,6 +15,11 @@
   }
 
   let { settings, onSettingsChange, onClose }: Props = $props();
+  // localSettings is a one-shot copy of the prop at mount: the panel
+  // owns the editing buffer and only commits via Save. Subsequent
+  // prop changes from the parent are intentionally ignored
+  // (Svelte's expected behavior for prop-as-default seed).
+  // svelte-ignore state_referenced_locally
   let localSettings = $state({ ...settings });
 
   const handleSave = () => {

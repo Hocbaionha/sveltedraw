@@ -37,8 +37,25 @@
   };
 </script>
 
-<div class="export-panel-overlay" onclick={onClose}>
-  <div class="export-panel" onclick={(e) => e.stopPropagation()}>
+<!-- Backdrop click + Escape both close. role="presentation" + the
+     keydown handler satisfy the a11y rule that visible click targets
+     also need keyboard equivalents. -->
+<div
+  class="export-panel-overlay"
+  role="presentation"
+  onclick={onClose}
+  onkeydown={(e) => { if (e.key === "Escape") onClose(); }}
+>
+  <!-- Stop propagation so clicks inside the panel don't dismiss it.
+       This is presentational (the modal is the dialog itself, not the
+       backdrop), so role="presentation" + the same keyboard escape
+       hatch are appropriate. -->
+  <div
+    class="export-panel"
+    role="presentation"
+    onclick={(e) => e.stopPropagation()}
+    onkeydown={(e) => { if (e.key === "Escape") onClose(); }}
+  >
     <!-- Header -->
     <div class="ep-header">
       <h2 class="ep-title">Export Drawing</h2>
@@ -53,10 +70,12 @@
 
     <!-- Content -->
     <div class="ep-content">
-      <!-- Format selection -->
+      <!-- Format selection. Group of toggle buttons, not a single
+           form control — use a fieldset/legend pair so screen readers
+           announce the group correctly. -->
       <div class="ep-section">
-        <label class="ep-label">Format</label>
-        <div class="ep-format-grid">
+        <span class="ep-label" id="ep-format-label">Format</span>
+        <div class="ep-format-grid" role="group" aria-labelledby="ep-format-label">
           {#each (['svg', 'png', 'pdf', 'json'] as const) as format}
             <button
               class="ep-format-btn"
@@ -83,8 +102,9 @@
 
       <!-- Presets -->
       <div class="ep-section">
-        <label class="ep-label">Presets</label>
+        <label class="ep-label" for="ep-presets-select">Presets</label>
         <select
+          id="ep-presets-select"
           class="ep-select"
           onchange={(e) => {
             const preset = presets.find(p => p.id === (e.target as HTMLSelectElement).value);
@@ -102,8 +122,9 @@
       <div class="ep-section">
         <div class="ep-dimension-group">
           <div>
-            <label class="ep-label">Width</label>
+            <label class="ep-label" for="ep-width">Width</label>
             <input
+              id="ep-width"
               type="number"
               class="ep-input"
               min="100"
@@ -113,8 +134,9 @@
             />
           </div>
           <div>
-            <label class="ep-label">Height</label>
+            <label class="ep-label" for="ep-height">Height</label>
             <input
+              id="ep-height"
               type="number"
               class="ep-input"
               min="100"
@@ -124,8 +146,9 @@
             />
           </div>
           <div>
-            <label class="ep-label">Scale</label>
+            <label class="ep-label" for="ep-scale">Scale</label>
             <input
+              id="ep-scale"
               type="number"
               class="ep-input"
               min="0.1"
@@ -141,10 +164,11 @@
       <!-- Quality slider (PNG only) -->
       {#if options.format === 'png'}
         <div class="ep-section">
-          <label class="ep-label">
+          <label class="ep-label" for="ep-quality">
             Quality: {(options.quality * 100).toFixed(0)}%
           </label>
           <input
+            id="ep-quality"
             type="range"
             class="ep-slider"
             min="0.1"
@@ -158,9 +182,10 @@
 
       <!-- File name -->
       <div class="ep-section">
-        <label class="ep-label">File Name</label>
+        <label class="ep-label" for="ep-filename">File Name</label>
         <div class="ep-filename-input">
           <input
+            id="ep-filename"
             type="text"
             class="ep-input"
             value={options.fileName}

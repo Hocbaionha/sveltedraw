@@ -94,8 +94,17 @@
       </div>
     {:else}
       {#each filteredComponents as component (component.id)}
+        <!-- Draggable thumbnail tile. role="button" + tabindex make
+             this a focusable interactive element so it satisfies the
+             a11y rule for elements that handle dragstart. The actual
+             drag-and-drop interaction is mouse/touch only — keyboard
+             users can't insert via DnD here, but the existing
+             "Insert" action button below covers them. -->
         <div
           class="lp-component"
+          role="button"
+          tabindex="0"
+          aria-label={component.name}
           draggable="true"
           ondragstart={(e) => handleDragStart(component, e)}
           title={component.description || component.name}

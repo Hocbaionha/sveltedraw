@@ -6530,20 +6530,26 @@
     font-weight: 500;
     white-space: nowrap;
   }
-  .sveltedraw-style-panel .sp-swatches {
+  /* These rules target classes emitted by subcomponents
+     (StyleSliderRow, ShadowPresetsRow, PresetIconRow, FormatRow,
+     EdgesRow, ActionsRow). Svelte's CSS scoping doesn't follow
+     descendant selectors into child components, so these need
+     :global() wrappers — without them svelte-check (correctly)
+     reports the rules as unused. */
+  :global(.sveltedraw-style-panel .sp-swatches) {
     display: flex;
     gap: 4px;
   }
   /* A9: slider variant for line-height + rotation controls. */
-  .sveltedraw-style-panel .sp-slider {
+  :global(.sveltedraw-style-panel .sp-slider) {
     flex: 1;
     align-items: center;
   }
-  .sveltedraw-style-panel .sp-slider input[type="range"] {
+  :global(.sveltedraw-style-panel .sp-slider input[type="range"]) {
     flex: 1;
     min-width: 80px;
   }
-  .sveltedraw-style-panel .sp-slider-value {
+  :global(.sveltedraw-style-panel .sp-slider-value) {
     min-width: 42px;
     font-variant-numeric: tabular-nums;
     text-align: right;
@@ -6551,11 +6557,11 @@
     font-weight: 600;
     font-size: 11px;
   }
-  .sveltedraw-style-panel .sp-picker {
+  :global(.sveltedraw-style-panel .sp-picker) {
     flex: 1;
   }
-  .sveltedraw-style-panel .sp-width,
-  .sveltedraw-style-panel .sp-opacity {
+  :global(.sveltedraw-style-panel .sp-width),
+  :global(.sveltedraw-style-panel .sp-opacity) {
     min-width: 30px;
     height: 22px;
     display: inline-flex;
@@ -6568,12 +6574,12 @@
     cursor: pointer;
     color: #1e1e1e;
   }
-  .sveltedraw-style-panel .sp-width.active,
-  .sveltedraw-style-panel .sp-opacity.active {
+  :global(.sveltedraw-style-panel .sp-width.active),
+  :global(.sveltedraw-style-panel .sp-opacity.active) {
     border-color: #6965db;
     background: #eeedfa;
   }
-  .sveltedraw-style-panel .sp-icon-btn {
+  :global(.sveltedraw-style-panel .sp-icon-btn) {
     width: 28px;
     height: 28px;
     display: inline-flex;
@@ -6586,7 +6592,7 @@
     cursor: pointer;
     color: #1e1e1e;
   }
-  .sveltedraw-style-panel .sp-icon-btn.active {
+  :global(.sveltedraw-style-panel .sp-icon-btn.active) {
     border-color: #6965db;
     background: #eeedfa;
   }
