@@ -159,7 +159,46 @@ export class PluginRegistry {
         return release;
       },
     };
-    const cleanup = plugin.install(wrappedCtx);
+    let cleanup: void | (() => void);
+    try {
+      cleanup = plugin.install(wrappedCtx);
+    } catch (err) {
+      // Install threw partway through: items registered before the
+      // throw are already in toolbar/sidePanel/store/etc. arrays AND
+      // their disposers are tracked under pluginId in pluginDisposers.
+      // Without this rescue, the host's $effect won't call uninstall
+      // (because cleanups never gets set, so isInstalled returns false)
+      // and the partial registrations leak forever. Sweep them now.
+      // eslint-disable-next-line no-console
+      console.error(`[plugin:${plugin.id}] install threw — sweeping partial registrations`, err);
+      const partialDisposers = this.pluginDisposers.get(plugin.id);
+      if (partialDisposers) {
+        for (const d of [...partialDisposers]) {
+          try { d(); } catch { /* swallow */ }
+        }
+        this.pluginDisposers.delete(plugin.id);
+      }
+      // Same identity-checked store sweep as the cleanup path.
+      let touched = false;
+      for (const { key, value } of claimed) {
+        if (this.stores.get(key) === value) {
+          this.stores.delete(key);
+          touched = true;
+        }
+      }
+      if (touched) this.storesVersion++;
+      // Strip partial UI items by id-prefix as defense-in-depth
+      // (track() should have removed them, but in case the plugin
+      // mutated registry arrays directly).
+      const prefix = `${plugin.id}/`;
+      this.toolbarItems = this.toolbarItems.filter((i) => !i.id.startsWith(prefix));
+      this.sidePanels = this.sidePanels.filter((p) => !p.id.startsWith(prefix));
+      this.canvasOverlays = this.canvasOverlays.filter((o) => !o.id.startsWith(prefix));
+      this.menuItems = this.menuItems.filter((m) => !m.id.startsWith(prefix));
+      this.chromeItems = this.chromeItems.filter((c) => !c.id.startsWith(prefix));
+      this.contextMenuItems = this.contextMenuItems.filter((c) => !c.id.startsWith(prefix));
+      throw err;
+    }
     this.cleanups.set(plugin.id, () => {
       cleanup?.();
       // Defensive store cleanup: release only entries whose value
@@ -244,18 +283,22 @@ export class PluginRegistry {
    * Dispatch a pointer event to every registered observer of `type`.
    * Called by the host (App.svelte) from its pointer handlers; not
    * for plugin use. Observers run AFTER the editor's own logic so they
-   * can never be the reason for a missed/swallowed event.
+   * can never be the reason for a missed/swallowed event. The host
+   * passes the pre-computed hit element so tooltip / hover plugins
+   * don't redo the hit-test.
    */
   dispatchPointerEvent(
     type: PointerEventType,
     event: PointerEvent | MouseEvent,
     sceneCoords: { x: number; y: number },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    hitElement: any = null,
   ): void {
     const observers = this.pointerObservers.get(type);
     if (!observers || observers.size === 0) return;
     for (const obs of observers) {
       try {
-        obs(event, sceneCoords);
+        obs(event, sceneCoords, hitElement);
       } catch (err) {
         // eslint-disable-next-line no-console
         console.error(`[plugin] pointer observer (${type}) threw`, err);
@@ -339,6 +382,16 @@ export class PluginRegistry {
         console.error("[plugin] element-change observer threw", err);
       }
     }
+  }
+
+  /**
+   * Whether any plugin has registered an element-change observer.
+   * The host's bumpSceneRepaint reads this to short-circuit the
+   * per-element diff loop when no plugin cares — saves an O(N) Map
+   * pass per scene tick on large drawings.
+   */
+  get hasElementObservers(): boolean {
+    return this.elementObservers.size > 0;
   }
 
   /**
@@ -454,25 +507,33 @@ export class PluginRegistry {
 
   /**
    * Notify the registry that the active tool changed. Fires the
-   * outgoing tool's onDeactivate + the incoming tool's onActivate.
+   * incoming tool's onActivate FIRST, then the outgoing tool's
+   * onDeactivate. Order matters: if onActivate throws, we want to
+   * leave the previous tool whole rather than half-deactivated +
+   * half-activated. The previous tool's onDeactivate fires only
+   * after a successful onActivate (or when there's no incoming tool
+   * — leaving / clearing the active tool).
+   *
    * Called by App.svelte's setActiveTool.
    */
   notifyToolChange(prev: string | null, next: string | null): void {
     if (prev === next) return;
-    if (prev) {
+    let activated = true;
+    if (next) {
+      try {
+        this.toolPlugins.get(next)?.onActivate?.();
+      } catch (err) {
+        activated = false;
+        // eslint-disable-next-line no-console
+        console.error(`[plugin:tool:${next}] onActivate threw — keeping previous tool's state intact`, err);
+      }
+    }
+    if (prev && activated) {
       try {
         this.toolPlugins.get(prev)?.onDeactivate?.();
       } catch (err) {
         // eslint-disable-next-line no-console
         console.error(`[plugin:tool:${prev}] onDeactivate threw`, err);
-      }
-    }
-    if (next) {
-      try {
-        this.toolPlugins.get(next)?.onActivate?.();
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error(`[plugin:tool:${next}] onActivate threw`, err);
       }
     }
     // Drop any stale gesture claim — tool change kills the gesture.

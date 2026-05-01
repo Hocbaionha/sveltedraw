@@ -242,4 +242,153 @@ describe("addMutationFilter (Tier-1, smoke for compose semantics)", () => {
   it("returns true when no filters installed", () => {
     expect(registry.canMutate({ elementId: "x", intent: "create" })).toBe(true);
   });
+
+  it("a throwing filter is treated as 'didn't block' (failing-open)", () => {
+    const ctx = registry.buildContext("p", stubApi, stubTunnels, noBridgeStore);
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    ctx.addMutationFilter(() => { throw new Error("boom"); });
+    ctx.addMutationFilter(() => true);
+    // The throwing filter is logged + skipped; the chain continues.
+    // Without this fail-open, a buggy plugin would lock every
+    // mutation in the editor.
+    expect(registry.canMutate({ elementId: "x", intent: "move" })).toBe(true);
+    expect(errSpy).toHaveBeenCalled();
+    errSpy.mockRestore();
+  });
+});
+
+describe("install / uninstall lifecycle", () => {
+  it("install-throw doesn't leak partial registrations", () => {
+    // Plugin registers a toolbar item + a store, then throws. The
+    // pre-throw registrations are tracked under pluginId in
+    // pluginDisposers — the install rescue path must sweep them.
+    // Without the rescue, isInstalled returns false (cleanups Map
+    // was never written) so the host's $effect won't call uninstall,
+    // and the leaked registrations live forever.
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const myKey: unique symbol = Symbol("my-store");
+    const before = registry.toolbarItems.length;
+    expect(() => {
+      registry.install(
+        {
+          id: "broken-plugin",
+          install(ctx) {
+            ctx.addToolbarItem({
+              id: "btn",
+              icon: () => null,
+              title: "test",
+              group: "utility",
+              onActivate: () => {},
+            });
+            ctx.provideStore(myKey, { foo: "bar" });
+            throw new Error("install boom");
+          },
+        },
+        registry.buildContext("broken-plugin", stubApi, stubTunnels, noBridgeStore),
+      );
+    }).toThrow(/install boom/);
+    // Toolbar entry rolled back
+    expect(registry.toolbarItems.length).toBe(before);
+    // Store rolled back
+    expect(registry.getStore(myKey)).toBeUndefined();
+    // isInstalled stays false — partial install isn't a real install
+    expect(registry.isInstalled("broken-plugin")).toBe(false);
+    errSpy.mockRestore();
+  });
+
+  it("track() wrapper prevents double-dispose via uninstall sweep", () => {
+    // A plugin that explicitly calls dispose for one of its items in
+    // its own cleanup. The uninstall sweep then iterates pluginDisposers
+    // and would call the same dispose again — but the wrapper's
+    // disposed flag short-circuits.
+    const removed: string[] = [];
+    let returnedDispose: (() => void) | undefined;
+    registry.install(
+      {
+        id: "double-dispose",
+        install(ctx) {
+          returnedDispose = ctx.addToolbarItem({
+            id: "btn",
+            icon: () => null,
+            title: "test",
+            group: "utility",
+            onActivate: () => {},
+          });
+          return () => {
+            // Plugin's own cleanup calls the dispose explicitly
+            removed.push("explicit");
+            returnedDispose?.();
+          };
+        },
+      },
+      registry.buildContext("double-dispose", stubApi, stubTunnels, noBridgeStore),
+    );
+    expect(registry.toolbarItems.length).toBe(1);
+    registry.uninstall("double-dispose");
+    expect(registry.toolbarItems.length).toBe(0);
+    expect(removed).toEqual(["explicit"]);
+    // Calling dispose again post-uninstall is a no-op (idempotent).
+    returnedDispose?.();
+    expect(registry.toolbarItems.length).toBe(0);
+  });
+
+  it("markEditorReady is idempotent — queued callbacks fire once", () => {
+    const ctx = registry.buildContext("p", stubApi, stubTunnels, noBridgeStore);
+    const cb = vi.fn();
+    ctx.onEditorReady(cb);
+    expect(cb).not.toHaveBeenCalled();
+    registry.markEditorReady();
+    expect(cb).toHaveBeenCalledOnce();
+    registry.markEditorReady(); // second call no-ops
+    expect(cb).toHaveBeenCalledOnce();
+  });
+
+  it("late-registered onEditorReady fires synchronously after markEditorReady", () => {
+    const ctx = registry.buildContext("p", stubApi, stubTunnels, noBridgeStore);
+    registry.markEditorReady();
+    const cb = vi.fn();
+    ctx.onEditorReady(cb);
+    expect(cb).toHaveBeenCalledOnce(); // fires immediately
+  });
+});
+
+describe("notifyToolChange ordering", () => {
+  it("incoming onActivate runs BEFORE outgoing onDeactivate", () => {
+    const ctx = registry.buildContext("p", stubApi, stubTunnels, noBridgeStore);
+    const order: string[] = [];
+    ctx.registerTool({
+      name: "old",
+      onDeactivate: () => order.push("old.deactivate"),
+    });
+    ctx.registerTool({
+      name: "new",
+      onActivate: () => order.push("new.activate"),
+    });
+    registry.notifyToolChange("old", "new");
+    // new tool gets activated first; old tool only deactivates after
+    // the activation succeeds — so a thrown onActivate doesn't leave
+    // the previous tool half-deactivated.
+    expect(order).toEqual(["new.activate", "old.deactivate"]);
+  });
+
+  it("if onActivate throws, prev's onDeactivate is SKIPPED (rollback)", () => {
+    const ctx = registry.buildContext("p", stubApi, stubTunnels, noBridgeStore);
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const order: string[] = [];
+    ctx.registerTool({
+      name: "old",
+      onDeactivate: () => order.push("old.deactivate"),
+    });
+    ctx.registerTool({
+      name: "new",
+      onActivate: () => { throw new Error("activate boom"); },
+    });
+    registry.notifyToolChange("old", "new");
+    // onActivate threw; old.onDeactivate must NOT have fired —
+    // otherwise the editor is left with no tool active and the user
+    // sees a dead UI.
+    expect(order).toEqual([]);
+    expect(errSpy).toHaveBeenCalled();
+    errSpy.mockRestore();
+  });
 });

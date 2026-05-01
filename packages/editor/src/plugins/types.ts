@@ -73,9 +73,22 @@ export type PointerEventType =
   | "click"
   | "dblclick";
 
-export type PointerObserver = (
+/**
+ * Pointer observer payload. The host pre-computes scene coords AND
+ * the element under the cursor (hit-test result, may be null) so
+ * tooltip / hover / annotation plugins skip redoing that work. The
+ * raw event is provided for plugins that need modifier-key state or
+ * pointerType.
+ *
+ * Observers cannot block the event — they're read-only. To veto a
+ * mutation triggered downstream of pointer input, register a
+ * mutation filter (`addMutationFilter`).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type PointerObserver<TElement = any> = (
   event: PointerEvent | MouseEvent,
   sceneCoords: { x: number; y: number },
+  hitElement: TElement | null,
 ) => void;
 
 /**

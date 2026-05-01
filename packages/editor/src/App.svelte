@@ -3063,9 +3063,13 @@
     scene?.triggerUpdate();
     sceneReady++;
     imperativeAPI.notifyChange();
-    // Diff vs snapshot, dispatch per change. No-op when nothing
-    // changed (every ref-equal entry skipped).
-    if (scene) {
+    // Per-element diff for plugin element-change observers. Gated on
+    // hasElementObservers so the O(N) diff is skipped when no plugin
+    // cares — common case at editor startup before any observer-
+    // registering plugin (text-editor, AI co-pilot, snap-guides)
+    // has installed. With observers present, ref-equality skips
+    // unchanged entries cheaply.
+    if (scene && pluginRegistry.hasElementObservers) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const live = scene.getElementsIncludingDeleted() as any[];
       const seen = new Set<string>();
@@ -4381,22 +4385,24 @@
     // Plugin pointer-observer dispatch. Read-only — observers can't
     // intercept this event. The collab plugin's cursor broadcast hooks
     // in here via ctx.onPointerEvent("move", ...) — no inline call
-    // needed in the host hot path anymore.
+    // needed in the host hot path anymore. We share the hit-test
+    // result with the tool dispatch below so both consumers see the
+    // same element under the cursor without duplicating O(N) work.
     const sceneCoords = toSceneCoords(event.clientX, event.clientY);
-    pluginRegistry.dispatchPointerEvent("move", event, sceneCoords);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const movePointerHit = hitTestAt(sceneCoords.x, sceneCoords.y) as any;
+    pluginRegistry.dispatchPointerEvent("move", event, sceneCoords, movePointerHit);
 
     // ── Tool plugin dispatch (move) ──────────────────────────────────
     // If a tool plugin claimed the gesture in pointerdown, route the
     // continuation to it. The host's built-in flow is bypassed for
     // the duration of the claim.
     {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const hit = hitTestAt(sceneCoords.x, sceneCoords.y) as any;
       const handled = pluginRegistry.dispatchToolPointerMove((passthrough) => ({
         event,
         sceneX: sceneCoords.x,
         sceneY: sceneCoords.y,
-        hitElement: hit,
+        hitElement: movePointerHit,
         passthrough,
         pushHistory: () => pushHistory(),
         bumpSceneRepaint: () => bumpSceneRepaint(),
@@ -4735,21 +4741,21 @@
 
   const onInteractivePointerUp = (event: PointerEvent) => {
     const sceneCoords = toSceneCoords(event.clientX, event.clientY);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const upPointerHit = hitTestAt(sceneCoords.x, sceneCoords.y) as any;
     // Plugin pointer-observer dispatch (up).
-    pluginRegistry.dispatchPointerEvent("up", event, sceneCoords);
+    pluginRegistry.dispatchPointerEvent("up", event, sceneCoords, upPointerHit);
 
     // ── Tool plugin dispatch (up) ────────────────────────────────────
     // Releases the gesture claim regardless — pointerup ends a gesture
     // by definition. If this tool plugin claimed earlier, host's
     // built-in flow stays skipped for this final event too.
     {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const hit = hitTestAt(sceneCoords.x, sceneCoords.y) as any;
       const handled = pluginRegistry.dispatchToolPointerUp((passthrough) => ({
         event,
         sceneX: sceneCoords.x,
         sceneY: sceneCoords.y,
-        hitElement: hit,
+        hitElement: upPointerHit,
         passthrough,
         pushHistory: () => pushHistory(),
         bumpSceneRepaint: () => bumpSceneRepaint(),
@@ -4960,15 +4966,15 @@
    */
   const onInteractivePointerCancel = (event: PointerEvent) => {
     const sceneCoords = toSceneCoords(event.clientX, event.clientY);
-    pluginRegistry.dispatchPointerEvent("cancel", event, sceneCoords);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cancelPointerHit = hitTestAt(sceneCoords.x, sceneCoords.y) as any;
+    pluginRegistry.dispatchPointerEvent("cancel", event, sceneCoords, cancelPointerHit);
     {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const hit = hitTestAt(sceneCoords.x, sceneCoords.y) as any;
       pluginRegistry.dispatchToolPointerCancel((passthrough) => ({
         event,
         sceneX: sceneCoords.x,
         sceneY: sceneCoords.y,
-        hitElement: hit,
+        hitElement: cancelPointerHit,
         passthrough,
         pushHistory: () => pushHistory(),
         bumpSceneRepaint: () => bumpSceneRepaint(),
