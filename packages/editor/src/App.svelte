@@ -95,6 +95,12 @@
     createPersistence,
   } from "./state/index.js";
   import {
+    PERSISTENCE_STORE_KEY,
+    PERSISTENCE_SCENE_BRIDGE_KEY,
+    type PersistenceStore,
+    type PersistenceSceneBridge,
+  } from "./plugins/builtin/persistence/index.js";
+  import {
     t,
     setLanguage,
     getCurrentLangCode,
@@ -1161,12 +1167,45 @@
   };
 
   // ── Persistence (localStorage) ───────────────────────────────────────
-  // Implementation lives in ./state/persistence.ts. Scene is reassigned in
-  // onMount, so we hand the factory a getter rather than the value.
-  const { saveNow, scheduleSave, tryLoad, flushPendingSave } = createPersistence({
+  // tryLoad runs ONCE in onMount before the first paint — has to come
+  // from a separate createPersistence instance because the
+  // builtin/persistence plugin install runs in a $effect AFTER
+  // onMount, so its store isn't published yet at bootstrap. Both
+  // instances target the same localStorage key (no conflict; the
+  // bootstrap only reads, the plugin only writes ongoing).
+  //
+  // Ongoing scheduleSave / saveNow / flushPendingSave delegate to the
+  // builtin/persistence plugin's published store — keeps the existing
+  // call sites unchanged while moving the debounce-timer ownership +
+  // beforeunload flush + scene-change subscription into the plugin.
+  const bootstrapPersistence = createPersistence({
     getScene: () => scene,
     appState,
   });
+  const tryLoad = bootstrapPersistence.tryLoad;
+  // Bridge for the persistence plugin — it can't access the local
+  // `scene` variable directly, and the api surface doesn't expose
+  // soft-deleted elements. Registered in the same context map other
+  // bridges use.
+  const persistenceSceneBridge: PersistenceSceneBridge = {
+    getScene: () => scene,
+  };
+  registerCtx(PERSISTENCE_SCENE_BRIDGE_KEY, persistenceSceneBridge);
+  // Thin shims that route through the plugin store. The store
+  // appears once the plugin install $effect runs (right after
+  // onMount); calls before that point — only possible if scheduleSave
+  // gets invoked synchronously during init — silently no-op via the
+  // optional chaining. Bootstrap tryLoad doesn't trigger any
+  // scheduleSave so this is safe.
+  const scheduleSave = () =>
+    pluginRegistry.getStore<PersistenceStore>(PERSISTENCE_STORE_KEY)?.requestSave();
+  const saveNow = () =>
+    // saveNow is rarely called and exists only for explicit "save
+    // right now" UX (Ctrl+S). Route through flush — equivalent
+    // semantics: cancel debounce + write immediately.
+    pluginRegistry.getStore<PersistenceStore>(PERSISTENCE_STORE_KEY)?.flush();
+  const flushPendingSave = () =>
+    pluginRegistry.getStore<PersistenceStore>(PERSISTENCE_STORE_KEY)?.flush();
 
   // ── History (undo/redo) ──────────────────────────────────────────────
   // Implementation lives in ./history/store.ts. App.svelte owns the reactive

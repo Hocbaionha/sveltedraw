@@ -275,7 +275,8 @@ describe("install / uninstall lifecycle", () => {
           install(ctx) {
             ctx.addToolbarItem({
               id: "btn",
-              icon: () => null,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              icon: (() => null) as any,
               title: "test",
               group: "utility",
               onActivate: () => {},
@@ -309,7 +310,8 @@ describe("install / uninstall lifecycle", () => {
         install(ctx) {
           returnedDispose = ctx.addToolbarItem({
             id: "btn",
-            icon: () => null,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            icon: (() => null) as any,
             title: "test",
             group: "utility",
             onActivate: () => {},
