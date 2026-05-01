@@ -856,6 +856,15 @@
 
     // Attempt to hydrate from localStorage BEFORE seeding history so the
     // initial history floor captures the restored state, not "empty".
+    //
+    // ORDER-CRITICAL: this runs in onMount, before the plugin-install
+    // $effect fires. That means the builtin/persistence plugin's
+    // onSceneChange listener is NOT yet attached, so the
+    // replaceAllElements inside loadPersistedScene does NOT cascade
+    // into a save loop. If you ever move plugin install earlier
+    // (e.g. into onMount), gate this load behind the persistence
+    // plugin's hasInstalled flag or you'll get a load→save→load
+    // shuttle on every reload.
     tryLoad();
     loadLibrary();
     sceneReady++; // triggers the first static paint
@@ -1207,6 +1216,21 @@
   // mutateElement bumps sceneReady. Without this, the modal shows
   // stale link values after an external mutateElement (e.g. paste-
   // over-link) — caught in the Wave A pass-1 review.
+  //
+  // Why this works (Svelte 5 rune semantics): `sceneReady` is a
+  // `let sceneReady = $state(0)` binding in this <script>. Reading
+  // the bare identifier hits the rune's get-trap, which subscribes
+  // whatever reactive scope is currently active when the read fires.
+  // The bridge functions are CLOSURES — they captured the binding
+  // at construction time, but the actual `$state` get happens when
+  // the function executes. DialogHost calls bridge.getLink(...)
+  // from inside `$derived.by(() => ...)`, so DialogHost's deriver
+  // is the active scope at read time → gets subscribed.
+  //
+  // FRAGILE: refactoring the bridge to a top-level helper that
+  // accepts `sceneReady` BY VALUE (not by closure) breaks the
+  // subscription silently. If you ever extract this, pass an
+  // explicit getter `() => sceneReady` instead.
   const linkDialogBridge: LinkDialogBridge = {
     getLink: (id) => {
       void sceneReady;
@@ -1221,8 +1245,23 @@
       if (!scene) return;
       const el = scene.getElement(id);
       if (!el) return;
+      // Normalize empty string to null. ElementLinkDialog emits ""
+      // for "user backspaced everything"; the engine renders the
+      // link chip on `el.link` truthiness, so "" hides the chip but
+      // persists a useless empty string in localStorage. Storing
+      // null keeps the saved scene clean and matches the "no link"
+      // initial state.
+      const normalized: string | null =
+        nextLink === "" || nextLink == null ? null : nextLink;
+      // Short-circuit a no-op confirm — otherwise the dialog's
+      // "Confirm" button always pushes a history entry, even when
+      // the user just hit Enter on an unchanged link. That makes
+      // undo confusing (one click = one no-op step on the stack).
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      scene.mutateElement(el, { link: nextLink } as any,
+      const current: string | null = ((el as any).link as string | null) ?? null;
+      if (current === normalized) return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      scene.mutateElement(el, { link: normalized } as any,
         { informMutation: false, isDragging: false });
       pushHistory();
       bumpSceneRepaint();
@@ -3104,17 +3143,32 @@
 
   // Per-element snapshot for the plugin element-change observer. We
   // store {ref, fp} per id: `ref` feeds `previous` in the dispatch
-  // payload, `fp` (version|versionNonce|isDeleted) is the change
-  // detector. Ref-equality alone misses in-place mutations like
-  // `el.isDeleted = true` (the deleteElements path) — version +
-  // versionNonce bump on every mutator, and isDeleted catches the
-  // delete-by-flag path even if a caller forgets to bump version.
+  // payload, `fp` is the change detector.
+  //
+  // Why a fingerprint and not ref-equality:
+  //   - `deleteElements` does `el.isDeleted = true` in place (same
+  //     ref). isDeleted in the fp catches it.
+  //   - `alignment/handlers.ts` writeBack does `el.x = u.x; el.y =
+  //     u.y` in place WITHOUT bumping version/versionNonce. x|y|w|h|
+  //     angle in the fp catch those moves.
+  //   - mutateElement bumps version + versionNonce; either alone
+  //     would suffice for that path.
+  //   - link is included so `bridge.setLink` (which uses
+  //     informMutation:false) still fires onElementChange — important
+  //     for any plugin observing link transitions, separate from the
+  //     dialog itself which is push-driven.
+  //
+  // Two un-versioned, structurally-identical elements collide on fp
+  // ("0|0|0|..."), but the diff loop is keyed by id, so collisions
+  // only matter within a single id across ticks — and an element
+  // that goes from undefined version to undefined version with same
+  // geometry/link IS genuinely unchanged. Benign.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   type ElementSnapshot = { ref: any; fp: string };
   const lastElementSnapshot = new Map<string, ElementSnapshot>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const elementFingerprint = (el: any): string =>
-    `${el.version ?? 0}|${el.versionNonce ?? 0}|${el.isDeleted ? 1 : 0}`;
+    `${el.version ?? 0}|${el.versionNonce ?? 0}|${el.isDeleted ? 1 : 0}|${el.x ?? 0}|${el.y ?? 0}|${el.width ?? 0}|${el.height ?? 0}|${el.angle ?? 0}|${el.link ?? ""}`;
 
   // Scene-nonce bump — forces the static-render $effect to repaint even
   // when no appState field changed (e.g. after scene.replaceAllElements).

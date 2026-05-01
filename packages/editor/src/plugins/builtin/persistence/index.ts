@@ -99,17 +99,24 @@ export const persistencePlugin: SveltedrawPlugin = {
     });
 
     return () => {
+      // Order matters here. removeChangeObs MUST run first: a peer
+      // plugin's teardown can mutate the scene (e.g. collab plugin
+      // dropping cursor overlays via replaceAllElements during its
+      // own dispose). If our onSceneChange listener is still
+      // attached when that happens, it schedules a save that races
+      // with our subsequent flush+dispose. Detach the listener
+      // synchronously, THEN flush any pending save accumulated
+      // before this point, THEN dispose to slam the door on any
+      // in-flight timer (saveNow checks `disposed` and bails).
+      //
       // Plugin-level cleanup runs AFTER the onEditorReady teardown
       // (registry orders them so), so pendingSave is normally
-      // already flushed. Belt-and-suspenders: call flush again here
-      // in case the plugin is uninstalled before onEditorReady fires
-      // (rare but possible — installer throws → registry rescues
-      // disposers but the editor-ready callback was never queued).
-      // Then dispose() to cancel any timer + block further saves
-      // (defends against an in-flight scheduleSave from a hook that
-      // ran between our flush and the timer's cancel call — the
-      // disposed flag flips synchronously so the timer's saveNow
-      // becomes a no-op when it fires).
+      // already flushed by the onEditorReady-return callback above.
+      // The flush here is the install-throw-rescue path: if the
+      // installer threw before onEditorReady queued its callback,
+      // there's no onEditorReady-return to run, but we still need
+      // to flush whatever the change-observer accumulated up to the
+      // throw.
       removeChangeObs();
       persistence.flushPendingSave();
       persistence.dispose();

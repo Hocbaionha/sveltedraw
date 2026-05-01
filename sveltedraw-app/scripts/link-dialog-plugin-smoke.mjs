@@ -216,6 +216,60 @@ const tests = await ev(`
   });
   p.closeLinkDialog();
 
+  // ── 9. confirmLinkDialog with same value is a no-op (no history push)
+  // Regression coverage for Wave A pass-2 #12: setLink early-returns
+  // when current === normalized so confirming an unchanged link
+  // doesn't push a useless undo step.
+  const ELEM5 = "link-test-noop-" + Date.now().toString(36);
+  p.scene.replaceAllElements([{
+    id: ELEM5, type: 'rectangle', x: 0, y: 0, width: 50, height: 50, angle: 0,
+    strokeColor: '#000', backgroundColor: 'transparent', fillStyle: 'solid',
+    strokeWidth: 1, strokeStyle: 'solid', roundness: null, roughness: 0,
+    opacity: 100, groupIds: [], frameId: null, index: 'a4',
+    boundElements: null, updated: Date.now(), link: 'https://same.example', locked: false,
+    seed: 5, version: 1, versionNonce: 1, isDeleted: false,
+  }]);
+  p.appState.selectedElementIds = { [ELEM5]: true };
+  p.bumpSceneRepaint();
+  await new Promise(r => setTimeout(r, 80));
+  const histLenBefore = window.__sveltedrawHistoryLen();
+  p.openLinkDialog();
+  await new Promise(r => setTimeout(r, 80));
+  p.confirmLinkDialog('https://same.example');
+  await new Promise(r => setTimeout(r, 80));
+  const histLenAfter = window.__sveltedrawHistoryLen();
+  tests.push({
+    name: 'confirming unchanged link does not push history',
+    ok: histLenAfter === histLenBefore,
+    detail: 'before=' + histLenBefore + ' after=' + histLenAfter,
+  });
+
+  // ── 10. confirmLinkDialog with "" normalizes to null
+  // Regression coverage for Wave A pass-2 #13: setLink normalizes ""
+  // to null so cleared links don't persist a useless empty string.
+  const ELEM6 = "link-test-empty-" + Date.now().toString(36);
+  p.scene.replaceAllElements([{
+    id: ELEM6, type: 'rectangle', x: 0, y: 0, width: 50, height: 50, angle: 0,
+    strokeColor: '#000', backgroundColor: 'transparent', fillStyle: 'solid',
+    strokeWidth: 1, strokeStyle: 'solid', roundness: null, roughness: 0,
+    opacity: 100, groupIds: [], frameId: null, index: 'a5',
+    boundElements: null, updated: Date.now(), link: 'https://about-to-clear.example', locked: false,
+    seed: 6, version: 1, versionNonce: 1, isDeleted: false,
+  }]);
+  p.appState.selectedElementIds = { [ELEM6]: true };
+  p.bumpSceneRepaint();
+  await new Promise(r => setTimeout(r, 80));
+  p.openLinkDialog();
+  await new Promise(r => setTimeout(r, 80));
+  p.confirmLinkDialog('');
+  await new Promise(r => setTimeout(r, 80));
+  const liveEl6 = p.scene.getElement(ELEM6);
+  tests.push({
+    name: 'confirmLinkDialog("") normalizes to null',
+    ok: liveEl6 && liveEl6.link === null,
+    detail: 'final link=' + JSON.stringify(liveEl6?.link),
+  });
+
   return tests;
 `);
 
