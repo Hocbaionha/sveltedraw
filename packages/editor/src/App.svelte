@@ -163,6 +163,12 @@
   import { createImperativeAPI } from "./api/ImperativeAPI.svelte.js";
   import { SVELTEDRAW_API_KEY, type SveltedrawAPI } from "./api/types.js";
   import { PluginRegistry, PLUGIN_REGISTRY_KEY } from "./plugins/registry.svelte.js";
+  import {
+    ActionManager,
+    ACTION_MANAGER_KEY,
+    registerCoreActions,
+    type ActionContext,
+  } from "./actions/index.js";
   import { recentFilesPlugin, RECENT_FILES_STORE_KEY } from "./plugins/builtin/recent-files/index.js";
   import { SETTINGS_STORE_KEY } from "./plugins/builtin/settings/index.js";
   import { HELP_STORE_KEY } from "./plugins/builtin/help/index.js";
@@ -434,6 +440,21 @@
 
   const pluginRegistry = new PluginRegistry();
   registerCtx(PLUGIN_REGISTRY_KEY, pluginRegistry);
+
+  // ActionManager — single dispatcher for keyboard / command-palette /
+  // toolbar / context-menu commands. The contextProvider closure is
+  // re-evaluated on every dispatch so reads of `appState` track
+  // correctly inside predicates. Action records are registered later
+  // (see registerCoreActions call further down) — at this point the
+  // ops they need (deleteSelected, undo, …) aren't defined yet.
+  const actionManager = new ActionManager((): ActionContext => ({
+    api: imperativeAPI,
+    appState,
+    pluginRegistry,
+    bumpSceneRepaint: () => bumpSceneRepaint(),
+    pushHistory: () => pushHistory(),
+  }));
+  registerCtx(ACTION_MANAGER_KEY, actionManager);
 
   // Stable-sorted view of canvas overlays. Re-derives only when the
   // registry array mutates; the sort is by ascending zIndex so plugins
@@ -910,6 +931,15 @@
           userCount: collabStore.users.size,
           myUserId: collabStore.myUserId,
           roomId: collabStore.roomId,
+        }),
+        // Expose the ActionManager so honest-tests can introspect the
+        // registered action set, dispatch by id, and verify hotkey
+        // routing end-to-end.
+        getActionManager: () => ({
+          list: () => actionManager.list(),
+          execute: (id, payload) => actionManager.execute(id, payload),
+          executeKey: (e) => actionManager.executeKey(e),
+          get: (id) => actionManager.get(id),
         }),
         forcePresentationSlides: (n) => {
           presentationSlides = Array.from({ length: n }, (_, i) => ({
@@ -3270,6 +3300,20 @@
       return;
     }
 
+    // ── ActionManager dispatch ─────────────────────────────────────────
+    // Try the registered actions first. If one claims the combo and
+    // returns `consumed: true`, we preventDefault + return; the legacy
+    // switch below never runs. Predicate-gated actions that aren't
+    // currently invocable return undefined here and fall through.
+    // Combos with no registered binding also fall through. This means
+    // adding a new hotkey is now a one-line change in actions/core.ts
+    // (or a plugin's install()) — no edit to this switch.
+    const actionResult = actionManager.executeKey(event);
+    if (actionResult?.consumed) {
+      event.preventDefault();
+      return;
+    }
+
     const mod = event.ctrlKey || event.metaKey;
 
     // ── Ctrl/Cmd + (Shift) shortcuts ──────────────────────────────────
@@ -5517,6 +5561,36 @@
   // doesn't eat pointer events mid-gesture. Batch 3 keeps it always enabled
   // since there's no pointer wiring yet.
   const uiPointerEvents = $derived(POINTER_EVENTS.enabled);
+
+  // ── ActionManager registration ──────────────────────────────────────
+  // Registered last so every op the actions need is in scope. Predicates
+  // (hasSelection / hasMultipleSelection) re-read appState on each call,
+  // so they stay reactive across selection changes. The dispose returned
+  // by registerCoreActions is intentionally not wired to a cleanup —
+  // App.svelte is a singleton, lives until full unmount, and the whole
+  // ActionManager is GC'd with the component.
+  registerCoreActions(actionManager, {
+    hasSelection: () => getSelectedElements().length > 0,
+    hasMultipleSelection: () => getSelectedElements().length > 1,
+    deleteSelected,
+    duplicateSelected,
+    selectAll,
+    clearSelection,
+    undo: historyStore.undo,
+    redo: historyStore.redo,
+    zoomIn: () => zoomCentered(((appState.zoom as { value: number }).value || 1) + ZOOM_STEP),
+    zoomOut: () => zoomCentered(((appState.zoom as { value: number }).value || 1) - ZOOM_STEP),
+    resetZoom,
+    toggleGrid,
+    toggleTheme,
+    bringForward: () => reorderSelected("forward"),
+    sendBackward: () => reorderSelected("backward"),
+    bringToFront: () => reorderSelected("front"),
+    sendToBack: () => reorderSelected("back"),
+    groupSelected,
+    ungroupSelected,
+    setActiveTool,
+  });
 </script>
 
 <!-- Container is focusable by design — global keyboard listeners live here.

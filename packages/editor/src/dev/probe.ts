@@ -112,6 +112,21 @@ export type ProbeBindings = {
     myUserId: string | null;
     roomId: string | null;
   };
+
+  // ActionManager handle. Smoke scripts use this to introspect the
+  // registered action set + dispatch by id without going through the
+  // keyboard handler. Returned object exposes only the safe surface
+  // (execute / list / executeKey / get) — not the internal hotkey index.
+  getActionManager: () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    list: () => any[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    execute: (id: string, payload?: any) => any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    executeKey: (event: KeyboardEvent) => any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    get: (id: string) => any;
+  };
 };
 
 export function installSveltedrawProbe(b: ProbeBindings): void {
@@ -201,6 +216,7 @@ export function installSveltedrawProbe(b: ProbeBindings): void {
     applyStyle: b.applyStyle,
     setActiveTool: b.setActiveTool,
     getCollabState: b.getCollabState,
+    getActionManager: b.getActionManager,
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).__sveltedrawHistoryLen = b.getHistoryLen;
