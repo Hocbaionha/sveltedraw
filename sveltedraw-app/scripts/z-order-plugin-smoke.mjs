@@ -65,6 +65,8 @@ const tests = await ev(`
     boundElements: null, updated: Date.now(), link: null, locked: false,
     seed: 1, version: 1, versionNonce: 1, isDeleted: false,
   });
+  // B is intentionally MIDDLE so bringForward has somewhere to go
+  // (asserting indexOf increases would fail vacuously if B was last).
   p.scene.replaceAllElements([mk(A, 'a0'), mk(B, 'a1'), mk(C, 'a2')]);
   p.appState.selectedElementIds = { [B]: true };
   p.bumpSceneRepaint();

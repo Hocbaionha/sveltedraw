@@ -1311,16 +1311,18 @@
   // bumpSceneRepaint (host-owned). Plugin's reorder() runs lazily
   // when the user invokes a reorder action — by that time pushHistory
   // is destructured from historyStore further below in this script.
-  // The `pushHistory: () => pushHistory()` thunk is load-bearing:
-  // `pushHistory` is destructured from `historyStore` further down
-  // in this script, so referencing it directly here would TDZ at
-  // bridge-object construction time. The thunk defers the lookup
-  // until the plugin invokes pushHistory (which is post-onMount,
-  // long after the destructure has run). Don't "simplify" to
-  // `pushHistory: pushHistory` — it'll throw at module init.
+  // pushHistory is destructured from historyStore further down in
+  // this script (TDZ-strict const, not hoisted), so referencing it
+  // by bare name here would crash at bridge-object construction.
+  // We could thunk via `() => pushHistory()` but the recursive-name
+  // shadow is fragile to refactor (rename, scope move, change the
+  // destructure → silent infinite recursion since the inner
+  // pushHistory resolves to the bridge member itself). Source the
+  // thunk from `historyStore.pushHistory` instead — same TDZ-
+  // deferring behavior, source unambiguous.
   const zOrderBridge: ZOrderBridge = {
     getScene: () => scene,
-    pushHistory: () => pushHistory(),
+    pushHistory: () => historyStore.pushHistory(),
     bumpSceneRepaint: () => bumpSceneRepaint(),
   };
   registerCtx(Z_ORDER_BRIDGE_KEY, zOrderBridge);
@@ -1331,7 +1333,7 @@
   // generator without forking the plugin.
   const groupBridge: GroupBridge = {
     getScene: () => scene,
-    pushHistory: () => pushHistory(),
+    pushHistory: () => historyStore.pushHistory(),
     bumpSceneRepaint: () => bumpSceneRepaint(),
     randomId,
   };
@@ -1527,22 +1529,26 @@
   // pointerdown flow because it's part of the selection state
   // machine, not a group-mutation op.
   const groupWarnedCallers = new Set<string>();
-  const warnGroupMissing = (caller: string) => {
-    if (!import.meta.env?.DEV || groupWarnedCallers.has(caller)) return;
-    groupWarnedCallers.add(caller);
-    // eslint-disable-next-line no-console
-    console.warn(
-      `[sveltedraw] ${caller}() called but the builtin/group plugin is not installed — call is a no-op. Restore the plugin to the editor's plugins prop.`,
-    );
-  };
   const groupSelected = () => {
     const s = pluginRegistry.getStore<GroupStore>(GROUP_STORE_KEY);
-    if (!s) warnGroupMissing("groupSelected");
+    if (!s && import.meta.env?.DEV && !groupWarnedCallers.has("groupSelected")) {
+      groupWarnedCallers.add("groupSelected");
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[sveltedraw] groupSelected() called but the builtin/group plugin is not installed — call is a no-op. Restore the plugin to the editor's plugins prop.`,
+      );
+    }
     s?.group();
   };
   const ungroupSelected = () => {
     const s = pluginRegistry.getStore<GroupStore>(GROUP_STORE_KEY);
-    if (!s) warnGroupMissing("ungroupSelected");
+    if (!s && import.meta.env?.DEV && !groupWarnedCallers.has("ungroupSelected")) {
+      groupWarnedCallers.add("ungroupSelected");
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[sveltedraw] ungroupSelected() called but the builtin/group plugin is not installed — call is a no-op. Restore the plugin to the editor's plugins prop.`,
+      );
+    }
     s?.ungroup();
   };
 

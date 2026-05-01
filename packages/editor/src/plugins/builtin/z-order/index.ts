@@ -85,7 +85,16 @@ export const zOrderPlugin: SveltedrawPlugin = {
       if (direction === "forward") next = moveOneRight(elements, appState, scene);
       else if (direction === "backward") next = moveOneLeft(elements, appState, scene);
       else if (direction === "front") next = moveAllRight(elements, appState);
-      else next = moveAllLeft(elements, appState);
+      else if (direction === "back") next = moveAllLeft(elements, appState);
+      else {
+        // Defense in depth: TypeScript's ZOrderDirection union catches
+        // typed callers, but the published store is reachable from
+        // probe code, devtools console, and future plugin-from-plugin
+        // calls that may stringify a direction. A no-op for unknown
+        // directions is safer than letting an `undefined` next array
+        // reach replaceAllElements + crash inside the engine.
+        return;
+      }
       scene.replaceAllElements(next, { skipValidation: true });
       bridge.pushHistory();
       bridge.bumpSceneRepaint();
